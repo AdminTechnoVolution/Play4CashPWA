@@ -18,8 +18,9 @@ export const SHIP_CATALOG: { type: string; size: number }[] = [
   { type: 'Destroyer', size: 2 },
 ];
 
+// Android phases: PLACEMENT → WAITING (submitted, waiting for opponent) → BATTLE → GAME_OVER
 interface BattleshipStoreState {
-  phase: 'placement' | 'battle' | 'finished';
+  phase: 'placement' | 'waiting' | 'battle' | 'finished';
   playerBoard: BattleshipCell[][];
   opponentBoard: BattleshipCell[][];
   placedShips: PlacedShip[];
@@ -70,11 +71,18 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
     socket.connect(roomId);
     socket.onGameUpdate((state: BattleshipState) => {
       const isMyTurn = state.currentPlayer === myUsername;
+      // Normalize phase: backend may send uppercase (PLACEMENT, BATTLE, GAME_OVER) or use roomStatus/status
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = state as any;
+      const rawPhaseStr: string = (
+        raw.phase ?? raw.roomPhase ?? raw.room_phase ?? raw.status ?? raw.roomStatus ?? ''
+      ).toString().toLowerCase();
+      const phase = (rawPhaseStr === 'game_over' ? 'finished' : rawPhaseStr || 'placement') as BattleshipStoreState['phase'];
       set({
-        phase: state.phase,
-        playerBoard: state.myBoard,
-        opponentBoard: state.opponentBoard,
-        currentPlayer: state.currentPlayer,
+        phase,
+        ...(state.myBoard && { playerBoard: state.myBoard }),
+        ...(state.opponentBoard && { opponentBoard: state.opponentBoard }),
+        currentPlayer: state.currentPlayer ?? '',
         isMyTurn,
         lastShot: state.lastShot ?? null,
         gameOver: state.gameOver ?? null,
@@ -162,8 +170,11 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       return;
     }
     try {
+      // Android: only calls submitBattleshipPlacement — server handles readiness automatically
+      // The placement response roomStatus tells whether both players are ready (battle starts)
       await apiRepository.submitBattleshipPlacement(roomId, { ships: placedShips });
-      await apiRepository.readyRoom(roomId);
+      // Transition to WAITING — socket will push to BATTLE when opponent submits too
+      set({ phase: 'waiting' });
     } catch (e: unknown) {
       set({ error: String(e) });
     }
@@ -171,7 +182,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
 
   fire(roomId, row, col) {
     const { isMyTurn, phase, socket, opponentBoard } = get();
-    if (!isMyTurn || phase !== 'battle' || !socket) return;
+    if (!isMyTurn || (phase !== 'battle') || !socket) return;
     if (opponentBoard[row][col] !== 'empty') return; // already fired
     socket.fire(roomId, row, col);
     set({ animatingShot: { row, col } });

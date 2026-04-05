@@ -1,4 +1,5 @@
-import { io, Socket } from 'socket.io-client';
+import io from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken, getRefreshToken, saveTokens } from '../auth/AuthSessionStore';
 import { bareClient } from './ApiClient';
@@ -26,7 +27,6 @@ async function refreshSocketToken(socket: Socket): Promise<void> {
     const newToken = data.token;
     socket.auth = { token: newToken };
     (socket.io.opts as Record<string, unknown>).query = { token: newToken };
-    (socket.io.opts.extraHeaders as Record<string, string>).Authorization = `Bearer ${newToken}`;
   })().finally(() => {
     socketRefreshPromise = null;
   });
@@ -38,10 +38,14 @@ export class DominoSocketManager {
   private socket: Socket | null = null;
 
   connect(roomId: string): void {
-    const token = getAccessToken() ?? '';
+    const token = getAccessToken();
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
+      return;
+    }
 
     this.socket = io(`${BASE_URL}/domino`, {
-      transports: ['websocket'],
+      transports: ['polling'],
       autoConnect: false,
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -50,7 +54,11 @@ export class DominoSocketManager {
       timeout: SOCKET_TIMEOUT_MS,
       auth: { token },
       query: { token, room_id: roomId },
-      extraHeaders: { Authorization: `Bearer ${token}` },
+    });
+
+    this.socket.on('connect', () => {
+      // Android: emits "join" on connect to subscribe to room events
+      this.socket?.emit('join', { room_id: roomId });
     });
 
     this.socket.on('connect_error', async (err: Error & { data?: { status?: number } }) => {
@@ -90,6 +98,6 @@ export class DominoSocketManager {
   }
 
   offAll(): void {
-    this.socket?.offAny();
+    this.socket?.removeAllListeners();
   }
 }

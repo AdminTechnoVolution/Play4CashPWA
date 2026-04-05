@@ -1,9 +1,6 @@
 import { create } from 'zustand';
 import { apiRepository } from '../data/network/ApiRepository';
-import { LobbySocketManager } from '../data/network/LobbySocketManager';
 import type { RoomResponse, CreateRoomRequest } from '../data/models/ApiModels';
-
-const lobbySocket = new LobbySocketManager();
 
 interface RoomsState {
   rooms: RoomResponse[];
@@ -12,12 +9,14 @@ interface RoomsState {
   showCreateDialog: boolean;
   currentGameId: string | null;
   loadRooms: (gameId: string) => Promise<void>;
-  createRoom: (req: CreateRoomRequest) => Promise<RoomResponse>;
-  joinRoom: (id: string) => Promise<RoomResponse>;
-  spectateRoom: (id: string) => Promise<RoomResponse>;
+  createRoom: (req: CreateRoomRequest) => Promise<string>;
+  joinRoom: (id: string) => Promise<void>;
+  spectateRoom: (id: string) => Promise<void>;
   setShowCreateDialog: (v: boolean) => void;
-  connectSocket: (gameId: string) => void;
-  disconnectSocket: () => void;
+  // Called directly by RoomsPage socket handlers
+  addOrUpdateRoom: (room: RoomResponse) => void;
+  updateRoom: (room: RoomResponse) => void;
+  removeRoom: (roomId: string) => void;
   clearError: () => void;
 }
 
@@ -40,11 +39,7 @@ export const useRoomsStore = create<RoomsState>((set) => ({
   },
 
   createRoom: async (req: CreateRoomRequest) => {
-    const room = await apiRepository.createRoom(req);
-    set((state) => ({
-      rooms: [room, ...state.rooms.filter((r) => r.id !== room.id)],
-    }));
-    return room;
+    return apiRepository.createRoom(req);
   },
 
   joinRoom: async (id: string) => {
@@ -57,34 +52,20 @@ export const useRoomsStore = create<RoomsState>((set) => ({
 
   setShowCreateDialog: (v: boolean) => set({ showCreateDialog: v }),
 
-  connectSocket: (gameId: string) => {
-    lobbySocket.connect();
+  addOrUpdateRoom: (room: RoomResponse) =>
+    set((state) => ({
+      rooms: [room, ...state.rooms.filter((r) => r.id !== room.id)],
+    })),
 
-    lobbySocket.onRoomCreated((room: RoomResponse) => {
-      if (room.gameId !== gameId) return;
-      set((state) => ({
-        rooms: [room, ...state.rooms.filter((r) => r.id !== room.id)],
-      }));
-    });
+  updateRoom: (room: RoomResponse) =>
+    set((state) => ({
+      rooms: state.rooms.map((r) => (r.id === room.id ? room : r)),
+    })),
 
-    lobbySocket.onRoomUpdated((room: RoomResponse) => {
-      if (room.gameId !== gameId) return;
-      set((state) => ({
-        rooms: state.rooms.map((r) => (r.id === room.id ? room : r)),
-      }));
-    });
-
-    lobbySocket.onRoomDeleted((roomId: string) => {
-      set((state) => ({
-        rooms: state.rooms.filter((r) => r.id !== roomId),
-      }));
-    });
-  },
-
-  disconnectSocket: () => {
-    lobbySocket.offAll();
-    lobbySocket.disconnect();
-  },
+  removeRoom: (roomId: string) =>
+    set((state) => ({
+      rooms: state.rooms.filter((r) => r.id !== roomId),
+    })),
 
   clearError: () => set({ error: null }),
 }));

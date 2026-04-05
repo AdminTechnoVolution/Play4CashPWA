@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useT } from '../../../i18n/translations';
 
 interface TurnTimerProps {
   seconds: number;
@@ -7,6 +8,7 @@ interface TurnTimerProps {
 }
 
 const TurnTimer: React.FC<TurnTimerProps> = ({ seconds, isMyTurn, onTimeout }) => {
+  const t = useT();
   const [remaining, setRemaining] = useState(seconds);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onTimeoutRef = useRef(onTimeout);
@@ -66,7 +68,7 @@ const TurnTimer: React.FC<TurnTimerProps> = ({ seconds, isMyTurn, onTimeout }) =
             fontWeight: '600',
           }}
         >
-          {isMyTurn ? 'Your Turn' : "Opponent's Turn"}
+          {t('APP.GAME.TURN_TIMER')}
         </span>
         <span
           style={{

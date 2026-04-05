@@ -1,5 +1,6 @@
 import React from 'react';
 import { IonAlert } from '@ionic/react';
+import { useT } from '../../../i18n/translations';
 
 interface RoomLeaveDialogProps {
   isOpen: boolean;
@@ -8,19 +9,20 @@ interface RoomLeaveDialogProps {
 }
 
 const RoomLeaveDialog: React.FC<RoomLeaveDialogProps> = ({ isOpen, onConfirm, onCancel }) => {
+  const t = useT();
   return (
     <IonAlert
       isOpen={isOpen}
-      header="Leave Match"
-      message="Are you sure you want to leave? You will forfeit the match."
+      header={t('APP.GAME.LEAVE_TITLE')}
+      message={t('APP.GAME.LEAVE_MSG')}
       buttons={[
         {
-          text: 'Stay',
+          text: t('APP.GAME.LEAVE_CANCEL'),
           role: 'cancel',
           handler: onCancel,
         },
         {
-          text: 'Leave',
+          text: t('APP.GAME.LEAVE_CONFIRM'),
           role: 'destructive',
           cssClass: 'alert-button-danger',
           handler: onConfirm,

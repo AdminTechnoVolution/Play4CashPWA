@@ -133,7 +133,6 @@ export const useChessStore = create<ChessStore>((set, get) => ({
   initGame(roomId, myColor, myUsername) {
     const socket = new ChessSocketManager();
     socket.connect(roomId);
-    socket.requestSync(roomId);
     socket.onGameUpdate((state: ChessState) => {
       set({
         board: state.board,

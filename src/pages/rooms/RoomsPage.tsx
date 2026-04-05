@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -27,7 +27,7 @@ import {
   IonToast,
   RefresherEventDetail,
 } from '@ionic/react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams, useNavigate } from "react-router-dom";
 import {
   addOutline,
   peopleOutline,
@@ -38,16 +38,17 @@ import {
   gameControllerOutline,
 } from 'ionicons/icons';
 import { useRoomsStore } from '../../store/roomsStore';
+import { useDashboardStore } from '../../store/dashboardStore';
+import { LobbySocketManager } from '../../data/network/LobbySocketManager';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
+import { useT } from '../../i18n/translations';
 import '../../ui/theme/variables.css';
-import type { RoomStatus } from '../../data/models/ApiModels';
+type RoomStatus = 'waiting' | 'started' | 'finished';
 
 interface RoomsParams {
   gameId: string;
   gameName: string;
-  minBet: string;
-  userBalance: string;
   gameSocketCode: string;
 }
 
@@ -57,20 +58,23 @@ const STATUS_COLORS: Record<RoomStatus, string> = {
   finished: 'var(--sovereign-text-muted)',
 };
 
-const STATUS_LABELS: Record<RoomStatus, string> = {
-  waiting: 'Waiting',
-  started: 'In Progress',
-  finished: 'Finished',
-};
-
 const RoomsPage: React.FC = () => {
-  const { gameId, gameName, minBet, userBalance, gameSocketCode } = useParams<RoomsParams>();
-  const history = useHistory();
+  const {
+    gameId = '',
+    gameName = '',
+    gameSocketCode = '',
+  } = useParams();
+  const navigate = useNavigate();
+  const t = useT();
   const decodedGameName = decodeURIComponent(gameName);
-  const minBetNum = parseFloat(minBet);
-  const userBalanceNum = parseFloat(userBalance);
 
-  const { rooms, isLoading, error, showCreateDialog, loadRooms, createRoom, joinRoom, spectateRoom, setShowCreateDialog, connectSocket, disconnectSocket, clearError } = useRoomsStore();
+  // Read balance and minBet from local store — no need to pass through URL
+  const { account, games } = useDashboardStore();
+  const userBalanceNum = account?.balance ?? 0;
+  const minBetNum = games.find((g) => g.id === gameId)?.minBet ?? 0;
+
+  const { rooms, isLoading, error, showCreateDialog, loadRooms, createRoom, joinRoom, spectateRoom, setShowCreateDialog, addOrUpdateRoom, updateRoom, removeRoom, clearError } = useRoomsStore();
+  const lobbySocketRef = useRef<LobbySocketManager | null>(null);
 
   const [filter, setFilter] = useState<'all' | 'waiting' | 'started'>('all');
   const [createName, setCreateName] = useState('');
@@ -84,9 +88,31 @@ const RoomsPage: React.FC = () => {
 
   useEffect(() => {
     loadRooms(gameId);
-    connectSocket(gameId);
+
+    // Own the socket lifecycle directly — same pattern as game pages
+    const socket = new LobbySocketManager();
+    lobbySocketRef.current = socket;
+    socket.connect(gameId);
+
+    socket.onConnect(() => {
+      // socket is live — future room changes will arrive in real time
+    });
+    socket.onRoomCreated((room) => {
+      if (room.gameId !== undefined && String(room.gameId) !== String(gameId)) return;
+      addOrUpdateRoom(room);
+    });
+    socket.onRoomUpdated((room) => {
+      if (room.gameId !== undefined && String(room.gameId) !== String(gameId)) return;
+      updateRoom(room);
+    });
+    socket.onRoomDeleted((roomId) => {
+      removeRoom(roomId);
+    });
+
     return () => {
-      disconnectSocket();
+      socket.offAll();
+      socket.disconnect();
+      lobbySocketRef.current = null;
     };
   }, [gameId]);
 
@@ -95,11 +121,12 @@ const RoomsPage: React.FC = () => {
     event.detail.complete();
   };
 
+
   const handleJoin = async (roomId: string, roomName: string, betAmount: number, opponentName: string) => {
     setJoiningId(roomId);
     try {
       await joinRoom(roomId);
-      history.push(
+      navigate(
         `/play/${gameSocketCode}/${roomId}/${betAmount}/${encodeURIComponent(roomName)}/${encodeURIComponent(opponentName)}/true/false`,
       );
     } catch (err) {
@@ -113,7 +140,7 @@ const RoomsPage: React.FC = () => {
     setSpectatingId(roomId);
     try {
       await spectateRoom(roomId);
-      history.push(
+      navigate(
         `/play/${gameSocketCode}/${roomId}/${betAmount}/${encodeURIComponent(roomName)}/Spectating/false/true`,
       );
     } catch (err) {
@@ -139,18 +166,20 @@ const RoomsPage: React.FC = () => {
     setCreateLoading(true);
     setCreateError('');
     try {
-      const room = await createRoom({
-        gameId,
-        betAmount: createBet,
-        playerLimit: createLimit,
+      const roomId = await createRoom({
+        game_id: gameId,
+        bet_amount: createBet,
+        public: true,
         name: createName.trim(),
+        player_limit: createLimit,
       });
+      const roomName = createName.trim();
       setShowCreateDialog(false);
       setCreateName('');
       setCreateBet(minBetNum);
       setCreateLimit(2);
-      history.push(
-        `/play/${gameSocketCode}/${room.id}/${createBet}/${encodeURIComponent(room.name)}/Waiting/false/false`,
+      navigate(
+        `/play/${gameSocketCode}/${roomId}/${createBet}/${encodeURIComponent(roomName)}/Waiting/false/false`,
       );
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create room.');
@@ -163,6 +192,12 @@ const RoomsPage: React.FC = () => {
     if (filter === 'all') return true;
     return r.status === filter;
   });
+
+  const statusLabels: Record<RoomStatus, string> = {
+    waiting: t('APP.ROOMS.STATUS_WAITING'),
+    started: t('APP.ROOMS.STATUS_STARTED'),
+    finished: t('APP.ROOMS.STATUS_FINISHED'),
+  };
 
   return (
     <IonPage>
@@ -211,13 +246,13 @@ const RoomsPage: React.FC = () => {
             style={{ '--background': 'var(--sovereign-surface)', borderRadius: '10px' } as React.CSSProperties}
           >
             <IonSegmentButton value="all">
-              <IonLabel>All</IonLabel>
+              <IonLabel>{t('APP.ROOMS.FILTER_ALL')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="waiting">
-              <IonLabel>Waiting</IonLabel>
+              <IonLabel>{t('APP.ROOMS.FILTER_WAITING')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="started">
-              <IonLabel>Started</IonLabel>
+              <IonLabel>{t('APP.ROOMS.FILTER_STARTED')}</IonLabel>
             </IonSegmentButton>
           </IonSegment>
         </div>
@@ -249,7 +284,7 @@ const RoomsPage: React.FC = () => {
               />
               <IonText>
                 <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '15px', margin: '0 0 8px 0' }}>
-                  No rooms found
+                  {t('APP.ROOMS.EMPTY')}
                 </p>
               </IonText>
               <IonText>
@@ -261,7 +296,7 @@ const RoomsPage: React.FC = () => {
           ) : (
             <IonList style={{ background: 'transparent' }}>
               {filteredRooms.map((room) => {
-                const isFull = room.players.length >= room.playerLimit;
+                const isFull = room.players.length >= 4;
                 const canJoin = room.status === 'waiting' && !isFull;
                 const canSpectate = room.status === 'started';
                 const opponentName = room.players.find((p) => p.username)?.username ?? 'Unknown';
@@ -290,7 +325,7 @@ const RoomsPage: React.FC = () => {
                             <IonIcon icon={peopleOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px' }} />
                             <IonText>
                               <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>
-                                {room.players.length}/{room.playerLimit}
+                                {room.players.length}/{4}
                               </span>
                             </IonText>
                           </div>
@@ -317,7 +352,7 @@ const RoomsPage: React.FC = () => {
 
                       <IonBadge
                         style={{
-                          background: STATUS_COLORS[room.status],
+                          background: STATUS_COLORS[room.status as RoomStatus] ?? '#8a9bbf',
                           color: room.status === 'waiting' ? '#fff' : '#0a1628',
                           borderRadius: '6px',
                           padding: '4px 10px',
@@ -325,7 +360,7 @@ const RoomsPage: React.FC = () => {
                           fontWeight: '700',
                         }}
                       >
-                        {STATUS_LABELS[room.status]}
+                        {statusLabels[room.status as RoomStatus] ?? room.status}
                       </IonBadge>
                     </div>
 
@@ -362,7 +397,7 @@ const RoomsPage: React.FC = () => {
                           style={{ flex: 1, margin: 0 } as React.CSSProperties}
                         >
                           <IonIcon icon={enterOutline} style={{ marginRight: '6px', fontSize: '16px' }} />
-                          Join
+                          {t('APP.ROOMS.JOIN')}
                         </SovereignPrimaryButton>
                       )}
                       {canSpectate && (
@@ -373,7 +408,7 @@ const RoomsPage: React.FC = () => {
                           style={{ flex: 1, margin: 0 } as React.CSSProperties}
                         >
                           <IonIcon icon={eyeOutline} style={{ marginRight: '6px', fontSize: '16px' }} />
-                          Watch
+                          {t('APP.ROOMS.WATCH')}
                         </SovereignSecondaryButton>
                       )}
                       {!canJoin && !canSpectate && room.status !== 'finished' && (
@@ -413,7 +448,7 @@ const RoomsPage: React.FC = () => {
         >
           <IonHeader>
             <IonToolbar style={{ '--background': 'var(--sovereign-surface)', '--border-color': 'var(--sovereign-border)' } as React.CSSProperties}>
-              <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>Create Room</IonTitle>
+              <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.ROOMS.CREATE_TITLE')}</IonTitle>
               <IonButtons slot="end">
                 <IonIcon
                   icon={closeOutline}
@@ -430,7 +465,7 @@ const RoomsPage: React.FC = () => {
               <div style={{ marginBottom: '20px' }}>
                 <IonText>
                   <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px', letterSpacing: '0.5px' }}>
-                    ROOM NAME
+                    {t('APP.ROOMS.ROOM_NAME').toUpperCase()}
                   </label>
                 </IonText>
                 <IonInput
@@ -457,16 +492,16 @@ const RoomsPage: React.FC = () => {
               <div style={{ marginBottom: '20px' }}>
                 <IonText>
                   <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px', letterSpacing: '0.5px' }}>
-                    BET AMOUNT (min ${minBetNum})
+                    {t('APP.ROOMS.BET_AMOUNT').toUpperCase()} (min ${minBetNum})
                   </label>
                 </IonText>
                 <IonInput
                   type="number"
-                  value={createBet}
+                  value={String(createBet)}
                   onIonInput={(e) => setCreateBet(parseFloat(e.detail.value ?? '0') || 0)}
-                  min={minBetNum}
-                  max={userBalanceNum}
-                  step={0.01}
+                  min={String(minBetNum)}
+                  max={String(userBalanceNum)}
+                  step="0.01"
                   style={{
                     '--background': 'var(--sovereign-bg)',
                     '--color': 'var(--sovereign-text)',
@@ -487,30 +522,32 @@ const RoomsPage: React.FC = () => {
                 </IonText>
               </div>
 
-              {/* Player Limit */}
-              <div style={{ marginBottom: '28px' }}>
-                <IonText>
-                  <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px', letterSpacing: '0.5px' }}>
-                    PLAYER LIMIT
-                  </label>
-                </IonText>
-                <IonSelect
-                  value={createLimit}
-                  onIonChange={(e) => setCreateLimit(Number(e.detail.value))}
-                  interface="popover"
-                  style={{
-                    '--background': 'var(--sovereign-bg)',
-                    '--color': 'var(--sovereign-text)',
-                    border: '1px solid var(--sovereign-border)',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    width: '100%',
-                  } as React.CSSProperties}
-                >
-                  <IonSelectOption value={2}>2 Players</IonSelectOption>
-                  <IonSelectOption value={4}>4 Players</IonSelectOption>
-                </IonSelect>
-              </div>
+              {/* Player Limit — only Domino supports 2 or 4 players */}
+              {gameSocketCode === 'domino' && (
+                <div style={{ marginBottom: '28px' }}>
+                  <IonText>
+                    <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                      {t('APP.ROOMS.PLAYER_LIMIT').toUpperCase()}
+                    </label>
+                  </IonText>
+                  <IonSelect
+                    value={createLimit}
+                    onIonChange={(e) => setCreateLimit(Number(e.detail.value))}
+                    interface="popover"
+                    style={{
+                      '--background': 'var(--sovereign-bg)',
+                      '--color': 'var(--sovereign-text)',
+                      border: '1px solid var(--sovereign-border)',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      width: '100%',
+                    } as React.CSSProperties}
+                  >
+                    <IonSelectOption value={2}>2 Players</IonSelectOption>
+                    <IonSelectOption value={4}>4 Players</IonSelectOption>
+                  </IonSelect>
+                </div>
+              )}
 
               {createError && (
                 <div
@@ -529,13 +566,13 @@ const RoomsPage: React.FC = () => {
               )}
 
               <SovereignPrimaryButton onClick={handleCreate} loading={createLoading} expand="block">
-                Create Room
+                {t('APP.ROOMS.CREATE_BTN')}
               </SovereignPrimaryButton>
 
               <div style={{ height: '12px' }} />
 
               <SovereignSecondaryButton onClick={() => setShowCreateDialog(false)} expand="block">
-                Cancel
+                {t('APP.COMMON.CANCEL')}
               </SovereignSecondaryButton>
             </div>
           </IonContent>

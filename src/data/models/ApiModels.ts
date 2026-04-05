@@ -12,68 +12,73 @@ export interface LoginResponse {
   refreshToken: string;
 }
 
+// ─── Account ──────────────────────────────────────────────────────────────────
+// Normalized (camelCase) — ApiService maps from backend snake_case
 export interface UserAccountResponse {
   id: string;
   email: string;
   username: string;
   balance: number;
-  totalRecharged: number;
-  totalWithdrawal: number;
-  totalWon: number;
-  status: string;
-  walletAddress?: string;
-  wallet?: string;
-  limits: { dailyWithdrawal: number };
+  walletAddress: string; // normalized from wallet_address.wallet || wallet
+  limits?: { dailyWithdrawal?: number };
 }
 
 // ─── Games ─────────────────────────────────────────────────────────────────────
+// Normalized — ApiService maps _id→id, min_bet→minBet, socket_code→socketCode, etc.
 export interface GameResponse {
   id: string;
   name: string;
   minBet: number;
   socketCode: string;
-  turnTimer: number;
+  turnTimerSeconds: number;
+  defaultBets: number[];
 }
 
 // ─── Rooms ─────────────────────────────────────────────────────────────────────
-export type RoomStatus = 'waiting' | 'started' | 'finished';
-
 export interface RoomPlayer {
   id: string;
   username: string;
 }
 
+// Normalized — ApiService maps _id→id, bet_amount→betAmount, players nesting
 export interface RoomResponse {
   id: string;
   name: string;
   players: RoomPlayer[];
   betAmount: number;
-  status: RoomStatus;
+  status: string;
   spectatorsCount: number;
-  playerLimit: number;
-  gameId: string;
+  gameId?: string;
 }
 
 export interface RoomStatusResponse {
+  id: string;
+  status: string;
   playerCount: number;
-  currentPlayer?: string;
+  betAmount?: number;
   winner?: string;
+  winnerReason?: string;
 }
 
+// Normalized — ApiService maps players_online→playersOnline, etc.
 export interface RoomStatsResponse {
   playersOnline: number;
   activeGames: number;
   totalBet: number;
 }
 
-// ─── Requests ──────────────────────────────────────────────────────────────────
+// ─── Request bodies — exact backend field names ────────────────────────────────
+
+// POST /api/rooms — Android: { game_id, bet_amount, public, name, player_limit? }
 export interface CreateRoomRequest {
-  gameId: string;
-  betAmount: number;
-  playerLimit: number;
+  game_id: string;
+  bet_amount: number;
+  public: boolean;
   name: string;
+  player_limit?: number;
 }
 
+// Internal ship placement shape used by battleshipStore
 export interface ShipPlacement {
   type: string;
   row: number;
@@ -81,70 +86,86 @@ export interface ShipPlacement {
   horizontal: boolean;
 }
 
+// POST /api/rooms/{id}/battleship/placement
+// ApiService transforms ShipPlacement → backend format { startRow, startCol, isHorizontal, cells }
 export interface BattleshipPlacementRequest {
   ships: ShipPlacement[];
 }
 
+// POST /api/transactions/withdrawal — Android: { amount: Int } only
 export interface WithdrawalRequest {
   amount: number;
-  walletAddress: string;
-  network: string;
 }
 
+// POST /api/transactions/verify-withdrawal — Android: { verification_code: String }
 export interface VerifyWithdrawalRequest {
-  code: string;
+  verification_code: string;
 }
 
+// POST /api/transactions/recharge — Android: { txId, amount, coin: "usdt" }
 export interface RechargeRequest {
   txId: string;
   amount: number;
+  coin: string;
 }
 
+// POST /api/user/register-wallet — Android: { wallet, coin, network }
 export interface RegisterWalletRequest {
-  walletAddress: string;
+  wallet: string;
+  coin: string;
   network: string;
 }
 
 // ─── Wallets ───────────────────────────────────────────────────────────────────
+// Normalized — ApiService maps red→network, networkWithdrawalFee→fee
 export interface WalletResponse {
+  id: string;
   coin: string;
   address: string;
+  network: string;
+  description: string;
   minAmount: number;
   fee: number;
-  network: string;
 }
 
 // ─── Greetings ─────────────────────────────────────────────────────────────────
+// Normalized — ApiService maps _id→id
 export interface GreetingResponse {
   id: string;
   text: string;
 }
 
 // ─── History ───────────────────────────────────────────────────────────────────
-export interface GameHistoryItem {
-  id: string;
-  opponent: string;
-  result: 'win' | 'lose' | 'draw';
-  prize: number;
-  finishedAt: string;
-  gameName: string;
-}
-
+// Normalized — ApiService maps created_at→createdAt, etc.
 export interface RechargeHistoryItem {
-  id: string;
   amount: number;
-  txId: string;
+  coin: string;
+  txId?: string;
+  wallet: string;
+  network: string;
   status: string;
   createdAt: string;
 }
 
 export interface WithdrawalHistoryItem {
-  id: string;
   amount: number;
-  address: string;
+  coin: string;
+  wallet: string;
   network: string;
+  txFee?: number;
   status: string;
   createdAt: string;
+}
+
+export interface GameHistoryItem {
+  roomId: string;
+  gameName: string;
+  gameCode: string;
+  betAmount: number;
+  result: string;
+  prize: number;
+  opponentName: string;
+  finishedAt: string;
 }
 
 // ─── Socket game state ─────────────────────────────────────────────────────────
@@ -163,7 +184,7 @@ export interface BattleshipState {
   myBoard: BattleshipCell[][];
   opponentBoard: BattleshipCell[][];
   currentPlayer: string;
-  phase: 'placement' | 'battle' | 'finished';
+  phase: 'placement' | 'waiting' | 'battle' | 'finished';
   gameOver?: GameOverPayload;
   lastShot?: { row: number; col: number; result: 'hit' | 'miss' | 'sunk' };
 }

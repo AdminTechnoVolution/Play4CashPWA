@@ -12,14 +12,16 @@ import {
   IonIcon,
   IonToast,
 } from '@ionic/react';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 import { mailOutline, shieldCheckmarkOutline, alertCircleOutline } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import '../../ui/theme/variables.css';
+import { useT } from '../../i18n/translations';
 
 const WithdrawalVerifyPage: React.FC = () => {
-  const history = useHistory();
+  const t = useT();
+  const navigate = useNavigate();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [fieldError, setFieldError] = useState('');
@@ -34,9 +36,9 @@ const WithdrawalVerifyPage: React.FC = () => {
     setLoading(true);
     setFieldError('');
     try {
-      await apiRepository.verifyWithdrawal({ code: otp });
-      setToast({ isOpen: true, message: 'Withdrawal verified successfully!', color: 'success' });
-      setTimeout(() => history.replace('/dashboard'), 1500);
+      await apiRepository.verifyWithdrawal({ verification_code: otp });
+      setToast({ isOpen: true, message: t('APP.WITHDRAWAL.SUCCESS'), color: 'success' });
+      setTimeout(() => navigate('/dashboard'), 1500);
     } catch (err) {
       setFieldError(err instanceof Error ? err.message : 'Invalid or expired OTP. Please try again.');
     } finally {
@@ -57,7 +59,7 @@ const WithdrawalVerifyPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>Verify Withdrawal</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.WITHDRAWAL.VERIFY_TITLE')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -113,7 +115,7 @@ const WithdrawalVerifyPage: React.FC = () => {
                 margin: '0 0 40px 0',
               }}
             >
-              We've sent a 6-digit verification code to your registered email address. Please enter it below to confirm your withdrawal.
+              {t('APP.WITHDRAWAL.OTP_HINT')}
             </p>
           </IonText>
 
@@ -140,7 +142,7 @@ const WithdrawalVerifyPage: React.FC = () => {
                   textTransform: 'uppercase',
                 }}
               >
-                VERIFICATION CODE
+                {t('APP.WITHDRAWAL.OTP_LABEL')}
               </label>
             </IonText>
 
@@ -217,16 +219,16 @@ const WithdrawalVerifyPage: React.FC = () => {
               expand="block"
             >
               <IonIcon icon={shieldCheckmarkOutline} style={{ marginRight: '8px', fontSize: '18px' }} />
-              Verify & Confirm
+              {t('APP.WITHDRAWAL.CONFIRM_BTN')}
             </SovereignPrimaryButton>
           </div>
 
           <div style={{ width: '100%' }}>
             <SovereignSecondaryButton
-              onClick={() => history.replace('/dashboard')}
+              onClick={() => navigate('/dashboard')}
               expand="block"
             >
-              Cancel
+              {t('APP.COMMON.CANCEL')}
             </SovereignSecondaryButton>
           </div>
 
@@ -250,7 +252,7 @@ const WithdrawalVerifyPage: React.FC = () => {
                 }}
                 onClick={() => setToast({ isOpen: true, message: 'Please re-submit your withdrawal request to get a new code.', color: 'medium' })}
               >
-                Go back
+                {t('APP.COMMON.BACK')}
               </span>{' '}
               and try again.
             </p>

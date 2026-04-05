@@ -15,22 +15,24 @@ import {
   IonSkeletonText,
   IonToast,
 } from '@ionic/react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { walletOutline, cashOutline, informationCircleOutline, alertCircleOutline } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
+import { useDashboardStore } from '../../store/dashboardStore';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
-
-interface WithdrawalParams {
-  userBalance: string;
-}
+import { useT } from '../../i18n/translations';
 
 const WithdrawalPage: React.FC = () => {
-  const { userBalance } = useParams<WithdrawalParams>();
-  const history = useHistory();
-  const balance = parseFloat(userBalance ?? '0');
+  const t = useT();
+  const navigate = useNavigate();
+
+  // Balance and daily limit come from the account stored locally — no URL params needed
+  const { account } = useDashboardStore();
+  const balance = account?.balance ?? 0;
+  const dailyLimit = account?.limits?.dailyWithdrawal ?? 0;
 
   const [wallets, setWallets] = useState<WalletResponse[]>([]);
   const [selectedWallet, setSelectedWallet] = useState<WalletResponse | null>(null);
@@ -42,9 +44,7 @@ const WithdrawalPage: React.FC = () => {
   const [fieldError, setFieldError] = useState('');
   const [toast, setToast] = useState({ isOpen: false, message: '', color: '' });
 
-  // Use a fixed daily limit from account — approximate here; real value from account store
-  const dailyLimit = 1000;
-  const remainingDailyLimit = dailyLimit; // Could be fetched from account
+  const remainingDailyLimit = dailyLimit;
 
   useEffect(() => {
     (async () => {
@@ -86,12 +86,8 @@ const WithdrawalPage: React.FC = () => {
     setLoading(true);
     setFieldError('');
     try {
-      await apiRepository.withdrawal({
-        amount: amountNum,
-        walletAddress: walletAddress.trim(),
-        network: selectedWallet.network,
-      });
-      history.push('/withdrawal-verify');
+      await apiRepository.withdrawal({ amount: amountNum });
+      navigate('/withdrawal-verify');
     } catch (err) {
       setFieldError(err instanceof Error ? err.message : 'Failed to submit withdrawal.');
     } finally {
@@ -106,7 +102,7 @@ const WithdrawalPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>Withdrawal</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.WITHDRAWAL.TITLE')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -129,7 +125,7 @@ const WithdrawalPage: React.FC = () => {
             <div>
               <IonText>
                 <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', letterSpacing: '1px', margin: '0 0 4px 0', textTransform: 'uppercase' }}>
-                  Available Balance
+                  {t('APP.WITHDRAWAL.AVAILABLE')}
                 </p>
               </IonText>
               <IonText>
@@ -169,8 +165,8 @@ const WithdrawalPage: React.FC = () => {
             <IonIcon icon={informationCircleOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '18px', flexShrink: 0 }} />
             <IonText>
               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', margin: 0 }}>
-                Daily withdrawal limit: <strong style={{ color: 'var(--sovereign-text)' }}>${dailyLimit.toFixed(2)}</strong>
-                &nbsp;— Remaining today: <strong style={{ color: 'var(--sovereign-gold)' }}>${remainingDailyLimit.toFixed(2)}</strong>
+                {t('APP.WITHDRAWAL.DAILY_LIMIT')}: <strong style={{ color: 'var(--sovereign-text)' }}>${dailyLimit.toFixed(2)}</strong>
+                &nbsp;— {t('APP.WITHDRAWAL.REMAINING')}: <strong style={{ color: 'var(--sovereign-gold)' }}>${remainingDailyLimit.toFixed(2)}</strong>
               </p>
             </IonText>
           </div>
@@ -187,7 +183,7 @@ const WithdrawalPage: React.FC = () => {
           >
             {/* Network */}
             <div style={{ marginBottom: '20px' }}>
-              <SectionLabel>NETWORK</SectionLabel>
+              <SectionLabel>{t('APP.COMMON.NETWORK')}</SectionLabel>
               {walletsLoading ? (
                 <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
               ) : (
@@ -219,7 +215,7 @@ const WithdrawalPage: React.FC = () => {
 
             {/* Wallet address */}
             <div style={{ marginBottom: '20px' }}>
-              <SectionLabel>YOUR WALLET ADDRESS</SectionLabel>
+              <SectionLabel>{t('APP.WITHDRAWAL.WALLET_LABEL')}</SectionLabel>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <IonIcon icon={walletOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '18px', flexShrink: 0 }} />
                 <IonInput
@@ -236,7 +232,7 @@ const WithdrawalPage: React.FC = () => {
 
             {/* Amount */}
             <div style={{ marginBottom: '20px' }}>
-              <SectionLabel>AMOUNT (USD)</SectionLabel>
+              <SectionLabel>{t('APP.WITHDRAWAL.AMOUNT_LABEL')}</SectionLabel>
               <IonInput
                 type="number"
                 value={amount}
@@ -245,9 +241,9 @@ const WithdrawalPage: React.FC = () => {
                   setFieldError('');
                 }}
                 placeholder={selectedWallet ? `Min $${selectedWallet.minAmount}` : 'Amount'}
-                min={selectedWallet?.minAmount ?? 0}
-                max={Math.min(balance, remainingDailyLimit)}
-                step={0.01}
+                min={String(selectedWallet?.minAmount ?? 0)}
+                max={String(Math.min(balance, remainingDailyLimit))}
+                step="0.01"
                 style={inputStyle as React.CSSProperties}
               />
             </div>
@@ -273,7 +269,7 @@ const WithdrawalPage: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <IonText>
-                    <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>Network fee</span>
+                    <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>{t('APP.COMMON.FEE')}</span>
                   </IonText>
                   <IonText>
                     <span style={{ color: 'var(--sovereign-error)', fontSize: '13px' }}>-${fee.toFixed(2)}</span>
@@ -288,7 +284,7 @@ const WithdrawalPage: React.FC = () => {
                   }}
                 >
                   <IonText>
-                    <span style={{ color: 'var(--sovereign-text)', fontWeight: '600', fontSize: '14px' }}>You receive</span>
+                    <span style={{ color: 'var(--sovereign-text)', fontWeight: '600', fontSize: '14px' }}>{t('APP.COMMON.YOU_RECEIVE')}</span>
                   </IonText>
                   <IonText>
                     <span style={{ color: 'var(--sovereign-gold)', fontWeight: '800', fontSize: '16px' }}>
@@ -321,7 +317,7 @@ const WithdrawalPage: React.FC = () => {
             )}
 
             <SovereignPrimaryButton onClick={handleSubmit} loading={loading} expand="block">
-              Request Withdrawal
+              {loading ? t('APP.COMMON.LOADING') : t('APP.WITHDRAWAL.REQUEST_BTN')}
             </SovereignPrimaryButton>
           </div>
 

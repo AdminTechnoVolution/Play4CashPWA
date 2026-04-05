@@ -93,15 +93,15 @@ export const apiRepository = {
     return apiService.getRooms(gameId);
   },
 
-  async createRoom(req: CreateRoomRequest): Promise<RoomResponse> {
+  async createRoom(req: CreateRoomRequest): Promise<string> {
     return apiService.createRoom(req);
   },
 
-  async joinRoom(roomId: string): Promise<RoomResponse> {
+  async joinRoom(roomId: string): Promise<void> {
     return apiService.joinRoom(roomId);
   },
 
-  async spectateRoom(roomId: string): Promise<RoomResponse> {
+  async spectateRoom(roomId: string): Promise<void> {
     return apiService.spectateRoom(roomId);
   },
 

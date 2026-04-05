@@ -32,10 +32,12 @@ import {
 import { apiRepository } from '../../data/network/ApiRepository';
 import '../../ui/theme/variables.css';
 import type { RechargeHistoryItem, WithdrawalHistoryItem, GameHistoryItem } from '../../data/models/ApiModels';
+import { useT } from '../../i18n/translations';
 
 type Tab = 'deposits' | 'withdrawals' | 'games';
 
 const TransactionHistoryPage: React.FC = () => {
+  const t = useT();
   const [activeTab, setActiveTab] = useState<Tab>('deposits');
 
   const [deposits, setDeposits] = useState<RechargeHistoryItem[]>([]);
@@ -137,10 +139,18 @@ const TransactionHistoryPage: React.FC = () => {
     return hourglassOutline;
   };
 
+  const statusLabel = (status: string): string => {
+    const s = status.toLowerCase();
+    if (s.includes('success') || s.includes('approved') || s.includes('complete')) return t('APP.HISTORY.STATUS_COMPLETED');
+    if (s.includes('pending') || s.includes('processing')) return t('APP.HISTORY.STATUS_PENDING');
+    if (s.includes('fail') || s.includes('reject') || s.includes('error')) return t('APP.HISTORY.STATUS_FAILED');
+    return status;
+  };
+
   const gameResultStyle = (result: 'win' | 'lose' | 'draw'): { bg: string; color: string; label: string } => {
-    if (result === 'win') return { bg: 'rgba(76,175,80,0.15)', color: '#4caf50', label: 'WIN' };
-    if (result === 'lose') return { bg: 'rgba(207,102,121,0.15)', color: 'var(--sovereign-error)', label: 'LOSE' };
-    return { bg: 'rgba(138,155,191,0.15)', color: 'var(--sovereign-text-muted)', label: 'DRAW' };
+    if (result === 'win') return { bg: 'rgba(76,175,80,0.15)', color: '#4caf50', label: t('APP.HISTORY.RESULT_WIN') };
+    if (result === 'lose') return { bg: 'rgba(207,102,121,0.15)', color: 'var(--sovereign-error)', label: t('APP.HISTORY.RESULT_LOSE') };
+    return { bg: 'rgba(138,155,191,0.15)', color: 'var(--sovereign-text-muted)', label: t('APP.HISTORY.RESULT_DRAW') };
   };
 
   const SkeletonItem = () => (
@@ -174,7 +184,7 @@ const TransactionHistoryPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>History</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.HISTORY.TITLE')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -191,13 +201,13 @@ const TransactionHistoryPage: React.FC = () => {
             style={{ '--background': 'var(--sovereign-surface)', borderRadius: '10px' } as React.CSSProperties}
           >
             <IonSegmentButton value="deposits">
-              <IonLabel style={{ fontSize: '13px' }}>Deposits</IonLabel>
+              <IonLabel style={{ fontSize: '13px' }}>{t('APP.HISTORY.TAB_DEPOSITS')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="withdrawals">
-              <IonLabel style={{ fontSize: '13px' }}>Withdrawals</IonLabel>
+              <IonLabel style={{ fontSize: '13px' }}>{t('APP.HISTORY.TAB_WITHDRAWALS')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="games">
-              <IonLabel style={{ fontSize: '13px' }}>Games</IonLabel>
+              <IonLabel style={{ fontSize: '13px' }}>{t('APP.HISTORY.TAB_GAMES')}</IonLabel>
             </IonSegmentButton>
           </IonSegment>
         </div>
@@ -210,12 +220,12 @@ const TransactionHistoryPage: React.FC = () => {
               {depositsLoading ? (
                 [0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)
               ) : deposits.length === 0 ? (
-                <EmptyState icon={arrowDownOutline} message="No deposit history yet." />
+                <EmptyState icon={arrowDownOutline} message={t('APP.HISTORY.EMPTY_DEPOSITS')} />
               ) : (
                 <IonList style={{ background: 'transparent' }}>
-                  {deposits.map((item) => (
+                  {deposits.map((item, idx) => (
                     <div
-                      key={item.id}
+                      key={idx}
                       style={{
                         background: 'var(--sovereign-surface)',
                         border: '1px solid var(--sovereign-border)',
@@ -248,7 +258,7 @@ const TransactionHistoryPage: React.FC = () => {
                             </IonText>
                             <IonText>
                               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: 0, fontFamily: 'monospace' }}>
-                                {truncate(item.txId)}
+                                {t('APP.HISTORY.TX_ID')}: {truncate(item.txId ?? '')}
                               </p>
                             </IonText>
                           </div>
@@ -269,7 +279,7 @@ const TransactionHistoryPage: React.FC = () => {
                             <IonIcon icon={statusIcon(item.status)} style={{ color: statusColor(item.status), fontSize: '12px' }} />
                             <IonText>
                               <span style={{ color: statusColor(item.status), fontSize: '11px', fontWeight: '700', textTransform: 'capitalize' }}>
-                                {item.status}
+                                {statusLabel(item.status)}
                               </span>
                             </IonText>
                           </div>
@@ -293,12 +303,12 @@ const TransactionHistoryPage: React.FC = () => {
               {withdrawalsLoading ? (
                 [0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)
               ) : withdrawals.length === 0 ? (
-                <EmptyState icon={arrowUpOutline} message="No withdrawal history yet." />
+                <EmptyState icon={arrowUpOutline} message={t('APP.HISTORY.EMPTY_WITHDRAWALS')} />
               ) : (
                 <IonList style={{ background: 'transparent' }}>
-                  {withdrawals.map((item) => (
+                  {withdrawals.map((item, idx) => (
                     <div
-                      key={item.id}
+                      key={idx}
                       style={{
                         background: 'var(--sovereign-surface)',
                         border: '1px solid var(--sovereign-border)',
@@ -331,7 +341,7 @@ const TransactionHistoryPage: React.FC = () => {
                             </IonText>
                             <IonText>
                               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: '0 0 1px 0', fontFamily: 'monospace' }}>
-                                {truncate(item.address)}
+                                {truncate(item.wallet)}
                               </p>
                             </IonText>
                             <IonText>
@@ -357,7 +367,7 @@ const TransactionHistoryPage: React.FC = () => {
                             <IonIcon icon={statusIcon(item.status)} style={{ color: statusColor(item.status), fontSize: '12px' }} />
                             <IonText>
                               <span style={{ color: statusColor(item.status), fontSize: '11px', fontWeight: '700', textTransform: 'capitalize' }}>
-                                {item.status}
+                                {statusLabel(item.status)}
                               </span>
                             </IonText>
                           </div>
@@ -381,14 +391,14 @@ const TransactionHistoryPage: React.FC = () => {
               {gamesLoading ? (
                 [0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)
               ) : games.length === 0 ? (
-                <EmptyState icon={trophyOutline} message="No games played yet." />
+                <EmptyState icon={trophyOutline} message={t('APP.HISTORY.EMPTY_GAMES')} />
               ) : (
                 <IonList style={{ background: 'transparent' }}>
-                  {games.map((item) => {
-                    const resultStyle = gameResultStyle(item.result);
+                  {games.map((item, idx) => {
+                    const resultStyle = gameResultStyle((item.result as 'win' | 'lose' | 'draw') ?? 'lose');
                     return (
                       <div
-                        key={item.id}
+                        key={idx}
                         style={{
                           background: 'var(--sovereign-surface)',
                           border: '1px solid var(--sovereign-border)',
@@ -416,12 +426,12 @@ const TransactionHistoryPage: React.FC = () => {
                             <div>
                               <IonText>
                                 <p style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '14px', margin: '0 0 2px 0' }}>
-                                  vs {item.opponent}
+                                  {t('APP.HISTORY.OPPONENT')} {item.opponentName}
                                 </p>
                               </IonText>
                               <IonText>
                                 <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: 0 }}>
-                                  {item.gameName}
+                                  {item.gameName ?? item.gameCode}
                                 </p>
                               </IonText>
                             </div>

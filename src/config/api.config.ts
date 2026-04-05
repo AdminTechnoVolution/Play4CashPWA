@@ -1,9 +1,8 @@
-// Build-time env via Vite — set VITE_ENV=prod in production
-const isProd = import.meta.env.VITE_ENV === 'prod';
-
-export const BASE_URL = isProd
-  ? 'https://p4c-agazhsdng5fuexaq.mexicocentral-01.azurewebsites.net'
-  : 'https://p4c-api.techno-volution.com';
+// VITE_API_URL must be set in .env — e.g. https://p4c-api.techno-volution.com
+// Falls back to prod server so the app always works out of the box.
+export const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  'https://p4c-api.techno-volution.com';
 
 export const SOCKET_TIMEOUT_MS = 20_000;
 export const REQUEST_TIMEOUT_MS = 180_000;

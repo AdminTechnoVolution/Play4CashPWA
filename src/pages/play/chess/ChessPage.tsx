@@ -13,6 +13,7 @@ import GameOverModal from '../components/GameOverModal';
 import TurnTimer from '../components/TurnTimer';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
+import { useT } from '../../../i18n/translations';
 
 const PIECE_SYMBOL: Record<string, string> = {
   wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
@@ -34,6 +35,7 @@ interface Props {
 export default function ChessPage({ roomId, betAmount, roomName, opponentName, isSpectator, onLeaveRequest }: Props) {
   const { user } = useAuthStore();
   const store = useChessStore();
+  const t = useT();
   const chatRef = useRef(new ChatSocketManager());
   const [greetings, setGreetings] = useState<GreetingResponse[]>([]);
   const [lastMsg, setLastMsg] = useState<ChatMessage | null>(null);
@@ -46,7 +48,7 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
     const username = user?.username ?? '';
     store.initGame(roomId, myColor, username);
     const chat = chatRef.current;
-    chat.connect();
+    chat.connect(roomId);
     chat.onMessage(setLastMsg);
     apiRepository.getGreetings().then(setGreetings).catch(() => {});
     return () => { store.cleanup(); chat.disconnect(); };
@@ -98,8 +100,11 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
           {(store.canCastleKingside || store.canCastleQueenside) && isMyTurn && (
             <div style={{ padding: '6px 12px', marginBottom: 8, background: 'rgba(201,168,76,0.1)', borderRadius: 8, border: '1px solid rgba(201,168,76,0.3)' }}>
               <IonText style={{ color: '#c9a84c', fontSize: 12 }}>
-                Castling available:{' '}
-                {[store.canCastleKingside && 'Kingside', store.canCastleQueenside && 'Queenside'].filter(Boolean).join(' / ')}
+                {t('APP.CHESS.CASTLING_HINT')}:{' '}
+                {[
+                  store.canCastleKingside && t('APP.CHESS.CASTLING_KINGSIDE'),
+                  store.canCastleQueenside && t('APP.CHESS.CASTLING_QUEENSIDE'),
+                ].filter(Boolean).join(' / ')}
               </IonText>
             </div>
           )}
@@ -107,7 +112,7 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
           {/* Turn indicator */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <IonText style={{ color: isMyTurn ? '#c9a84c' : '#8a9bbf', fontSize: 13 }}>
-              {isMyTurn ? '▶ Your turn' : `${opponentName}'s turn`}
+              {isMyTurn ? `▶ ${t('APP.GAME.YOUR_TURN')}` : `${opponentName}'s ${t('APP.GAME.OPPONENT_TURN')}`}
             </IonText>
           </div>
 
@@ -167,12 +172,12 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
       {/* Promotion picker */}
       <IonActionSheet
         isOpen={showPromotion}
-        header="Promote pawn"
+        header={t('APP.CHESS.PROMOTE_TITLE')}
         buttons={[
-          { text: '♕ Queen', handler: () => { store.setPromotion(roomId, 'q'); setShowPromotion(false); } },
-          { text: '♖ Rook', handler: () => { store.setPromotion(roomId, 'r'); setShowPromotion(false); } },
-          { text: '♗ Bishop', handler: () => { store.setPromotion(roomId, 'b'); setShowPromotion(false); } },
-          { text: '♘ Knight', handler: () => { store.setPromotion(roomId, 'n'); setShowPromotion(false); } },
+          { text: `♕ ${t('APP.CHESS.QUEEN')}`, handler: () => { store.setPromotion(roomId, 'q'); setShowPromotion(false); } },
+          { text: `♖ ${t('APP.CHESS.ROOK')}`, handler: () => { store.setPromotion(roomId, 'r'); setShowPromotion(false); } },
+          { text: `♗ ${t('APP.CHESS.BISHOP')}`, handler: () => { store.setPromotion(roomId, 'b'); setShowPromotion(false); } },
+          { text: `♘ ${t('APP.CHESS.KNIGHT')}`, handler: () => { store.setPromotion(roomId, 'n'); setShowPromotion(false); } },
         ]}
         onDidDismiss={() => setShowPromotion(false)}
       />

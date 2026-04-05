@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   IonPage,
   IonHeader,
@@ -33,6 +34,8 @@ import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
+import { useT } from '../../i18n/translations';
+import { useLanguageStore } from '../../i18n/languageStore';
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -44,7 +47,10 @@ const LANGUAGES = [
 ];
 
 const SettingsPage: React.FC = () => {
+  const t = useT();
+  const { lang, setLang } = useLanguageStore();
   const [wallets, setWallets] = useState<WalletResponse[]>([]);
+  const [selectedWallet, setSelectedWallet] = useState<WalletResponse | null>(null);
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const [newWalletAddress, setNewWalletAddress] = useState('');
   const [currentWalletAddress, setCurrentWalletAddress] = useState('');
@@ -57,7 +63,7 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     // Load current wallet address
     const account = getUserAccount();
-    const storedAddress = getWalletAddress() ?? account?.walletAddress ?? account?.wallet ?? '';
+    const storedAddress = getWalletAddress() ?? account?.walletAddress ?? '';
     setCurrentWalletAddress(storedAddress);
     setNewWalletAddress(storedAddress);
 
@@ -66,7 +72,10 @@ const SettingsPage: React.FC = () => {
       try {
         const data = await apiRepository.getWallets();
         setWallets(data);
-        if (data.length > 0) setSelectedNetwork(data[0].network);
+        if (data.length > 0) {
+          setSelectedWallet(data[0]);
+          setSelectedNetwork(data[0].network);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load wallets.');
       } finally {
@@ -87,12 +96,13 @@ const SettingsPage: React.FC = () => {
     setWalletSaving(true);
     try {
       await apiRepository.registerWallet({
-        walletAddress: newWalletAddress.trim(),
+        wallet: newWalletAddress.trim(),
+        coin: selectedWallet?.coin ?? 'USDT',
         network: selectedNetwork,
       });
       saveWalletAddress(newWalletAddress.trim());
       setCurrentWalletAddress(newWalletAddress.trim());
-      setToast({ isOpen: true, message: 'Wallet address saved successfully!', color: 'success' });
+      setToast({ isOpen: true, message: t('APP.SETTINGS.WALLET_SAVED'), color: 'success' });
     } catch (err) {
       setToast({ isOpen: true, message: err instanceof Error ? err.message : 'Failed to save wallet.', color: 'danger' });
     } finally {
@@ -102,8 +112,8 @@ const SettingsPage: React.FC = () => {
 
   const handleSaveLanguage = () => {
     saveLanguage(language);
-    setToast({ isOpen: true, message: 'Language updated. Reloading...', color: 'success' });
-    setTimeout(() => window.location.reload(), 1200);
+    setLang(language);
+    setToast({ isOpen: true, message: 'Language updated.', color: 'success' });
   };
 
   return (
@@ -113,7 +123,7 @@ const SettingsPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>Settings</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.SETTINGS.TITLE')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -138,7 +148,7 @@ const SettingsPage: React.FC = () => {
               </div>
               <IonText>
                 <h3 style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '17px', margin: 0 }}>
-                  Withdrawal Wallet
+                  {t('APP.SETTINGS.WALLET_SECTION')}
                 </h3>
               </IonText>
             </div>
@@ -183,13 +193,18 @@ const SettingsPage: React.FC = () => {
 
               {/* Network */}
               <div style={{ marginBottom: '16px' }}>
-                <SectionLabel>NETWORK</SectionLabel>
+                <SectionLabel>{t('APP.SETTINGS.NETWORK_LABEL')}</SectionLabel>
                 {walletsLoading ? (
                   <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
                 ) : (
                   <IonSelect
                     value={selectedNetwork}
-                    onIonChange={(e) => setSelectedNetwork(e.detail.value)}
+                    onIonChange={(e) => {
+                      const network = e.detail.value;
+                      setSelectedNetwork(network);
+                      const w = wallets.find((w) => w.network === network);
+                      if (w) setSelectedWallet(w);
+                    }}
                     interface="action-sheet"
                     placeholder="Select network"
                     style={{
@@ -212,7 +227,7 @@ const SettingsPage: React.FC = () => {
 
               {/* New wallet address */}
               <div style={{ marginBottom: '20px' }}>
-                <SectionLabel>WALLET ADDRESS</SectionLabel>
+                <SectionLabel>{t('APP.SETTINGS.ADDRESS_LABEL')}</SectionLabel>
                 <IonInput
                   value={newWalletAddress}
                   onIonInput={(e) => setNewWalletAddress(e.detail.value ?? '')}
@@ -241,7 +256,7 @@ const SettingsPage: React.FC = () => {
               </div>
 
               <SovereignPrimaryButton onClick={handleSaveWallet} loading={walletSaving} expand="block">
-                Save Wallet Address
+                {t('APP.SETTINGS.SAVE_WALLET')}
               </SovereignPrimaryButton>
             </div>
           </div>
@@ -264,7 +279,7 @@ const SettingsPage: React.FC = () => {
               </div>
               <IonText>
                 <h3 style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '17px', margin: 0 }}>
-                  Language
+                  {t('APP.SETTINGS.LANGUAGE_SECTION')}
                 </h3>
               </IonText>
             </div>
@@ -278,7 +293,7 @@ const SettingsPage: React.FC = () => {
               }}
             >
               <div style={{ marginBottom: '20px' }}>
-                <SectionLabel>APP LANGUAGE</SectionLabel>
+                <SectionLabel>{t('APP.SETTINGS.LANGUAGE_LABEL')}</SectionLabel>
                 <IonSelect
                   value={language}
                   onIonChange={(e) => setLanguage(e.detail.value)}
@@ -301,7 +316,7 @@ const SettingsPage: React.FC = () => {
               </div>
 
               <SovereignPrimaryButton onClick={handleSaveLanguage} expand="block">
-                Save Language
+                {t('APP.SETTINGS.SAVE_LANGUAGE')}
               </SovereignPrimaryButton>
             </div>
           </div>
@@ -315,15 +330,19 @@ const SettingsPage: React.FC = () => {
           >
             <IonText>
               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: 0, lineHeight: '1.8' }}>
-                Play4Cash v1.0.0
+                {t('APP.SETTINGS.VERSION')}
                 <br />
-                <a href="#terms" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none' }}>
+                <Link to="/terms" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none' }}>
                   Terms &amp; Conditions
-                </a>
+                </Link>
                 {' · '}
-                <a href="#privacy" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none' }}>
+                <Link to="/privacy" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none' }}>
                   Privacy Policy
-                </a>
+                </Link>
+                {' · '}
+                <Link to="/data-treatment" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none' }}>
+                  Data Processing
+                </Link>
               </p>
             </IonText>
           </div>

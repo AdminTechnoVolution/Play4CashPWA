@@ -1,11 +1,13 @@
 import React from 'react';
 import { IonBadge } from '@ionic/react';
+import { useT } from '../../../i18n/translations';
 
 interface SpectatorBadgeProps {
-  isSpectator: boolean;
+  isSpectator?: boolean;
 }
 
-const SpectatorBadge: React.FC<SpectatorBadgeProps> = ({ isSpectator }) => {
+const SpectatorBadge: React.FC<SpectatorBadgeProps> = ({ isSpectator = true }) => {
+  const t = useT();
   if (!isSpectator) return null;
 
   return (
@@ -31,7 +33,7 @@ const SpectatorBadge: React.FC<SpectatorBadgeProps> = ({ isSpectator }) => {
           letterSpacing: '0.5px',
         }}
       >
-        👁 Watching
+        👁 {t('APP.GAME.SPECTATING')}
       </IonBadge>
     </div>
   );

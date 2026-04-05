@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      devOptions: { enabled: true },
       includeAssets: ['icons/*.png', 'icons/*.svg'],
       manifest: {
         name: 'Play4Cash',
@@ -36,5 +37,11 @@ export default defineConfig({
       }
     })
   ],
-  server: { port: 3000 }
+  server: { port: 3000 },
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    include: ['socket.io-client', 'react', 'react-dom'],
+  }
 });

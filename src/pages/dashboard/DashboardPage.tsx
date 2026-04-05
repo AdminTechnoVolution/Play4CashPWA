@@ -25,7 +25,7 @@ import {
   IonSplitPane,
   RefresherEventDetail,
 } from '@ionic/react';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 import {
   gameControllerOutline,
   walletOutline,
@@ -44,18 +44,25 @@ import {
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAuthStore } from '../../store/authStore';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
+import { useT } from '../../i18n/translations';
 import '../../ui/theme/variables.css';
 
 const MENU_ID = 'dashboard-menu';
 
 const DashboardPage: React.FC = () => {
-  const history = useHistory();
+  const navigate = useNavigate();
   const { account, games, roomStats, isLoading, error, loadDashboard, clearError } = useDashboardStore();
   const { logout } = useAuthStore();
   const contentRef = useRef<HTMLIonContentElement>(null);
+  const t = useT();
 
   useEffect(() => {
     loadDashboard();
+    // Live stats refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadDashboard();
+    }, 30_000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleRefresh = async (event: CustomEvent<RefresherEventDetail>) => {
@@ -65,27 +72,19 @@ const DashboardPage: React.FC = () => {
 
   const handleLogout = async () => {
     await logout();
-    history.replace('/login');
+    navigate('/login');
   };
 
-  const handleGameCard = (game: {
-    id: string;
-    name: string;
-    minBet: number;
-    socketCode: string;
-  }) => {
-    if (!account) return;
-    history.push(
-      `/rooms/${game.id}/${encodeURIComponent(game.name)}/${game.minBet}/${account.balance}/${game.socketCode}`,
-    );
+  const handleGameCard = (game: { id: string; name: string; socketCode: string }) => {
+    navigate(`/rooms/${game.id}/${encodeURIComponent(game.name)}/${game.socketCode}`);
   };
 
   const navItems = [
     { icon: gridOutline, label: 'Dashboard', path: '/dashboard' },
-    { icon: walletOutline, label: 'Add Funds', path: '/add-funds' },
-    { icon: arrowDownOutline, label: 'Withdrawal', path: `/withdrawal/${account?.balance ?? 0}` },
-    { icon: timeOutline, label: 'History', path: '/history' },
-    { icon: settingsOutline, label: 'Settings', path: '/settings' },
+    { icon: walletOutline, label: t('APP.DASHBOARD.MENU_ADD_FUNDS'), path: '/add-funds' },
+    { icon: arrowDownOutline, label: t('APP.DASHBOARD.MENU_WITHDRAWAL'), path: '/withdrawal' },
+    { icon: timeOutline, label: t('APP.DASHBOARD.MENU_HISTORY'), path: '/history' },
+    { icon: settingsOutline, label: t('APP.DASHBOARD.MENU_SETTINGS'), path: '/settings' },
   ];
 
   const SkeletonCard = () => (
@@ -162,7 +161,7 @@ const DashboardPage: React.FC = () => {
                 <IonItem
                   button
                   detail={false}
-                  onClick={() => history.push(item.path)}
+                  onClick={() => navigate(item.path)}
                   style={{ '--background': 'transparent', '--border-color': 'transparent', margin: '2px 12px', borderRadius: '10px' } as React.CSSProperties}
                 >
                   <IonIcon icon={item.icon} slot="start" style={{ color: 'var(--sovereign-gold)', fontSize: '20px' }} />
@@ -182,7 +181,7 @@ const DashboardPage: React.FC = () => {
                 style={{ '--background': 'rgba(207,102,121,0.1)', '--border-color': 'transparent', borderRadius: '10px', margin: '0 12px' } as React.CSSProperties}
               >
                 <IonIcon icon={logOutOutline} slot="start" style={{ color: 'var(--sovereign-error)', fontSize: '20px' }} />
-                <IonLabel style={{ color: 'var(--sovereign-error)', fontWeight: '500' }}>Logout</IonLabel>
+                <IonLabel style={{ color: 'var(--sovereign-error)', fontWeight: '500' }}>{t('APP.DASHBOARD.MENU_LOGOUT')}</IonLabel>
               </IonItem>
             </IonMenuToggle>
           </div>
@@ -237,12 +236,12 @@ const DashboardPage: React.FC = () => {
               <div style={{ marginBottom: '20px', animation: 'fadeInUp 0.5s ease' }}>
                 <IonText>
                   <h2 style={{ color: 'var(--sovereign-text)', fontSize: '20px', fontWeight: '700', margin: '0 0 4px 0' }}>
-                    Welcome, {account.username}
+                    {t('APP.DASHBOARD.WELCOME')} {account.username}
                   </h2>
                 </IonText>
                 <IonText>
                   <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px', margin: 0 }}>
-                    Ready to play? Choose a game below.
+                    {t('APP.DASHBOARD.SUBTITLE')}
                   </p>
                 </IonText>
               </div>
@@ -293,7 +292,7 @@ const DashboardPage: React.FC = () => {
                     </IonText>
                     <IonText>
                       <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', margin: 0, letterSpacing: '0.5px' }}>
-                        Online
+                        {t('APP.DASHBOARD.PLAYERS_ONLINE')}
                       </p>
                     </IonText>
                   </div>
@@ -315,7 +314,7 @@ const DashboardPage: React.FC = () => {
                     </IonText>
                     <IonText>
                       <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', margin: 0, letterSpacing: '0.5px' }}>
-                        Active Games
+                        {t('APP.DASHBOARD.ACTIVE_GAMES')}
                       </p>
                     </IonText>
                   </div>
@@ -337,7 +336,7 @@ const DashboardPage: React.FC = () => {
                     </IonText>
                     <IonText>
                       <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', margin: 0, letterSpacing: '0.5px' }}>
-                        Total Bet
+                        {t('APP.DASHBOARD.TOTAL_BET')}
                       </p>
                     </IonText>
                   </div>
@@ -349,12 +348,12 @@ const DashboardPage: React.FC = () => {
             <div style={{ marginBottom: '16px', animation: 'fadeInUp 0.7s ease' }}>
               <IonText>
                 <h3 style={{ color: 'var(--sovereign-text)', fontSize: '17px', fontWeight: '700', margin: '0 0 4px 0' }}>
-                  Choose a Game
+                  {t('APP.DASHBOARD.GAMES')}
                 </h3>
               </IonText>
               <IonText>
                 <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', margin: 0 }}>
-                  Tap any game to enter the lobby
+                  {t('APP.DASHBOARD.GAMES_SUBTITLE')}
                 </p>
               </IonText>
             </div>
@@ -437,7 +436,7 @@ const DashboardPage: React.FC = () => {
                             >
                               <IonText>
                                 <span style={{ color: 'var(--sovereign-gold)', fontSize: '12px', fontWeight: '600' }}>
-                                  Min ${game.minBet}
+                                  {t('APP.DASHBOARD.MIN_BET')} ${game.minBet}
                                 </span>
                               </IonText>
                             </div>
@@ -467,7 +466,7 @@ const DashboardPage: React.FC = () => {
                 />
                 <IonText>
                   <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '15px' }}>
-                    No games available right now.
+                    {t('APP.DASHBOARD.NO_GAMES')}
                   </p>
                 </IonText>
               </div>
@@ -477,21 +476,21 @@ const DashboardPage: React.FC = () => {
             <div style={{ marginTop: '32px', animation: 'fadeInUp 0.9s ease' }}>
               <IonText>
                 <h3 style={{ color: 'var(--sovereign-text)', fontSize: '17px', fontWeight: '700', margin: '0 0 14px 0' }}>
-                  Quick Actions
+                  {t('APP.DASHBOARD.QUICK_ACTIONS')}
                 </h3>
               </IonText>
               <IonList style={{ background: 'transparent', padding: 0 }}>
                 {[
-                  { icon: walletOutline, label: 'Add Funds', sub: 'Recharge your balance', path: '/add-funds' },
-                  { icon: arrowDownOutline, label: 'Withdrawal', sub: 'Withdraw earnings', path: `/withdrawal/${account?.balance ?? 0}` },
-                  { icon: timeOutline, label: 'History', sub: 'View transactions & games', path: '/history' },
-                  { icon: settingsOutline, label: 'Settings', sub: 'Wallet & preferences', path: '/settings' },
+                  { icon: walletOutline, label: t('APP.DASHBOARD.MENU_ADD_FUNDS'), sub: t('APP.DASHBOARD.ADD_FUNDS_SUB'), path: '/add-funds' },
+                  { icon: arrowDownOutline, label: t('APP.DASHBOARD.MENU_WITHDRAWAL'), sub: t('APP.DASHBOARD.WITHDRAWAL_SUB'), path: '/withdrawal' },
+                  { icon: timeOutline, label: t('APP.DASHBOARD.MENU_HISTORY'), sub: t('APP.DASHBOARD.HISTORY_SUB'), path: '/history' },
+                  { icon: settingsOutline, label: t('APP.DASHBOARD.MENU_SETTINGS'), sub: t('APP.DASHBOARD.SETTINGS_SUB'), path: '/settings' },
                 ].map((item) => (
                   <IonItem
                     key={item.path}
                     button
                     detail={false}
-                    onClick={() => history.push(item.path)}
+                    onClick={() => navigate(item.path)}
                     style={{
                       '--background': 'var(--sovereign-surface)',
                       '--background-hover': 'var(--sovereign-surface-high)',

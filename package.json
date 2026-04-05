@@ -11,17 +11,16 @@
   },
   "dependencies": {
     "@ionic/react": "^8.3.0",
-    "@ionic/react-router": "^8.3.0",
+    "@react-oauth/google": "^0.12.1",
+    "axios": "^1.7.9",
     "ionicons": "^7.4.0",
+    "jwt-decode": "^4.0.0",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
-    "socket.io-client": "^4.8.1",
-    "axios": "^1.7.9",
-    "zustand": "^5.0.2",
-    "@react-oauth/google": "^0.12.1",
-    "qrcode.react": "^4.2.0",
-    "jwt-decode": "^4.0.0"
+    "socket.io-client": "^4.8.3",
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

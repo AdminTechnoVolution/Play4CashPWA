@@ -2,6 +2,7 @@ import React from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../../ui/components/SovereignButton';
 import type { GameOverPayload } from '../../../data/models/ApiModels';
+import { useT } from '../../../i18n/translations';
 
 interface GameOverModalProps {
   isOpen: boolean;
@@ -11,13 +12,14 @@ interface GameOverModalProps {
 }
 
 const GameOverModal: React.FC<GameOverModalProps> = ({ isOpen, gameOver, onPlayAgain, onExit }) => {
+  const t = useT();
   if (!gameOver) return null;
 
   const isWin = gameOver.youWon;
   const isDraw = gameOver.isDraw;
 
   const icon = isWin ? '🏆' : isDraw ? '🤝' : '💔';
-  const title = isWin ? 'You Won!' : isDraw ? 'Draw!' : 'You Lost';
+  const title = isWin ? t('APP.GAME.GAME_OVER_WIN') : isDraw ? t('APP.GAME.GAME_OVER_DRAW') : t('APP.GAME.GAME_OVER_LOSE');
   const titleColor = isWin
     ? 'var(--sovereign-gold)'
     : isDraw
@@ -25,13 +27,13 @@ const GameOverModal: React.FC<GameOverModalProps> = ({ isOpen, gameOver, onPlayA
       : '#cf6679';
 
   const reasonLabel: Record<string, string> = {
-    checkmate: 'Checkmate',
-    stalemate: 'Stalemate',
-    timeout: 'Time ran out',
-    forfeit: 'Opponent forfeited',
+    checkmate: t('APP.GAME.REASON_CHECKMATE'),
+    stalemate: t('APP.GAME.REASON_STALEMATE'),
+    timeout: t('APP.GAME.REASON_TIMEOUT'),
+    forfeit: t('APP.GAME.REASON_FORFEIT'),
     all_sunk: 'All ships sunk',
     blocked: 'No moves available',
-    resigned: 'Resignation',
+    resigned: t('APP.GAME.REASON_RESIGN'),
   };
   const reasonText = gameOver.reason
     ? (reasonLabel[gameOver.reason] ?? gameOver.reason)
@@ -108,7 +110,7 @@ const GameOverModal: React.FC<GameOverModalProps> = ({ isOpen, gameOver, onPlayA
               }}
             >
               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 12, margin: '0 0 2px' }}>
-                Prize
+                {t('APP.GAME.PRIZE')}
               </p>
               <p
                 style={{
@@ -142,10 +144,10 @@ const GameOverModal: React.FC<GameOverModalProps> = ({ isOpen, gameOver, onPlayA
           {/* Buttons */}
           <div style={{ width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <SovereignPrimaryButton onClick={onPlayAgain}>
-              Play Again
+              {t('APP.GAME.PLAY_AGAIN')}
             </SovereignPrimaryButton>
             <SovereignSecondaryButton onClick={onExit}>
-              Back to Dashboard
+              {t('APP.GAME.EXIT')}
             </SovereignSecondaryButton>
           </div>
         </div>

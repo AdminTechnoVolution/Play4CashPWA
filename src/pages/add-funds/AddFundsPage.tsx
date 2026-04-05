@@ -23,8 +23,10 @@ import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
+import { useT } from '../../i18n/translations';
 
 const AddFundsPage: React.FC = () => {
+  const t = useT();
   const [wallets, setWallets] = useState<WalletResponse[]>([]);
   const [selectedWallet, setSelectedWallet] = useState<WalletResponse | null>(null);
   const [txId, setTxId] = useState('');
@@ -79,10 +81,10 @@ const AddFundsPage: React.FC = () => {
 
     setLoading(true);
     try {
-      await apiRepository.recharge({ txId: txId.trim(), amount: amountNum });
+      await apiRepository.recharge({ txId: txId.trim(), amount: amountNum, coin: 'usdt' });
       setTxId('');
       setAmount('');
-      setToast({ isOpen: true, message: 'Recharge request submitted! It will be processed shortly.', color: 'success' });
+      setToast({ isOpen: true, message: t('APP.ADD_FUNDS.SUCCESS'), color: 'success' });
     } catch (err) {
       setToast({ isOpen: true, message: err instanceof Error ? err.message : 'Failed to submit recharge.', color: 'danger' });
     } finally {
@@ -101,7 +103,7 @@ const AddFundsPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>Add Funds</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.ADD_FUNDS.TITLE')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -110,7 +112,7 @@ const AddFundsPage: React.FC = () => {
 
           {/* Select network */}
           <div style={{ marginBottom: '24px' }}>
-            <SectionLabel>SELECT NETWORK</SectionLabel>
+            <SectionLabel>{t('APP.ADD_FUNDS.SELECT_NETWORK')}</SectionLabel>
             {walletsLoading ? (
               <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
             ) : (
@@ -182,7 +184,7 @@ const AddFundsPage: React.FC = () => {
 
               {/* Address */}
               <div>
-                <SectionLabel>DEPOSIT ADDRESS</SectionLabel>
+                <SectionLabel>{t('APP.ADD_FUNDS.WALLET_ADDRESS')}</SectionLabel>
                 <div
                   style={{
                     background: 'var(--sovereign-bg)',
@@ -243,24 +245,24 @@ const AddFundsPage: React.FC = () => {
               </IonText>
 
               <div style={{ marginBottom: '16px' }}>
-                <SectionLabel>TRANSACTION ID (TX HASH)</SectionLabel>
+                <SectionLabel>{t('APP.ADD_FUNDS.TX_ID')}</SectionLabel>
                 <IonInput
                   value={txId}
                   onIonInput={(e) => setTxId(e.detail.value ?? '')}
-                  placeholder="Paste your transaction hash"
+                  placeholder={t('APP.ADD_FUNDS.TX_ID_PLACEHOLDER')}
                   style={inputStyle}
                 />
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <SectionLabel>AMOUNT (USD)</SectionLabel>
+                <SectionLabel>{t('APP.ADD_FUNDS.AMOUNT_LABEL')}</SectionLabel>
                 <IonInput
                   type="number"
                   value={amount}
                   onIonInput={(e) => setAmount(e.detail.value ?? '')}
-                  placeholder={`Min $${selectedWallet.minAmount}`}
-                  min={selectedWallet.minAmount}
-                  step={0.01}
+                  placeholder={`${t('APP.ADD_FUNDS.MIN_AMOUNT')} $${selectedWallet.minAmount}`}
+                  min={String(selectedWallet.minAmount)}
+                  step="0.01"
                   style={inputStyle}
                 />
               </div>
@@ -280,12 +282,12 @@ const AddFundsPage: React.FC = () => {
                 >
                   <IonText>
                     <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>
-                      Network fee: -${selectedWallet.fee}
+                      {t('APP.COMMON.FEE')}: -${selectedWallet.fee}
                     </span>
                   </IonText>
                   <IonText>
                     <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '15px' }}>
-                      You receive: ${receiveAmount.toFixed(2)}
+                      {t('APP.COMMON.YOU_RECEIVE')}: ${receiveAmount.toFixed(2)}
                     </span>
                   </IonText>
                 </div>
@@ -311,7 +313,7 @@ const AddFundsPage: React.FC = () => {
               </div>
 
               <SovereignPrimaryButton onClick={handleSubmit} loading={loading} expand="block">
-                {loading ? <IonSpinner name="crescent" /> : 'Submit Recharge'}
+                {loading ? <IonSpinner name="crescent" /> : t('APP.ADD_FUNDS.SUBMIT')}
               </SovereignPrimaryButton>
             </div>
           )}
