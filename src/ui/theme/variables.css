@@ -1,0 +1,135 @@
+/* ── Sovereign Design System – CSS Variables ──────────────────────────────── */
+:root {
+  --sovereign-bg: #0a1628;
+  --sovereign-surface: #131f35;
+  --sovereign-surface-high: #1a2940;
+  --sovereign-gold: #c9a84c;
+  --sovereign-gold-light: #e8c96e;
+  --sovereign-text: #ffffff;
+  --sovereign-text-muted: #8a9bbf;
+  --sovereign-error: #cf6679;
+  --sovereign-border: rgba(201, 168, 76, 0.25);
+
+  /* Ionic overrides */
+  --ion-background-color: #0a1628;
+  --ion-background-color-rgb: 10, 22, 40;
+  --ion-color-primary: #c9a84c;
+  --ion-color-primary-rgb: 201, 168, 76;
+  --ion-color-primary-contrast: #0a1628;
+  --ion-color-primary-contrast-rgb: 10, 22, 40;
+  --ion-color-primary-shade: #b1943f;
+  --ion-color-primary-tint: #d4b35e;
+  --ion-text-color: #ffffff;
+  --ion-text-color-rgb: 255, 255, 255;
+  --ion-toolbar-background: #0a1628;
+  --ion-toolbar-color: #ffffff;
+  --ion-item-background: #131f35;
+  --ion-item-color: #ffffff;
+  --ion-border-color: rgba(201, 168, 76, 0.25);
+  --ion-card-background: #131f35;
+  --ion-tab-bar-background: #0a1628;
+  --ion-tab-bar-border-color: rgba(201, 168, 76, 0.25);
+  --ion-color-step-50: #131f35;
+  --ion-color-step-100: #1a2940;
+  --ion-color-step-150: #1f3050;
+  --ion-color-step-200: #243660;
+  --ion-color-step-250: #2a3d70;
+  --ion-color-step-300: #2f4480;
+  --ion-color-step-400: #3a5098;
+  --ion-color-step-500: #455daf;
+  --ion-color-step-600: #6a7ec4;
+  --ion-color-step-700: #8a9bbf;
+  --ion-color-step-800: #aab5d4;
+  --ion-color-step-900: #cfd5e5;
+  --ion-color-step-950: #e7eaf2;
+  --ion-overlay-background-color: #0a1628;
+  --ion-modal-background: #131f35;
+}
+
+/* ── Global resets ────────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+ion-content {
+  --background: var(--sovereign-bg);
+}
+
+ion-header ion-toolbar {
+  --background: var(--sovereign-bg);
+  --border-color: var(--sovereign-border);
+  border-bottom: 1px solid var(--sovereign-border);
+}
+
+ion-menu ion-content {
+  --background: var(--sovereign-surface);
+}
+
+ion-item {
+  --background: transparent;
+  --color: var(--sovereign-text);
+  --border-color: var(--sovereign-border);
+}
+
+ion-card {
+  --background: var(--sovereign-surface);
+  border: 1px solid var(--sovereign-border);
+  border-radius: 12px;
+}
+
+ion-modal {
+  --background: var(--sovereign-surface);
+}
+
+ion-list {
+  background: transparent;
+}
+
+ion-segment {
+  --background: var(--sovereign-surface);
+}
+
+ion-segment-button {
+  --color: var(--sovereign-text-muted);
+  --color-checked: var(--sovereign-gold);
+  --indicator-color: var(--sovereign-gold);
+}
+
+ion-select {
+  --placeholder-color: var(--sovereign-text-muted);
+  color: var(--sovereign-text);
+}
+
+ion-input {
+  --color: var(--sovereign-text);
+  --placeholder-color: var(--sovereign-text-muted);
+}
+
+ion-badge {
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
