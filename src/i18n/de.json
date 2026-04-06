@@ -254,7 +254,16 @@
       "WAITING_OPPONENT": "Warte auf Gegner...",
       "HIT": "Treffer!",
       "MISS": "Daneben",
-      "SUNK": "Versenkt!"
+      "SUNK": "Versenkt!",
+      "READY_CONFIRM_TITLE": "Bereit zum Spielen?",
+      "READY_CONFIRM_BET": "${amount} werden bei Bestätigung von deinem Guthaben abgezogen.",
+      "READY_CONFIRM_WARNING": "Wenn du den Raum verlässt, verlierst du automatisch und dein Gegner erhält den gesamten Einsatz.",
+      "READY_CONFIRM_BTN": "Bestätigen und Schiffe senden",
+      "OPPONENT_LEFT_TITLE": "Gegner hat verlassen",
+      "OPPONENT_LEFT_MSG": "Dein Gegner hat den Raum vor Spielbeginn verlassen. Du kannst auf einen neuen Gegner warten oder den Raum verlassen.",
+      "OPPONENT_LEFT_WAIT": "Auf Gegner warten",
+      "OPPONENT_LEFT_BALANCE_NOTE": "Wenn du gehst, wird der Einsatz deinem Guthaben zurückerstattet. Wenn du bleibst, wird der Einsatz erst abgezogen, wenn ein neuer Gegner beitritt und du deine Schiffe bestätigst.",
+      "LEAVE_ANYWAY": "Trotzdem verlassen"
     },
     "CHESS": {
       "CASTLING_HINT": "Rochade verfügbar",

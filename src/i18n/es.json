@@ -254,7 +254,16 @@
       "WAITING_OPPONENT": "Esperando al oponente...",
       "HIT": "¡Tocado!",
       "MISS": "Agua",
-      "SUNK": "¡Hundido!"
+      "SUNK": "¡Hundido!",
+      "READY_CONFIRM_TITLE": "¿Listo para jugar?",
+      "READY_CONFIRM_BET": "${amount} serán descontados de tu saldo al confirmar.",
+      "READY_CONFIRM_WARNING": "Si abandonas la sala en cualquier momento, perderás automáticamente y tu oponente recibirá la apuesta completa.",
+      "READY_CONFIRM_BTN": "Confirmar y enviar barcos",
+      "OPPONENT_LEFT_TITLE": "Oponente abandonó",
+      "OPPONENT_LEFT_MSG": "Tu oponente abandonó la sala antes de que comenzara el juego. Puedes esperar a otro oponente o salir.",
+      "OPPONENT_LEFT_WAIT": "Esperar oponente",
+      "OPPONENT_LEFT_BALANCE_NOTE": "Si sales, el importe de la apuesta se te devolverá al saldo. Si te quedas, la apuesta solo se descontará cuando un nuevo oponente se una y confirmes tus barcos.",
+      "LEAVE_ANYWAY": "Salir de todos modos"
     },
     "CHESS": {
       "CASTLING_HINT": "Enroque disponible",

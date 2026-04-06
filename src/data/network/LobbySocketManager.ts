@@ -48,6 +48,7 @@ function normalizeRoom(raw: any): RoomResponse {
       : raw.game_id
         ? String(raw.game_id)
         : undefined,
+    playerLimit: raw.player_limit ?? raw.playerLimit ?? raw.maxPlayers ?? 2,
   };
 }
 

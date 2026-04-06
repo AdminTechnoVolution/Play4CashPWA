@@ -49,6 +49,7 @@ export interface RoomResponse {
   status: string;
   spectatorsCount: number;
   gameId?: string;
+  playerLimit: number;
 }
 
 export interface RoomStatusResponse {

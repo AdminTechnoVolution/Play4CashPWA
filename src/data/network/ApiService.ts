@@ -202,7 +202,7 @@ export const apiService = {
         cells.push(s.horizontal ? [s.row, s.col + i] : [s.row + i, s.col]);
       }
       return {
-        type: s.type,
+        type: s.type.toLowerCase(),
         startRow: s.row,
         startCol: s.col,
         isHorizontal: s.horizontal,
@@ -305,5 +305,6 @@ function normalizeRoom(raw: any): RoomResponse {
     status: (raw.status ?? raw.roomStatus ?? raw.room_status ?? '').toLowerCase(),
     spectatorsCount: raw.spectatorsCount ?? raw.spectators_count ?? 0,
     gameId: raw.game_id?._id ?? raw.game_id ?? undefined,
+    playerLimit: raw.player_limit ?? raw.playerLimit ?? raw.maxPlayers ?? 2,
   };
 }

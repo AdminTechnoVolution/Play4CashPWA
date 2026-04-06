@@ -254,7 +254,16 @@
       "WAITING_OPPONENT": "In attesa dell'avversario...",
       "HIT": "Colpito!",
       "MISS": "Mancato",
-      "SUNK": "Affondato!"
+      "SUNK": "Affondato!",
+      "READY_CONFIRM_TITLE": "Pronto a giocare?",
+      "READY_CONFIRM_BET": "${amount} verranno detratti dal tuo saldo alla conferma.",
+      "READY_CONFIRM_WARNING": "Se abbandoni la stanza in qualsiasi momento, perderai automaticamente e il tuo avversario riceverà l'intera puntata.",
+      "READY_CONFIRM_BTN": "Conferma e invia le navi",
+      "OPPONENT_LEFT_TITLE": "L'avversario ha lasciato",
+      "OPPONENT_LEFT_MSG": "Il tuo avversario ha abbandonato la stanza prima dell'inizio della partita. Puoi aspettare un nuovo avversario o uscire.",
+      "OPPONENT_LEFT_WAIT": "Aspetta un avversario",
+      "OPPONENT_LEFT_BALANCE_NOTE": "Se esci, l'importo della puntata ti verrà restituito sul saldo. Se rimani, la puntata verrà detratta solo quando un nuovo avversario si unirà e confermerai le tue navi.",
+      "LEAVE_ANYWAY": "Esci comunque"
     },
     "CHESS": {
       "CASTLING_HINT": "Arrocco disponibile",

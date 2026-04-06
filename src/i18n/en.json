@@ -254,7 +254,16 @@
       "WAITING_OPPONENT": "Waiting for opponent...",
       "HIT": "Hit!",
       "MISS": "Miss",
-      "SUNK": "Sunk!"
+      "SUNK": "Sunk!",
+      "READY_CONFIRM_TITLE": "Ready to play?",
+      "READY_CONFIRM_BET": "${amount} will be deducted from your balance when you confirm.",
+      "READY_CONFIRM_WARNING": "If you leave the room at any point, you will automatically lose and your opponent will receive the full bet.",
+      "READY_CONFIRM_BTN": "Confirm & Send Ships",
+      "OPPONENT_LEFT_TITLE": "Opponent Left",
+      "OPPONENT_LEFT_MSG": "Your opponent abandoned the room before the game started. You can wait for a new opponent or leave.",
+      "OPPONENT_LEFT_WAIT": "Wait for Opponent",
+      "OPPONENT_LEFT_BALANCE_NOTE": "If you leave, your bet will be returned to your balance. If you stay, the bet will only be deducted once a new opponent joins and you confirm your ships.",
+      "LEAVE_ANYWAY": "Leave Anyway"
     },
     "CHESS": {
       "CASTLING_HINT": "Castling available",

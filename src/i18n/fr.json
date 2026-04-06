@@ -254,7 +254,16 @@
       "WAITING_OPPONENT": "En attente de l'adversaire...",
       "HIT": "Touché !",
       "MISS": "Manqué",
-      "SUNK": "Coulé !"
+      "SUNK": "Coulé !",
+      "READY_CONFIRM_TITLE": "Prêt à jouer ?",
+      "READY_CONFIRM_BET": "${amount} seront déduits de votre solde à la confirmation.",
+      "READY_CONFIRM_WARNING": "Si vous quittez la salle à tout moment, vous perdrez automatiquement et votre adversaire recevra la mise complète.",
+      "READY_CONFIRM_BTN": "Confirmer et envoyer les navires",
+      "OPPONENT_LEFT_TITLE": "L'adversaire est parti",
+      "OPPONENT_LEFT_MSG": "Votre adversaire a quitté la salle avant le début de la partie. Vous pouvez attendre un nouvel adversaire ou partir.",
+      "OPPONENT_LEFT_WAIT": "Attendre un adversaire",
+      "OPPONENT_LEFT_BALANCE_NOTE": "Si vous partez, votre mise vous sera restituée sur votre solde. Si vous restez, la mise ne sera déduite qu'une fois qu'un nouvel adversaire vous rejoindra et que vous confirmerez vos navires.",
+      "LEAVE_ANYWAY": "Partir quand même"
     },
     "CHESS": {
       "CASTLING_HINT": "Roque disponible",

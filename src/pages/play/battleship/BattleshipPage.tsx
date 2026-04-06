@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
-  IonButtons, IonButton, IonIcon, IonText,
+  IonButtons, IonButton, IonIcon, IonText, IonToast, IonModal,
 } from '@ionic/react';
 import { arrowBackOutline, swapHorizontalOutline } from 'ionicons/icons';
 import { useAuthStore } from '../../../store/authStore';
@@ -69,35 +69,27 @@ function ShipOverlay({ ships }: { ships: PlacedShip[] }) {
           );
         }
 
-        // Vertical: rotate 90° inside a CELL-wide × longSide-tall container
+        // Vertical: rotate(90deg) with transformOrigin '0 0' uses matrix [[0,-1],[1,0]]
+        // which visually places the image at [left-CELL, left] × [top, top+longSide].
+        // Add CELL to left so the visual left edge aligns with column x.
         return (
-          <div
+          <img
             key={s.type}
+            src={shipImageSrc(s.type)}
+            alt={s.type}
+            draggable={false}
             style={{
               position: 'absolute',
-              left: x, top: y,
-              width: CELL, height: longSide,
-              overflow: 'hidden',
+              left: x + CELL, top: y,
+              width: longSide, height: CELL,
+              objectFit: 'fill',
+              transform: 'rotate(90deg)',
+              transformOrigin: '0 0',
               pointerEvents: 'none',
               zIndex: 3,
+              filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
             }}
-          >
-            <img
-              src={shipImageSrc(s.type)}
-              alt={s.type}
-              draggable={false}
-              style={{
-                position: 'absolute',
-                width: longSide, height: CELL,
-                left: (CELL - longSide) / 2,
-                top:  (longSide - CELL) / 2,
-                objectFit: 'fill',
-                transform: 'rotate(90deg)',
-                transformOrigin: 'center center',
-                filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
-              }}
-            />
-          </div>
+          />
         );
       })}
     </>
@@ -192,23 +184,25 @@ interface Props {
   betAmount: number;
   roomName: string;
   opponentName: string;
+  hasOpponent: boolean;
   isSpectator: boolean;
   onLeaveRequest: () => void;
 }
 
 export default function BattleshipPage({
-  roomId, betAmount, roomName, opponentName, isSpectator, onLeaveRequest,
+  roomId, betAmount, roomName, opponentName, hasOpponent, isSpectator, onLeaveRequest,
 }: Props) {
   const { user } = useAuthStore();
   const store    = useBattleshipStore();
   const t        = useT();
   const chatRef  = useRef(new ChatSocketManager());
-  const [greetings, setGreetings] = useState<GreetingResponse[]>([]);
-  const [lastMsg, setLastMsg]     = useState<ChatMessage | null>(null);
+  const [greetings, setGreetings]           = useState<GreetingResponse[]>([]);
+  const [lastMsg, setLastMsg]               = useState<ChatMessage | null>(null);
+  const [showReadyConfirm, setShowReadyConfirm] = useState(false);
 
   useEffect(() => {
     const myUsername = user?.username ?? '';
-    store.initGame(roomId, myUsername);
+    store.initGame(roomId, myUsername, hasOpponent, opponentName);
     const chat = chatRef.current;
     chat.connect(roomId);
     chat.onMessage((msg) => setLastMsg(msg));
@@ -228,6 +222,27 @@ export default function BattleshipPage({
         <p style={{ color: 'rgba(201,168,76,0.75)', fontSize: 12, margin: 0, textAlign: 'center' }}>
           Tap a cell to place the selected ship
         </p>
+
+        {/* Opponent joined status banner */}
+        {!store.opponentConfirmed ? (
+          <div style={{
+            background: 'rgba(255,160,0,0.12)',
+            border: '1px solid rgba(255,160,0,0.35)',
+            borderRadius: 8, padding: '8px 16px',
+            color: '#ffb74d', fontSize: 12, textAlign: 'center',
+          }}>
+            ⏳ Waiting for opponent to join…
+          </div>
+        ) : (
+          <div style={{
+            background: 'rgba(76,175,80,0.12)',
+            border: '1px solid rgba(76,175,80,0.35)',
+            borderRadius: 8, padding: '8px 16px',
+            color: '#81c784', fontSize: 12, textAlign: 'center',
+          }}>
+            ✓ {store.opponentName || 'Opponent'} joined — Place your ships!
+          </div>
+        )}
 
         {/* Placement grid with ocean background */}
         <OceanPanel width={GRID_PX + 16} height={GRID_PX + 16}>
@@ -343,7 +358,7 @@ export default function BattleshipPage({
         {/* Ready button */}
         <div style={{ width: GRID_PX + 16, paddingBottom: 20 }}>
           <button
-            onClick={() => store.submitPlacement(roomId)}
+            onClick={() => store.placedShips.length >= SHIP_CATALOG.length && setShowReadyConfirm(true)}
             disabled={store.placedShips.length < SHIP_CATALOG.length}
             style={{
               width: '100%',
@@ -365,33 +380,51 @@ export default function BattleshipPage({
           </button>
         </div>
       </div>
+
+      <IonToast
+        isOpen={!!store.placementError}
+        message={store.placementError ?? ''}
+        duration={2000}
+        position="top"
+        onDidDismiss={() => store.clearPlacementError()}
+        style={{ '--background': '#1e0e12', '--color': '#ff8a8a', '--border-radius': '10px' }}
+      />
     </IonContent>
   );
 
   // ── Waiting phase ───────────────────────────────────────────────────────────
-  const renderWaiting = () => (
-    <IonContent style={{ '--background': '#060e1e' }}>
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', height: '100%', padding: 32,
-      }}>
-        <OceanPanel width={GRID_PX} height={200}>
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', height: 200, gap: 14,
-          }}>
-            <span style={{ fontSize: 44 }}>⚓</span>
-            <p style={{ color: '#fff', margin: 0, fontSize: 16, fontWeight: 600, textAlign: 'center' }}>
-              {t('APP.BATTLESHIP.WAITING_TITLE')}
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.55)', margin: 0, fontSize: 13, textAlign: 'center', padding: '0 24px' }}>
-              {t('APP.BATTLESHIP.WAITING_DESC')}
-            </p>
-          </div>
-        </OceanPanel>
-      </div>
-    </IonContent>
-  );
+  const renderWaiting = () => {
+    const waitingForJoin = !store.opponentConfirmed;
+    const waitingLabel = waitingForJoin
+      ? 'Waiting for opponent to join…'
+      : `${store.opponentName || 'Opponent'} joined! Waiting for them to place ships…`;
+    const waitingDesc = waitingForJoin
+      ? 'Your ships are ready. The battle begins once your opponent joins.'
+      : 'Your ships are deployed. The battle will start once your opponent is ready.';
+    return (
+      <IonContent style={{ '--background': '#060e1e' }}>
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', height: '100%', padding: 32,
+        }}>
+          <OceanPanel width={GRID_PX} height={200}>
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', height: 200, gap: 14,
+            }}>
+              <span style={{ fontSize: 44 }}>⚓</span>
+              <p style={{ color: '#fff', margin: 0, fontSize: 16, fontWeight: 600, textAlign: 'center', padding: '0 20px' }}>
+                {waitingLabel}
+              </p>
+              <p style={{ color: 'rgba(255,255,255,0.55)', margin: 0, fontSize: 13, textAlign: 'center', padding: '0 24px' }}>
+                {waitingDesc}
+              </p>
+            </div>
+          </OceanPanel>
+        </div>
+      </IonContent>
+    );
+  };
 
   // ── Battle phase ────────────────────────────────────────────────────────────
   const renderBattle = () => (
@@ -414,7 +447,7 @@ export default function BattleshipPage({
               color: '#e05060', fontSize: 11, fontWeight: 700,
               letterSpacing: '0.8px', textTransform: 'uppercase',
             }}>
-              ⚡ Enemy Waters — {opponentName}
+              ⚡ Enemy Waters — {store.opponentName || opponentName}
             </span>
             {store.isMyTurn && !isSpectator && (
               <span style={{ color: '#c9a84c', fontSize: 11, fontWeight: 600 }}>Your turn</span>
@@ -501,6 +534,187 @@ export default function BattleshipPage({
         message={store.error ?? ''}
         onDismiss={() => store.clearError()}
       />
+
+      {/* ── Ready confirmation modal ── */}
+      <IonModal
+        isOpen={showReadyConfirm}
+        onDidDismiss={() => setShowReadyConfirm(false)}
+        breakpoints={[0, 1]}
+        initialBreakpoint={1}
+        style={{ '--height': 'auto' }}
+      >
+        <div style={{
+          background: '#0d1e30',
+          borderRadius: '16px 16px 0 0',
+          padding: '28px 20px 32px',
+          display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {/* Title */}
+          <h2 style={{
+            margin: 0, textAlign: 'center',
+            color: '#fff', fontSize: 20, fontWeight: 800,
+          }}>
+            {t('APP.BATTLESHIP.READY_CONFIRM_TITLE')}
+          </h2>
+
+          {/* Bet info row (only when betAmount > 0) */}
+          {betAmount > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: 'rgba(201,168,76,0.10)',
+              border: '1px solid rgba(201,168,76,0.25)',
+              borderRadius: 10, padding: '10px 14px',
+            }}>
+              <span style={{ fontSize: 18 }}>💰</span>
+              <span style={{ color: '#e8d08a', fontSize: 13, lineHeight: 1.4 }}>
+                {t('APP.BATTLESHIP.READY_CONFIRM_BET').replace('${amount}', `$${betAmount.toFixed(2)}`)}
+              </span>
+            </div>
+          )}
+
+          {/* Forfeit warning row */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            background: 'rgba(255,107,53,0.10)',
+            border: '1px solid rgba(255,107,53,0.30)',
+            borderRadius: 10, padding: '10px 14px',
+          }}>
+            <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>⚠️</span>
+            <span style={{ color: '#ff8a5c', fontSize: 13, lineHeight: 1.4 }}>
+              {t('APP.BATTLESHIP.READY_CONFIRM_WARNING')}
+            </span>
+          </div>
+
+          {/* Confirm button */}
+          <button
+            onClick={() => {
+              setShowReadyConfirm(false);
+              store.submitPlacement(roomId);
+            }}
+            style={{
+              width: '100%', padding: '14px',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #b8922a, #e8c96b)',
+              border: 'none',
+              color: '#0a1628', fontWeight: 800, fontSize: 15,
+              cursor: 'pointer', letterSpacing: '0.5px',
+            }}
+          >
+            {t('APP.BATTLESHIP.READY_CONFIRM_BTN')}
+          </button>
+
+          {/* Cancel button */}
+          <button
+            onClick={() => setShowReadyConfirm(false)}
+            style={{
+              width: '100%', padding: '12px',
+              borderRadius: 12,
+              background: 'transparent',
+              border: '1px solid rgba(201,168,76,0.35)',
+              color: '#c9a84c', fontWeight: 600, fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            {t('APP.COMMON.CANCEL') || 'Cancel'}
+          </button>
+        </div>
+      </IonModal>
+
+      {/* Opponent joined notification */}
+      <IonToast
+        isOpen={!!store.opponentJoinedToast}
+        message={store.opponentJoinedToast ?? ''}
+        duration={3000}
+        position="top"
+        onDidDismiss={() => store.clearOpponentJoinedToast()}
+        style={{ '--background': '#0d2a18', '--color': '#81c784', '--border-radius': '10px' }}
+      />
+
+      {/* Shot result feedback (hit / miss / sunk) */}
+      <IonToast
+        isOpen={!!store.shotMessage}
+        message={store.shotMessage ?? ''}
+        duration={2500}
+        position="bottom"
+        onDidDismiss={() => store.clearShotMessage()}
+        style={{ '--background': '#0d1e30', '--color': '#e8d08a', '--border-radius': '10px' }}
+      />
+
+      {/* ── Opponent left pre-game dialog ── */}
+      <IonModal
+        isOpen={store.opponentLeftDialog}
+        onDidDismiss={() => {/* force explicit choice — do not dismiss on backdrop */}}
+        backdropDismiss={false}
+        breakpoints={[0, 1]}
+        initialBreakpoint={1}
+        style={{ '--height': 'auto' }}
+      >
+        <div style={{
+          background: '#0d1e30',
+          borderRadius: '16px 16px 0 0',
+          padding: '28px 20px 32px',
+          display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {/* Title */}
+          <h2 style={{
+            margin: 0, textAlign: 'center',
+            color: '#ffb74d', fontSize: 20, fontWeight: 800,
+          }}>
+            {t('APP.BATTLESHIP.OPPONENT_LEFT_TITLE')}
+          </h2>
+
+          {/* Message */}
+          <p style={{
+            margin: 0, textAlign: 'center',
+            color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 1.5,
+          }}>
+            {t('APP.BATTLESHIP.OPPONENT_LEFT_MSG')}
+          </p>
+
+          {/* Balance note row */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            background: 'rgba(76,175,80,0.10)',
+            border: '1px solid rgba(76,175,80,0.30)',
+            borderRadius: 10, padding: '10px 14px',
+          }}>
+            <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>💰</span>
+            <span style={{ color: '#81c784', fontSize: 13, lineHeight: 1.4 }}>
+              {t('APP.BATTLESHIP.OPPONENT_LEFT_BALANCE_NOTE')}
+            </span>
+          </div>
+
+          {/* Wait button */}
+          <button
+            onClick={() => store.clearOpponentLeftDialog()}
+            style={{
+              width: '100%', padding: '14px',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #b8922a, #e8c96b)',
+              border: 'none',
+              color: '#0a1628', fontWeight: 800, fontSize: 15,
+              cursor: 'pointer', letterSpacing: '0.5px',
+            }}
+          >
+            {t('APP.BATTLESHIP.OPPONENT_LEFT_WAIT')}
+          </button>
+
+          {/* Leave button */}
+          <button
+            onClick={() => { store.clearOpponentLeftDialog(); onLeaveRequest(); }}
+            style={{
+              width: '100%', padding: '12px',
+              borderRadius: 12,
+              background: 'transparent',
+              border: '1px solid rgba(255,107,107,0.5)',
+              color: '#ff6b6b', fontWeight: 600, fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            {t('APP.BATTLESHIP.LEAVE_ANYWAY')}
+          </button>
+        </div>
+      </IonModal>
     </IonPage>
   );
 }

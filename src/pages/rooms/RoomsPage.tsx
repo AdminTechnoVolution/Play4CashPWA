@@ -296,7 +296,7 @@ const RoomsPage: React.FC = () => {
           ) : (
             <IonList style={{ background: 'transparent' }}>
               {filteredRooms.map((room) => {
-                const isFull = room.players.length >= 4;
+                const isFull = room.players.length >= room.playerLimit;
                 const canJoin = room.status === 'waiting' && !isFull;
                 const canSpectate = room.status === 'started';
                 const opponentName = room.players.find((p) => p.username)?.username ?? 'Unknown';
@@ -325,7 +325,7 @@ const RoomsPage: React.FC = () => {
                             <IonIcon icon={peopleOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px' }} />
                             <IonText>
                               <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>
-                                {room.players.length}/{4}
+                                {room.players.length}/{room.playerLimit}
                               </span>
                             </IonText>
                           </div>
