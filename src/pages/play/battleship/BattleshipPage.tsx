@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonIcon, IonText, IonToast, IonModal,
@@ -7,15 +7,12 @@ import { arrowBackOutline, swapHorizontalOutline } from 'ionicons/icons';
 import { useAuthStore } from '../../../store/authStore';
 import { useBattleshipStore, SHIP_CATALOG } from '../../../store/battleshipStore';
 import type { PlacedShip } from '../../../store/battleshipStore';
-import { ChatSocketManager } from '../../../data/network/ChatSocketManager';
-import { apiRepository } from '../../../data/network/ApiRepository';
-import type { GreetingResponse, ChatMessage } from '../../../data/models/ApiModels';
 import GameOverModal from '../components/GameOverModal';
 import TurnTimer from '../components/TurnTimer';
-import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import { useT } from '../../../i18n/translations';
+import { formatApiMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
 import OceanCanvas from './OceanCanvas';
 
 // ── Grid constants ─────────────────────────────────────────────────────────────
@@ -121,13 +118,14 @@ function OceanPanel({
 
 // ── Battle grid (opponent or own) ─────────────────────────────────────────────
 function BattleGrid({
-  board, ships, showShips, clickable, isSpectator, onFire,
+  board, ships, showShips, clickable, isSpectator, boardSide, onFire,
 }: {
   board: string[][];
   ships: PlacedShip[];
   showShips: boolean;
   clickable: boolean;
   isSpectator: boolean;
+  boardSide: 'player' | 'opponent';
   onFire: (r: number, c: number) => void;
 }) {
   const store = useBattleshipStore();
@@ -145,7 +143,8 @@ function BattleGrid({
         >
           {board.map((row, r) =>
             row.map((cell, c) => {
-              const isAnim = store.animatingShot?.row === r && store.animatingShot?.col === c;
+              const anim = store.animatingShot;
+              const isAnim = anim?.row === r && anim?.col === c && anim?.board === boardSide;
               return (
                 <div
                   key={`${r}-${c}`}
@@ -195,22 +194,13 @@ export default function BattleshipPage({
   const { user } = useAuthStore();
   const store    = useBattleshipStore();
   const t        = useT();
-  const chatRef  = useRef(new ChatSocketManager());
-  const [greetings, setGreetings]           = useState<GreetingResponse[]>([]);
-  const [lastMsg, setLastMsg]               = useState<ChatMessage | null>(null);
   const [showReadyConfirm, setShowReadyConfirm] = useState(false);
 
   useEffect(() => {
     const myUsername = user?.username ?? '';
-    store.initGame(roomId, myUsername, hasOpponent, opponentName);
-    const chat = chatRef.current;
-    chat.connect(roomId);
-    chat.onMessage((msg) => setLastMsg(msg));
-    apiRepository.getGreetings().then(setGreetings).catch(() => {});
-    return () => { store.cleanup(); chat.disconnect(); };
+    store.initGame(roomId, myUsername, hasOpponent, opponentName, isSpectator);
+    return () => { store.cleanup(); };
   }, [roomId]);
-
-  const sendGreeting = (id: string) => chatRef.current.sendGreeting(roomId, id);
 
   // ── Placement phase ─────────────────────────────────────────────────────────
   const renderPlacement = () => (
@@ -231,7 +221,7 @@ export default function BattleshipPage({
             borderRadius: 8, padding: '8px 16px',
             color: '#ffb74d', fontSize: 12, textAlign: 'center',
           }}>
-            ⏳ Waiting for opponent to join…
+            ⏳ {t('halma_status_waiting_opponent')}
           </div>
         ) : (
           <div style={{
@@ -376,7 +366,7 @@ export default function BattleshipPage({
               transition: 'opacity 0.2s',
             }}
           >
-            {t('APP.BATTLESHIP.READY_BTN')} ({store.placedShips.length}/{SHIP_CATALOG.length})
+            {t('bs_ready_button')} ({store.placedShips.length}/{SHIP_CATALOG.length})
           </button>
         </div>
       </div>
@@ -433,9 +423,15 @@ export default function BattleshipPage({
         padding: '8px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
       }}>
-        {isSpectator && <SpectatorBadge />}
+        {isSpectator && <SpectatorBadge count={store.spectatorsCount} />}
 
-        <TurnTimer seconds={30} isMyTurn={store.isMyTurn} onTimeout={() => {}} />
+        <TurnTimer
+          seconds={store.turnTimerSeconds}
+          isMyTurn={store.isMyTurn}
+          onTimeout={() => {}}
+          turnPlayerName={isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
+          resetKey={isSpectator ? store.shotCount : undefined}
+        />
 
         {/* ── Opponent board ── */}
         <div style={{ width: GRID_PX + 16 }}>
@@ -447,10 +443,12 @@ export default function BattleshipPage({
               color: '#e05060', fontSize: 11, fontWeight: 700,
               letterSpacing: '0.8px', textTransform: 'uppercase',
             }}>
-              ⚡ Enemy Waters — {store.opponentName || opponentName}
+              {isSpectator
+                ? `⚡ ${store.spectatorOpponentFleetName || store.opponentName || opponentName}`
+                : `⚡ Enemy Waters — ${store.opponentName || opponentName}`}
             </span>
             {store.isMyTurn && !isSpectator && (
-              <span style={{ color: '#c9a84c', fontSize: 11, fontWeight: 600 }}>Your turn</span>
+              <span style={{ color: '#c9a84c', fontSize: 11, fontWeight: 600 }}>{t('bs_your_turn')}</span>
             )}
           </div>
           <BattleGrid
@@ -459,6 +457,7 @@ export default function BattleshipPage({
             showShips={false}
             clickable={store.isMyTurn && !isSpectator}
             isSpectator={isSpectator}
+            boardSide="opponent"
             onFire={(r, c) => store.fire(roomId, r, c)}
           />
         </div>
@@ -473,10 +472,12 @@ export default function BattleshipPage({
               color: '#4a9ec0', fontSize: 11, fontWeight: 700,
               letterSpacing: '0.8px', textTransform: 'uppercase',
             }}>
-              ⚓ My Fleet
+              {isSpectator
+                ? `⚓ ${store.spectatorFleetOwnerName || store.spectatorBoardOwner}`
+                : '⚓ My Fleet'}
             </span>
             {!store.isMyTurn && !isSpectator && (
-              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>Opponent&apos;s turn</span>
+              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{t('bs_opponent_turn')}</span>
             )}
           </div>
           <BattleGrid
@@ -485,15 +486,11 @@ export default function BattleshipPage({
             showShips={true}
             clickable={false}
             isSpectator={isSpectator}
+            boardSide="player"
             onFire={() => {}}
           />
         </div>
 
-        <ChatGreetingChips
-          greetings={greetings}
-          onSend={sendGreeting}
-          lastReceivedMessage={lastMsg}
-        />
       </div>
     </IonContent>
   );
@@ -526,12 +523,13 @@ export default function BattleshipPage({
       <GameOverModal
         isOpen={!!store.gameOver}
         gameOver={store.gameOver}
-        onPlayAgain={onLeaveRequest}
+        isSpectator={isSpectator}
         onExit={onLeaveRequest}
+        gameProfile="BATTLESHIP"
       />
       <GenericErrorModal
         isOpen={!!store.error}
-        message={store.error ?? ''}
+        message={formatApiMessageForDisplay(store.error)}
         onDismiss={() => store.clearError()}
       />
 
@@ -554,7 +552,7 @@ export default function BattleshipPage({
             margin: 0, textAlign: 'center',
             color: '#fff', fontSize: 20, fontWeight: 800,
           }}>
-            {t('APP.BATTLESHIP.READY_CONFIRM_TITLE')}
+            {t('bs_ready_confirm_title')}
           </h2>
 
           {/* Bet info row (only when betAmount > 0) */}
@@ -567,7 +565,7 @@ export default function BattleshipPage({
             }}>
               <span style={{ fontSize: 18 }}>💰</span>
               <span style={{ color: '#e8d08a', fontSize: 13, lineHeight: 1.4 }}>
-                {t('APP.BATTLESHIP.READY_CONFIRM_BET').replace('${amount}', `$${betAmount.toFixed(2)}`)}
+                {t('bs_ready_confirm_bet_info').replace('%s', `$${betAmount.toFixed(2)}`)}
               </span>
             </div>
           )}
@@ -581,7 +579,7 @@ export default function BattleshipPage({
           }}>
             <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>⚠️</span>
             <span style={{ color: '#ff8a5c', fontSize: 13, lineHeight: 1.4 }}>
-              {t('APP.BATTLESHIP.READY_CONFIRM_WARNING')}
+              {t('bs_confirm_ready_warning') || t('recharge_important_information') || 'Warning'}
             </span>
           </div>
 
@@ -600,7 +598,7 @@ export default function BattleshipPage({
               cursor: 'pointer', letterSpacing: '0.5px',
             }}
           >
-            {t('APP.BATTLESHIP.READY_CONFIRM_BTN')}
+            {t('bs_ready_confirm_button')}
           </button>
 
           {/* Cancel button */}
@@ -615,7 +613,7 @@ export default function BattleshipPage({
               cursor: 'pointer',
             }}
           >
-            {t('APP.COMMON.CANCEL') || 'Cancel'}
+            {t('cancel')}
           </button>
         </div>
       </IonModal>
@@ -623,7 +621,7 @@ export default function BattleshipPage({
       {/* Opponent joined notification */}
       <IonToast
         isOpen={!!store.opponentJoinedToast}
-        message={store.opponentJoinedToast ?? ''}
+        message={formatApiMessageForDisplay(store.opponentJoinedToast)}
         duration={3000}
         position="top"
         onDidDismiss={() => store.clearOpponentJoinedToast()}
@@ -633,7 +631,7 @@ export default function BattleshipPage({
       {/* Shot result feedback (hit / miss / sunk) */}
       <IonToast
         isOpen={!!store.shotMessage}
-        message={store.shotMessage ?? ''}
+        message={formatApiMessageForDisplay(store.shotMessage)}
         duration={2500}
         position="bottom"
         onDidDismiss={() => store.clearShotMessage()}
@@ -660,7 +658,7 @@ export default function BattleshipPage({
             margin: 0, textAlign: 'center',
             color: '#ffb74d', fontSize: 20, fontWeight: 800,
           }}>
-            {t('APP.BATTLESHIP.OPPONENT_LEFT_TITLE')}
+            {t('bs_opponent_left_title')}
           </h2>
 
           {/* Message */}
@@ -668,7 +666,7 @@ export default function BattleshipPage({
             margin: 0, textAlign: 'center',
             color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 1.5,
           }}>
-            {t('APP.BATTLESHIP.OPPONENT_LEFT_MSG')}
+            {t('bs_opponent_left')}
           </p>
 
           {/* Balance note row */}
@@ -680,7 +678,7 @@ export default function BattleshipPage({
           }}>
             <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>💰</span>
             <span style={{ color: '#81c784', fontSize: 13, lineHeight: 1.4 }}>
-              {t('APP.BATTLESHIP.OPPONENT_LEFT_BALANCE_NOTE')}
+              {t('bs_opponent_left_balance_note')}
             </span>
           </div>
 
@@ -696,7 +694,7 @@ export default function BattleshipPage({
               cursor: 'pointer', letterSpacing: '0.5px',
             }}
           >
-            {t('APP.BATTLESHIP.OPPONENT_LEFT_WAIT')}
+            {t('bs_opponent_left_wait')}
           </button>
 
           {/* Leave button */}
@@ -711,7 +709,7 @@ export default function BattleshipPage({
               cursor: 'pointer',
             }}
           >
-            {t('APP.BATTLESHIP.LEAVE_ANYWAY')}
+            {t('bs_leave_confirm_leave')}
           </button>
         </div>
       </IonModal>

@@ -13,6 +13,8 @@ const ALL: Record<SupportedLang, any> = { es: esJson, en: enJson, fr: frJson, de
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function resolve(dict: any, fallback: any, key: string): string {
+  if (typeof dict[key] === 'string') return dict[key];
+
   const parts = key.split('.');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let cur: any = dict;
@@ -23,6 +25,7 @@ function resolve(dict: any, fallback: any, key: string): string {
   if (typeof cur === 'string') return cur;
 
   // fallback to EN
+  if (typeof fallback[key] === 'string') return fallback[key];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fb: any = fallback;
   for (const p of parts) {
@@ -44,4 +47,26 @@ export function t(key: string): string {
   const lang = useLanguageStore.getState().lang as SupportedLang;
   const dict = ALL[lang] ?? ALL['en'];
   return resolve(dict, ALL['en'], key);
+}
+
+/** Returns true if the key exists in the current or fallback dictionary */
+export function hasKey(key: string): boolean {
+  const lang = useLanguageStore.getState().lang as SupportedLang;
+  const dict = ALL[lang] ?? ALL['en'];
+  const fallback = ALL['en'];
+
+  if (typeof dict[key] === 'string') return true;
+  if (typeof fallback[key] === 'string') return true;
+
+  const parts = key.split('.');
+  const check = (d: any) => {
+    let cur = d;
+    for (const p of parts) {
+      if (cur == null || typeof cur !== 'object') return false;
+      cur = cur[p];
+    }
+    return typeof cur === 'string';
+  };
+
+  return check(dict) || check(fallback);
 }

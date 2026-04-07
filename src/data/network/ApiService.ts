@@ -159,7 +159,9 @@ export const apiService = {
 
   // Android: POST /api/rooms/{id}/spectate
   async spectateRoom(roomId: string): Promise<void> {
+    console.log('[SPECTATOR][1] ApiService.spectateRoom → POST /api/rooms/' + roomId + '/spectate');
     await apiClient.post<ApiResponse<void>>(`/api/rooms/${roomId}/spectate`);
+    console.log('[SPECTATOR][1] ApiService.spectateRoom → 200 OK');
   },
 
   // Android: PATCH /api/rooms/{id}/ready with { ready: true }

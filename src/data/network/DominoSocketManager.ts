@@ -25,8 +25,8 @@ async function refreshSocketToken(socket: Socket): Promise<void> {
     saveTokens(data.token, data.refreshToken);
 
     const newToken = data.token;
-    socket.auth = { token: newToken };
     (socket.io.opts as Record<string, unknown>).query = { token: newToken };
+    (socket.io.opts as Record<string, unknown>).extraHeaders = { Authorization: `Bearer ${newToken}` };
   })().finally(() => {
     socketRefreshPromise = null;
   });
@@ -52,8 +52,8 @@ export class DominoSocketManager {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: SOCKET_TIMEOUT_MS,
-      auth: { token },
-      query: { token, room_id: roomId },
+      query: { token },
+      extraHeaders: { Authorization: `Bearer ${token}` },
     });
 
     this.socket.on('connect', () => {

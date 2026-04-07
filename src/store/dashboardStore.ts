@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { apiRepository } from '../data/network/ApiRepository';
 import { saveUserAccount } from '../data/auth/AuthSessionStore';
+import { formatApiMessageForDisplay } from '../i18n/ApiMessageDisplay';
 import type { UserAccountResponse, GameResponse, RoomStatsResponse } from '../data/models/ApiModels';
 
 interface DashboardState {
@@ -32,9 +33,8 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       ]);
       saveUserAccount(account);
       set({ account, games, roomStats, isLoading: false });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load dashboard.';
-      set({ isLoading: false, error: msg });
+    } catch (err: any) {
+      set({ isLoading: false, error: formatApiMessageForDisplay(err) });
     }
   },
 

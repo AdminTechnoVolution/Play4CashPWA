@@ -92,7 +92,7 @@ const LoginPage: React.FC = () => {
                 textTransform: 'uppercase',
                 fontWeight: 500,
               }}>
-                {t('APP.LOGIN.TAGLINE')}
+                {t('login_tagline')}
               </p>
             </IonText>
           </div>
@@ -116,7 +116,7 @@ const LoginPage: React.FC = () => {
                 textAlign: 'center',
                 margin: '0 0 6px 0',
               }}>
-                {t('APP.LOGIN.WELCOME')}
+                {t('login_welcome_title')}
               </h2>
             </IonText>
             <IonText>
@@ -127,7 +127,7 @@ const LoginPage: React.FC = () => {
                 margin: '0 0 28px 0',
                 lineHeight: 1.5,
               }}>
-                {t('APP.LOGIN.SUBTITLE')}
+                {t('login_welcome_subtitle')}
               </p>
             </IonText>
 
@@ -135,7 +135,7 @@ const LoginPage: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '12px 0' }}>
                 <IonSpinner name="crescent" style={{ color: 'var(--sovereign-gold)', width: 40, height: 40 }} />
                 <IonText>
-                  <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 14, margin: 0 }}>{t('APP.LOGIN.SIGNING_IN')}</p>
+                  <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 14, margin: 0 }}>{t('loading')}</p>
                 </IonText>
               </div>
             ) : (
@@ -159,13 +159,13 @@ const LoginPage: React.FC = () => {
           <div style={{ marginTop: 32, textAlign: 'center' }}>
             <IonText>
               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 12, margin: 0, lineHeight: 1.8 }}>
-                {t('APP.LOGIN.AGREE_BEFORE')}{' '}
+                {t('login_compliance_agree')}{' '}
                 <Link to="/terms" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none', fontWeight: 600 }}>
-                  {t('APP.LOGIN.TERMS')}
+                  {t('login_terms')}
                 </Link>{' '}
-                {t('APP.LOGIN.AND')}{' '}
+                {t('login_compliance_and')}{' '}
                 <Link to="/privacy" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none', fontWeight: 600 }}>
-                  {t('APP.LOGIN.PRIVACY')}
+                  {t('login_privacy')}
                 </Link>
               </p>
             </IonText>

@@ -8,6 +8,7 @@ import {
   getUserAccount,
   getRefreshToken,
 } from '../data/auth/AuthSessionStore';
+import { formatApiMessageForDisplay } from '../i18n/ApiMessageDisplay';
 import type { UserAccountResponse } from '../data/models/ApiModels';
 
 interface AuthState {
@@ -24,7 +25,7 @@ export const useAuthStore = create<AuthState>((set) => {
   // Listen for auth failure events (token refresh failed, 401 unrecoverable)
   window.addEventListener('p4c:auth-failure', () => {
     clearTokens();
-    set({ user: null, isLoading: false, error: 'Your session has expired. Please sign in again.' });
+    set({ user: null, isLoading: false, error: formatApiMessageForDisplay('Your session has expired. Please sign in again.') });
   });
 
   return {
@@ -40,9 +41,8 @@ export const useAuthStore = create<AuthState>((set) => {
         const account = await apiRepository.getUserAccount();
         saveUserAccount(account);
         set({ user: account, isLoading: false, error: null });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Sign-in failed. Please try again.';
-        set({ isLoading: false, error: msg });
+      } catch (err: any) {
+        set({ isLoading: false, error: formatApiMessageForDisplay(err) });
         throw err;
       }
     },

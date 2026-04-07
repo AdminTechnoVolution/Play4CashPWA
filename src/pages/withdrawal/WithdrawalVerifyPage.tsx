@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { mailOutline, shieldCheckmarkOutline, alertCircleOutline } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
+import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import '../../ui/theme/variables.css';
 import { useT } from '../../i18n/translations';
 
@@ -30,17 +31,17 @@ const WithdrawalVerifyPage: React.FC = () => {
 
   const handleSubmit = async () => {
     if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
-      setFieldError('Please enter the 6-digit OTP code.');
+      setFieldError(t('recharge_error_tx_required'));
       return;
     }
     setLoading(true);
     setFieldError('');
     try {
       await apiRepository.verifyWithdrawal({ verification_code: otp });
-      setToast({ isOpen: true, message: t('APP.WITHDRAWAL.SUCCESS'), color: 'success' });
+      setToast({ isOpen: true, message: t('withdrawal_verify_success'), color: 'success' });
       setTimeout(() => navigate('/dashboard'), 1500);
-    } catch (err) {
-      setFieldError(err instanceof Error ? err.message : 'Invalid or expired OTP. Please try again.');
+    } catch (err: any) {
+      setFieldError(formatApiMessageForDisplay(err));
     } finally {
       setLoading(false);
     }
@@ -59,7 +60,7 @@ const WithdrawalVerifyPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.WITHDRAWAL.VERIFY_TITLE')}</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('withdrawal_verify_title')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -102,7 +103,7 @@ const WithdrawalVerifyPage: React.FC = () => {
                 margin: '0 0 10px 0',
               }}
             >
-              Check Your Email
+              {t('withdrawal_verify_title')}
             </h2>
           </IonText>
           <IonText>
@@ -115,7 +116,7 @@ const WithdrawalVerifyPage: React.FC = () => {
                 margin: '0 0 40px 0',
               }}
             >
-              {t('APP.WITHDRAWAL.OTP_HINT')}
+              {t('withdrawal_otp_hint')}
             </p>
           </IonText>
 
@@ -142,7 +143,7 @@ const WithdrawalVerifyPage: React.FC = () => {
                   textTransform: 'uppercase',
                 }}
               >
-                {t('APP.WITHDRAWAL.OTP_LABEL')}
+                {t('withdrawal_verify_otp_label')}
               </label>
             </IonText>
 
@@ -219,7 +220,7 @@ const WithdrawalVerifyPage: React.FC = () => {
               expand="block"
             >
               <IonIcon icon={shieldCheckmarkOutline} style={{ marginRight: '8px', fontSize: '18px' }} />
-              {t('APP.WITHDRAWAL.CONFIRM_BTN')}
+              {t('withdrawal_verify_confirm')}
             </SovereignPrimaryButton>
           </div>
 
@@ -228,7 +229,7 @@ const WithdrawalVerifyPage: React.FC = () => {
               onClick={() => navigate('/dashboard')}
               expand="block"
             >
-              {t('APP.COMMON.CANCEL')}
+              {t('ok') || 'Cancel'}
             </SovereignSecondaryButton>
           </div>
 
@@ -252,7 +253,7 @@ const WithdrawalVerifyPage: React.FC = () => {
                 }}
                 onClick={() => setToast({ isOpen: true, message: 'Please re-submit your withdrawal request to get a new code.', color: 'medium' })}
               >
-                {t('APP.COMMON.BACK')}
+                {t('chess_cd_back')}
               </span>{' '}
               and try again.
             </p>
@@ -261,7 +262,7 @@ const WithdrawalVerifyPage: React.FC = () => {
 
         <IonToast
           isOpen={toast.isOpen}
-          message={toast.message}
+          message={formatApiMessageForDisplay(toast.message)}
           duration={3500}
           color={toast.color}
           onDidDismiss={() => setToast({ ...toast, isOpen: false })}

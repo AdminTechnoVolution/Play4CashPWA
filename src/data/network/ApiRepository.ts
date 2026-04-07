@@ -102,6 +102,7 @@ export const apiRepository = {
   },
 
   async spectateRoom(roomId: string): Promise<void> {
+    console.log('[SPECTATOR][2] ApiRepository.spectateRoom → roomId:', roomId);
     return apiService.spectateRoom(roomId);
   },
 

@@ -14,6 +14,7 @@ import TurnTimer from '../components/TurnTimer';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import { useT } from '../../../i18n/translations';
+import { applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
 
 const PIECE_SYMBOL: Record<string, string> = {
   wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
@@ -100,10 +101,10 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
           {(store.canCastleKingside || store.canCastleQueenside) && isMyTurn && (
             <div style={{ padding: '6px 12px', marginBottom: 8, background: 'rgba(201,168,76,0.1)', borderRadius: 8, border: '1px solid rgba(201,168,76,0.3)' }}>
               <IonText style={{ color: '#c9a84c', fontSize: 12 }}>
-                {t('APP.CHESS.CASTLING_HINT')}:{' '}
+                {t('chess_castling_banner_title')}:{' '}
                 {[
-                  store.canCastleKingside && t('APP.CHESS.CASTLING_KINGSIDE'),
-                  store.canCastleQueenside && t('APP.CHESS.CASTLING_QUEENSIDE'),
+                  store.canCastleKingside && t('chess_castling_kingside'),
+                  store.canCastleQueenside && t('chess_castling_queenside'),
                 ].filter(Boolean).join(' / ')}
               </IonText>
             </div>
@@ -111,8 +112,12 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
 
           {/* Turn indicator */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <IonText style={{ color: isMyTurn ? '#c9a84c' : '#8a9bbf', fontSize: 13 }}>
-              {isMyTurn ? `▶ ${t('APP.GAME.YOUR_TURN')}` : `${opponentName}'s ${t('APP.GAME.OPPONENT_TURN')}`}
+            <IonText style={{ color: isMyTurn && !isSpectator ? '#c9a84c' : '#8a9bbf', fontSize: 13 }}>
+              {isSpectator
+                ? applyWsMessagePlaceholders(t('spectator_chess_turn_x'), { username: store.currentPlayer })
+                : isMyTurn
+                  ? `▶ ${t('ws.games.yourTurn')}`
+                  : `${opponentName}'s ${t('chess_opponent_turn')}`}
             </IonText>
           </div>
 
@@ -172,17 +177,17 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
       {/* Promotion picker */}
       <IonActionSheet
         isOpen={showPromotion}
-        header={t('APP.CHESS.PROMOTE_TITLE')}
+        header={t('chess_promotion_title')}
         buttons={[
-          { text: `♕ ${t('APP.CHESS.QUEEN')}`, handler: () => { store.setPromotion(roomId, 'q'); setShowPromotion(false); } },
-          { text: `♖ ${t('APP.CHESS.ROOK')}`, handler: () => { store.setPromotion(roomId, 'r'); setShowPromotion(false); } },
-          { text: `♗ ${t('APP.CHESS.BISHOP')}`, handler: () => { store.setPromotion(roomId, 'b'); setShowPromotion(false); } },
-          { text: `♘ ${t('APP.CHESS.KNIGHT')}`, handler: () => { store.setPromotion(roomId, 'n'); setShowPromotion(false); } },
+          { text: `♕ ${t('chess_promotion_queen')}`, handler: () => { store.setPromotion(roomId, 'q'); setShowPromotion(false); } },
+          { text: `♖ ${t('chess_promotion_rook')}`, handler: () => { store.setPromotion(roomId, 'r'); setShowPromotion(false); } },
+          { text: `♗ ${t('chess_promotion_bishop')}`, handler: () => { store.setPromotion(roomId, 'b'); setShowPromotion(false); } },
+          { text: `♘ ${t('chess_promotion_knight')}`, handler: () => { store.setPromotion(roomId, 'n'); setShowPromotion(false); } },
         ]}
         onDidDismiss={() => setShowPromotion(false)}
       />
 
-      <GameOverModal isOpen={!!store.gameOver} gameOver={store.gameOver} onPlayAgain={onLeaveRequest} onExit={onLeaveRequest} />
+      <GameOverModal isOpen={!!store.gameOver} gameOver={store.gameOver} isSpectator={isSpectator} onExit={onLeaveRequest} gameProfile="CHESS" />
     </IonPage>
   );
 }

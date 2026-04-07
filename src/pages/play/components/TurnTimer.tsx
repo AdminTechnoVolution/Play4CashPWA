@@ -5,18 +5,23 @@ interface TurnTimerProps {
   seconds: number;
   isMyTurn: boolean;
   onTimeout: () => void;
+  /** Spectator mode: name of the player whose turn it is now */
+  turnPlayerName?: string;
+  /** Change this value to force-reset the countdown (use shot key for spectators) */
+  resetKey?: string | number;
 }
 
-const TurnTimer: React.FC<TurnTimerProps> = ({ seconds, isMyTurn, onTimeout }) => {
+const TurnTimer: React.FC<TurnTimerProps> = ({ seconds, isMyTurn, onTimeout, turnPlayerName, resetKey }) => {
   const t = useT();
   const [remaining, setRemaining] = useState(seconds);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onTimeoutRef = useRef(onTimeout);
   onTimeoutRef.current = onTimeout;
 
+  // Reset countdown when turn changes (isMyTurn, resetKey) or duration changes
   useEffect(() => {
     setRemaining(seconds);
-  }, [seconds, isMyTurn]);
+  }, [seconds, isMyTurn, resetKey]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -35,15 +40,19 @@ const TurnTimer: React.FC<TurnTimerProps> = ({ seconds, isMyTurn, onTimeout }) =
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [seconds, isMyTurn]);
+  }, [seconds, isMyTurn, resetKey]);
 
+  const isSpectatorMode = turnPlayerName !== undefined;
+  const isActive = isMyTurn || isSpectatorMode;
   const percentage = (remaining / seconds) * 100;
-  const isLow = remaining <= 5 && isMyTurn;
-  const barColor = isMyTurn
-    ? isLow
-      ? '#cf6679'
-      : 'var(--sovereign-gold)'
+  const isLow = remaining <= 5 && isActive;
+  const barColor = isActive
+    ? isLow ? '#cf6679' : 'var(--sovereign-gold)'
     : 'rgba(138, 155, 191, 0.5)';
+
+  const label = isSpectatorMode
+    ? `${turnPlayerName}'s turn`
+    : t('game_turn_timer');
 
   return (
     <div
@@ -64,17 +73,17 @@ const TurnTimer: React.FC<TurnTimerProps> = ({ seconds, isMyTurn, onTimeout }) =
         <span
           style={{
             fontSize: '12px',
-            color: isMyTurn ? 'var(--sovereign-gold)' : 'var(--sovereign-text-muted)',
+            color: isActive ? 'var(--sovereign-gold)' : 'var(--sovereign-text-muted)',
             fontWeight: '600',
           }}
         >
-          {t('APP.GAME.TURN_TIMER')}
+          {label}
         </span>
         <span
           style={{
             fontSize: '13px',
             fontWeight: '700',
-            color: isLow ? '#cf6679' : isMyTurn ? 'var(--sovereign-gold)' : 'var(--sovereign-text-muted)',
+            color: isLow ? '#cf6679' : isActive ? 'var(--sovereign-gold)' : 'var(--sovereign-text-muted)',
             animation: isLow ? 'pulse 0.8s ease-in-out infinite' : 'none',
           }}
         >

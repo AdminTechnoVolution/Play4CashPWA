@@ -102,7 +102,7 @@ const SettingsPage: React.FC = () => {
       });
       saveWalletAddress(newWalletAddress.trim());
       setCurrentWalletAddress(newWalletAddress.trim());
-      setToast({ isOpen: true, message: t('APP.SETTINGS.WALLET_SAVED'), color: 'success' });
+      setToast({ isOpen: true, message: t('recharge_success'), color: 'success' });
     } catch (err) {
       setToast({ isOpen: true, message: err instanceof Error ? err.message : 'Failed to save wallet.', color: 'danger' });
     } finally {
@@ -123,7 +123,7 @@ const SettingsPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.SETTINGS.TITLE')}</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('settings_title')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -148,7 +148,7 @@ const SettingsPage: React.FC = () => {
               </div>
               <IonText>
                 <h3 style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '17px', margin: 0 }}>
-                  {t('APP.SETTINGS.WALLET_SECTION')}
+                  {t('label_wallet')}
                 </h3>
               </IonText>
             </div>
@@ -193,7 +193,7 @@ const SettingsPage: React.FC = () => {
 
               {/* Network */}
               <div style={{ marginBottom: '16px' }}>
-                <SectionLabel>{t('APP.SETTINGS.NETWORK_LABEL')}</SectionLabel>
+                <SectionLabel>{t('label_network')}</SectionLabel>
                 {walletsLoading ? (
                   <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
                 ) : (
@@ -227,7 +227,7 @@ const SettingsPage: React.FC = () => {
 
               {/* New wallet address */}
               <div style={{ marginBottom: '20px' }}>
-                <SectionLabel>{t('APP.SETTINGS.ADDRESS_LABEL')}</SectionLabel>
+                <SectionLabel>{t('label_wallet')}</SectionLabel>
                 <IonInput
                   value={newWalletAddress}
                   onIonInput={(e) => setNewWalletAddress(e.detail.value ?? '')}
@@ -256,7 +256,7 @@ const SettingsPage: React.FC = () => {
               </div>
 
               <SovereignPrimaryButton onClick={handleSaveWallet} loading={walletSaving} expand="block">
-                {t('APP.SETTINGS.SAVE_WALLET')}
+                {t('save_wallet')}
               </SovereignPrimaryButton>
             </div>
           </div>
@@ -279,7 +279,7 @@ const SettingsPage: React.FC = () => {
               </div>
               <IonText>
                 <h3 style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '17px', margin: 0 }}>
-                  {t('APP.SETTINGS.LANGUAGE_SECTION')}
+                  {t('label_language')}
                 </h3>
               </IonText>
             </div>
@@ -293,7 +293,7 @@ const SettingsPage: React.FC = () => {
               }}
             >
               <div style={{ marginBottom: '20px' }}>
-                <SectionLabel>{t('APP.SETTINGS.LANGUAGE_LABEL')}</SectionLabel>
+                <SectionLabel>{t('label_language')}</SectionLabel>
                 <IonSelect
                   value={language}
                   onIonChange={(e) => setLanguage(e.detail.value)}
@@ -316,7 +316,7 @@ const SettingsPage: React.FC = () => {
               </div>
 
               <SovereignPrimaryButton onClick={handleSaveLanguage} expand="block">
-                {t('APP.SETTINGS.SAVE_LANGUAGE')}
+                {t('save_wallet')}
               </SovereignPrimaryButton>
             </div>
           </div>
@@ -330,7 +330,7 @@ const SettingsPage: React.FC = () => {
           >
             <IonText>
               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: 0, lineHeight: '1.8' }}>
-                {t('APP.SETTINGS.VERSION')}
+                {t('label_version')}
                 <br />
                 <Link to="/terms" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none' }}>
                   Terms &amp; Conditions

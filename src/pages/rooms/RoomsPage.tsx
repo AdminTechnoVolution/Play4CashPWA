@@ -42,7 +42,12 @@ import { useDashboardStore } from '../../store/dashboardStore';
 import { LobbySocketManager } from '../../data/network/LobbySocketManager';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
-import { useT } from '../../i18n/translations';
+import { useT, hasKey } from '../../i18n/translations';
+import { 
+  formatApiMessageForDisplay, 
+  classifyRoomLobbyStatus,
+  RoomLobbyKind 
+} from '../../i18n/ApiMessageDisplay';
 import '../../ui/theme/variables.css';
 type RoomStatus = 'waiting' | 'started' | 'finished';
 
@@ -130,21 +135,31 @@ const RoomsPage: React.FC = () => {
         `/play/${gameSocketCode}/${roomId}/${betAmount}/${encodeURIComponent(roomName)}/${encodeURIComponent(opponentName)}/true/false`,
       );
     } catch (err) {
-      setToast({ isOpen: true, message: err instanceof Error ? err.message : 'Failed to join room', color: 'danger' });
+      setToast({ 
+        isOpen: true, 
+        message: formatApiMessageForDisplay(err instanceof Error ? err.message : null, 'error_join_room_failed'), 
+        color: 'danger' 
+      });
     } finally {
       setJoiningId(null);
     }
   };
 
-  const handleSpectate = async (roomId: string, roomName: string, betAmount: number) => {
+  const handleSpectate = async (roomId: string, roomName: string, betAmount: number, firstPlayerName: string) => {
+    console.log('[SPECTATOR][3] handleSpectate → roomId:', roomId, 'roomName:', roomName, 'betAmount:', betAmount, 'firstPlayerName:', firstPlayerName);
     setSpectatingId(roomId);
     try {
       await spectateRoom(roomId);
-      navigate(
-        `/play/${gameSocketCode}/${roomId}/${betAmount}/${encodeURIComponent(roomName)}/Spectating/false/true`,
-      );
+      const url = `/play/${gameSocketCode}/${roomId}/${betAmount}/${encodeURIComponent(roomName)}/${encodeURIComponent(firstPlayerName)}/true/true`;
+      console.log('[SPECTATOR][4] Navigating to game as spectator →', url);
+      navigate(url);
     } catch (err) {
-      setToast({ isOpen: true, message: err instanceof Error ? err.message : 'Failed to spectate room', color: 'danger' });
+      console.error('[SPECTATOR][ERROR] spectateRoom failed:', err);
+      setToast({ 
+        isOpen: true, 
+        message: formatApiMessageForDisplay(err instanceof Error ? err.message : null, 'error_spectate_room_failed'), 
+        color: 'danger' 
+      });
     } finally {
       setSpectatingId(null);
     }
@@ -182,7 +197,7 @@ const RoomsPage: React.FC = () => {
         `/play/${gameSocketCode}/${roomId}/${createBet}/${encodeURIComponent(roomName)}/Waiting/false/false`,
       );
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : 'Failed to create room.');
+      setCreateError(formatApiMessageForDisplay(err instanceof Error ? err.message : null, 'error_create_room_failed'));
     } finally {
       setCreateLoading(false);
     }
@@ -193,10 +208,23 @@ const RoomsPage: React.FC = () => {
     return r.status === filter;
   });
 
-  const statusLabels: Record<RoomStatus, string> = {
-    waiting: t('APP.ROOMS.STATUS_WAITING'),
-    started: t('APP.ROOMS.STATUS_STARTED'),
-    finished: t('APP.ROOMS.STATUS_FINISHED'),
+  const getLocalizedStatusLabel = (status: string) => {
+    const kind = classifyRoomLobbyStatus(status);
+    switch (kind) {
+      case 'WAITING':
+        return t('rooms_filter_waiting');
+      case 'STARTED':
+        return t('rooms_filter_started');
+      default:
+        return status;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const kind = classifyRoomLobbyStatus(status);
+    if (kind === 'WAITING') return '#4caf50';
+    if (kind === 'STARTED') return 'var(--sovereign-gold)';
+    return 'var(--sovereign-text-muted)';
   };
 
   return (
@@ -246,13 +274,13 @@ const RoomsPage: React.FC = () => {
             style={{ '--background': 'var(--sovereign-surface)', borderRadius: '10px' } as React.CSSProperties}
           >
             <IonSegmentButton value="all">
-              <IonLabel>{t('APP.ROOMS.FILTER_ALL')}</IonLabel>
+              <IonLabel>{t('rooms_filter_all')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="waiting">
-              <IonLabel>{t('APP.ROOMS.FILTER_WAITING')}</IonLabel>
+              <IonLabel>{t('rooms_filter_waiting')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="started">
-              <IonLabel>{t('APP.ROOMS.FILTER_STARTED')}</IonLabel>
+              <IonLabel>{t('rooms_filter_started')}</IonLabel>
             </IonSegmentButton>
           </IonSegment>
         </div>
@@ -284,12 +312,12 @@ const RoomsPage: React.FC = () => {
               />
               <IonText>
                 <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '15px', margin: '0 0 8px 0' }}>
-                  {t('APP.ROOMS.EMPTY')}
+                  {t('rooms_filter_empty_title')}
                 </p>
               </IonText>
               <IonText>
                 <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', margin: 0 }}>
-                  Create one to get started!
+                  {t('rooms_filter_empty_subtitle')}
                 </p>
               </IonText>
             </div>
@@ -352,15 +380,15 @@ const RoomsPage: React.FC = () => {
 
                       <IonBadge
                         style={{
-                          background: STATUS_COLORS[room.status as RoomStatus] ?? '#8a9bbf',
-                          color: room.status === 'waiting' ? '#fff' : '#0a1628',
+                          background: getStatusColor(room.status),
+                          color: classifyRoomLobbyStatus(room.status) === 'WAITING' ? '#fff' : '#0a1628',
                           borderRadius: '6px',
                           padding: '4px 10px',
                           fontSize: '11px',
                           fontWeight: '700',
                         }}
                       >
-                        {statusLabels[room.status as RoomStatus] ?? room.status}
+                        {getLocalizedStatusLabel(room.status)}
                       </IonBadge>
                     </div>
 
@@ -397,23 +425,23 @@ const RoomsPage: React.FC = () => {
                           style={{ flex: 1, margin: 0 } as React.CSSProperties}
                         >
                           <IonIcon icon={enterOutline} style={{ marginRight: '6px', fontSize: '16px' }} />
-                          {t('APP.ROOMS.JOIN')}
+                          {t('join_room')}
                         </SovereignPrimaryButton>
                       )}
                       {canSpectate && (
                         <SovereignSecondaryButton
-                          onClick={() => handleSpectate(room.id, room.name, room.betAmount)}
+                          onClick={() => handleSpectate(room.id, room.name, room.betAmount, opponentName)}
                           loading={spectatingId === room.id}
                           expand="block"
                           style={{ flex: 1, margin: 0 } as React.CSSProperties}
                         >
                           <IonIcon icon={eyeOutline} style={{ marginRight: '6px', fontSize: '16px' }} />
-                          {t('APP.ROOMS.WATCH')}
+                          {t('rooms_watch_live')}
                         </SovereignSecondaryButton>
                       )}
                       {!canJoin && !canSpectate && room.status !== 'finished' && (
                         <IonText>
-                          <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>Full</span>
+                          <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>{t('room_full')}</span>
                         </IonText>
                       )}
                     </div>
@@ -448,7 +476,7 @@ const RoomsPage: React.FC = () => {
         >
           <IonHeader>
             <IonToolbar style={{ '--background': 'var(--sovereign-surface)', '--border-color': 'var(--sovereign-border)' } as React.CSSProperties}>
-              <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.ROOMS.CREATE_TITLE')}</IonTitle>
+              <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('create_room')}</IonTitle>
               <IonButtons slot="end">
                 <IonIcon
                   icon={closeOutline}
@@ -465,7 +493,7 @@ const RoomsPage: React.FC = () => {
               <div style={{ marginBottom: '20px' }}>
                 <IonText>
                   <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px', letterSpacing: '0.5px' }}>
-                    {t('APP.ROOMS.ROOM_NAME').toUpperCase()}
+                    {t('label_room').toUpperCase()}
                   </label>
                 </IonText>
                 <IonInput
@@ -492,7 +520,7 @@ const RoomsPage: React.FC = () => {
               <div style={{ marginBottom: '20px' }}>
                 <IonText>
                   <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px', letterSpacing: '0.5px' }}>
-                    {t('APP.ROOMS.BET_AMOUNT').toUpperCase()} (min ${minBetNum})
+                    {t('label_bet').toUpperCase()} (min ${minBetNum})
                   </label>
                 </IonText>
                 <IonInput
@@ -527,7 +555,7 @@ const RoomsPage: React.FC = () => {
                 <div style={{ marginBottom: '28px' }}>
                   <IonText>
                     <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px', letterSpacing: '0.5px' }}>
-                      {t('APP.ROOMS.PLAYER_LIMIT').toUpperCase()}
+                      {t('room_player_limit_label').toUpperCase()}
                     </label>
                   </IonText>
                   <IonSelect
@@ -566,13 +594,13 @@ const RoomsPage: React.FC = () => {
               )}
 
               <SovereignPrimaryButton onClick={handleCreate} loading={createLoading} expand="block">
-                {t('APP.ROOMS.CREATE_BTN')}
+                {t('create_room')}
               </SovereignPrimaryButton>
 
               <div style={{ height: '12px' }} />
 
               <SovereignSecondaryButton onClick={() => setShowCreateDialog(false)} expand="block">
-                {t('APP.COMMON.CANCEL')}
+                {t('cancel')}
               </SovereignSecondaryButton>
             </div>
           </IonContent>

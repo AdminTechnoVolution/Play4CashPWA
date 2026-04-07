@@ -81,10 +81,10 @@ const DashboardPage: React.FC = () => {
 
   const navItems = [
     { icon: gridOutline, label: 'Dashboard', path: '/dashboard' },
-    { icon: walletOutline, label: t('APP.DASHBOARD.MENU_ADD_FUNDS'), path: '/add-funds' },
-    { icon: arrowDownOutline, label: t('APP.DASHBOARD.MENU_WITHDRAWAL'), path: '/withdrawal' },
-    { icon: timeOutline, label: t('APP.DASHBOARD.MENU_HISTORY'), path: '/history' },
-    { icon: settingsOutline, label: t('APP.DASHBOARD.MENU_SETTINGS'), path: '/settings' },
+    { icon: walletOutline, label: t('add_funds_title'), path: '/add-funds' },
+    { icon: arrowDownOutline, label: t('withdrawal_title'), path: '/withdrawal' },
+    { icon: timeOutline, label: t('game_history_title'), path: '/history' },
+    { icon: settingsOutline, label: t('settings_title'), path: '/settings' },
   ];
 
   const SkeletonCard = () => (
@@ -181,7 +181,7 @@ const DashboardPage: React.FC = () => {
                 style={{ '--background': 'rgba(207,102,121,0.1)', '--border-color': 'transparent', borderRadius: '10px', margin: '0 12px' } as React.CSSProperties}
               >
                 <IonIcon icon={logOutOutline} slot="start" style={{ color: 'var(--sovereign-error)', fontSize: '20px' }} />
-                <IonLabel style={{ color: 'var(--sovereign-error)', fontWeight: '500' }}>{t('APP.DASHBOARD.MENU_LOGOUT')}</IonLabel>
+                <IonLabel style={{ color: 'var(--sovereign-error)', fontWeight: '500' }}>{t('log_out')}</IonLabel>
               </IonItem>
             </IonMenuToggle>
           </div>
@@ -236,12 +236,12 @@ const DashboardPage: React.FC = () => {
               <div style={{ marginBottom: '20px', animation: 'fadeInUp 0.5s ease' }}>
                 <IonText>
                   <h2 style={{ color: 'var(--sovereign-text)', fontSize: '20px', fontWeight: '700', margin: '0 0 4px 0' }}>
-                    {t('APP.DASHBOARD.WELCOME')} {account.username}
+                    {t('login_welcome_title')} {account.username}
                   </h2>
                 </IonText>
                 <IonText>
                   <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px', margin: 0 }}>
-                    {t('APP.DASHBOARD.SUBTITLE')}
+                    {t('login_welcome_subtitle')}
                   </p>
                 </IonText>
               </div>
@@ -292,7 +292,7 @@ const DashboardPage: React.FC = () => {
                     </IonText>
                     <IonText>
                       <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', margin: 0, letterSpacing: '0.5px' }}>
-                        {t('APP.DASHBOARD.PLAYERS_ONLINE')}
+                        {t('dashboard_stat_players_online')}
                       </p>
                     </IonText>
                   </div>
@@ -314,7 +314,7 @@ const DashboardPage: React.FC = () => {
                     </IonText>
                     <IonText>
                       <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', margin: 0, letterSpacing: '0.5px' }}>
-                        {t('APP.DASHBOARD.ACTIVE_GAMES')}
+                        {t('dashboard_stat_active_games')}
                       </p>
                     </IonText>
                   </div>
@@ -336,7 +336,7 @@ const DashboardPage: React.FC = () => {
                     </IonText>
                     <IonText>
                       <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', margin: 0, letterSpacing: '0.5px' }}>
-                        {t('APP.DASHBOARD.TOTAL_BET')}
+                        {t('dashboard_stat_money_in_play')}
                       </p>
                     </IonText>
                   </div>
@@ -348,12 +348,12 @@ const DashboardPage: React.FC = () => {
             <div style={{ marginBottom: '16px', animation: 'fadeInUp 0.7s ease' }}>
               <IonText>
                 <h3 style={{ color: 'var(--sovereign-text)', fontSize: '17px', fontWeight: '700', margin: '0 0 4px 0' }}>
-                  {t('APP.DASHBOARD.GAMES')}
+                  {t('dashboard_games')}
                 </h3>
               </IonText>
               <IonText>
                 <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', margin: 0 }}>
-                  {t('APP.DASHBOARD.GAMES_SUBTITLE')}
+                  {t('dashboard_no_games_subtitle')}
                 </p>
               </IonText>
             </div>
@@ -436,7 +436,7 @@ const DashboardPage: React.FC = () => {
                             >
                               <IonText>
                                 <span style={{ color: 'var(--sovereign-gold)', fontSize: '12px', fontWeight: '600' }}>
-                                  {t('APP.DASHBOARD.MIN_BET')} ${game.minBet}
+                                  {t('rooms_filter_min_bet')} ${game.minBet}
                                 </span>
                               </IonText>
                             </div>
@@ -466,7 +466,7 @@ const DashboardPage: React.FC = () => {
                 />
                 <IonText>
                   <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '15px' }}>
-                    {t('APP.DASHBOARD.NO_GAMES')}
+                    {t('dashboard_no_games_title')}
                   </p>
                 </IonText>
               </div>
@@ -476,15 +476,15 @@ const DashboardPage: React.FC = () => {
             <div style={{ marginTop: '32px', animation: 'fadeInUp 0.9s ease' }}>
               <IonText>
                 <h3 style={{ color: 'var(--sovereign-text)', fontSize: '17px', fontWeight: '700', margin: '0 0 14px 0' }}>
-                  {t('APP.DASHBOARD.QUICK_ACTIONS')}
+                  {t('dashboard_quick_actions')}
                 </h3>
               </IonText>
               <IonList style={{ background: 'transparent', padding: 0 }}>
                 {[
-                  { icon: walletOutline, label: t('APP.DASHBOARD.MENU_ADD_FUNDS'), sub: t('APP.DASHBOARD.ADD_FUNDS_SUB'), path: '/add-funds' },
-                  { icon: arrowDownOutline, label: t('APP.DASHBOARD.MENU_WITHDRAWAL'), sub: t('APP.DASHBOARD.WITHDRAWAL_SUB'), path: '/withdrawal' },
-                  { icon: timeOutline, label: t('APP.DASHBOARD.MENU_HISTORY'), sub: t('APP.DASHBOARD.HISTORY_SUB'), path: '/history' },
-                  { icon: settingsOutline, label: t('APP.DASHBOARD.MENU_SETTINGS'), sub: t('APP.DASHBOARD.SETTINGS_SUB'), path: '/settings' },
+                  { icon: walletOutline, label: t('dashboard_item_add_funds'), sub: t('dashboard_item_add_funds_subtitle'), path: '/add-funds' },
+                  { icon: arrowDownOutline, label: t('dashboard_item_withdrawal'), sub: t('dashboard_item_withdrawal_subtitle'), path: '/withdrawal' },
+                  { icon: timeOutline, label: t('history_hub_title'), sub: t('history_hub_title'), path: '/history' },
+                  { icon: settingsOutline, label: t('settings_title'), sub: t('settings_title'), path: '/settings' },
                 ].map((item) => (
                   <IonItem
                     key={item.path}

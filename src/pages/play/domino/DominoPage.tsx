@@ -13,6 +13,7 @@ import GameOverModal from '../components/GameOverModal';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import { useT } from '../../../i18n/translations';
+import { applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
 
 interface Props {
   roomId: string;
@@ -104,11 +105,15 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
 
           {/* Turn + opponent info */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <IonText style={{ color: isMyTurn ? '#c9a84c' : '#8a9bbf', fontSize: 13 }}>
-              {isMyTurn ? `▶ ${t('APP.GAME.YOUR_TURN')}` : `${opponentName}'s ${t('APP.GAME.OPPONENT_TURN')}`}
+            <IonText style={{ color: isSpectator ? '#8a9bbf' : (isMyTurn ? '#c9a84c' : '#8a9bbf'), fontSize: 13 }}>
+              {isSpectator
+                ? applyWsMessagePlaceholders(t('spectator_generic_turn_x'), { username: store.currentPlayer })
+                : isMyTurn
+                  ? `▶ ${t('domino_your_turn')}`
+                  : `${opponentName}'s ${t('domino_opponent_turn')}`}
             </IonText>
             <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>
-              {t('APP.DOMINO.BONEYARD')}: {store.boneyardCount}
+              {applyWsMessagePlaceholders(t('domino_boneyard_count'), { count: store.boneyardCount })}
             </IonText>
           </div>
 
@@ -116,16 +121,16 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
           <div style={{ display: 'flex', gap: 8 }}>
             {store.opponents.map((op) => (
               <div key={op.username} style={{ padding: '4px 10px', background: '#131f35', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
-                <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>{op.username}: {op.tileCount} {t('APP.DOMINO.TILES')}</IonText>
+                <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>{op.username}: {applyWsMessagePlaceholders(t('domino_tile_count'), { count: op.tileCount })}</IonText>
               </div>
             ))}
           </div>
 
           {/* Board */}
           <div style={{ background: '#0d1a2a', borderRadius: 12, padding: 8, minHeight: 80, border: '1px solid rgba(255,255,255,0.08)' }}>
-            <IonText style={{ color: '#8a9bbf', fontSize: 11, marginBottom: 6 }}>{t('APP.DOMINO.BOARD')}</IonText>
+            <IonText style={{ color: '#8a9bbf', fontSize: 11, marginBottom: 6 }}>{t('play_room_label') || 'Board'}</IonText>
             {store.board.length === 0 ? (
-              <IonText style={{ color: '#4a5a7a', fontSize: 13 }}>{t('APP.DOMINO.NO_TILES')}</IonText>
+              <IonText style={{ color: '#4a5a7a', fontSize: 13 }}>{t('domino_board_empty')}</IonText>
             ) : (
               <div style={{ display: 'flex', overflowX: 'auto', gap: 4, paddingBottom: 4, alignItems: 'center' }}>
                 <IonText style={{ color: '#c9a84c', fontSize: 12, flexShrink: 0 }}>[{store.leftEnd}]</IonText>
@@ -138,27 +143,41 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
             )}
           </div>
 
-          {/* My hand */}
-          <div>
-            <IonText style={{ color: '#8a9bbf', fontSize: 12, marginBottom: 8 }}>{t('APP.DOMINO.YOUR_HAND')} ({store.myHand.length})</IonText>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-              {store.myHand.map((tile, i) => {
-                const vm = store.validMoves.find((m) => m.tile.a === tile.a && m.tile.b === tile.b);
-                const isValid = !!vm && isMyTurn;
-                const isSelected = store.sidePickTile?.a === tile.a && store.sidePickTile?.b === tile.b;
-                return (
-                  <DominoTileView
-                    key={i}
-                    tile={tile}
-                    valid={isValid}
-                    selected={isSelected}
-                    dim={!isValid && isMyTurn}
-                    onClick={() => handleTileClick(tile)}
-                  />
-                );
-              })}
+          {/* My hand / Spectator hidden hand */}
+          {isSpectator ? (
+            <div style={{
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 8,
+              padding: '10px 14px',
+              color: '#4a5a7a',
+              fontSize: 13,
+              textAlign: 'center',
+            }}>
+              Players&apos; tiles are hidden from spectators
             </div>
-          </div>
+          ) : (
+            <div>
+              <IonText style={{ color: '#8a9bbf', fontSize: 12, marginBottom: 8 }}>{t('domino_your_hand')} ({store.myHand.length})</IonText>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                {store.myHand.map((tile, i) => {
+                  const vm = store.validMoves.find((m) => m.tile.a === tile.a && m.tile.b === tile.b);
+                  const isValid = !!vm && isMyTurn;
+                  const isSelected = store.sidePickTile?.a === tile.a && store.sidePickTile?.b === tile.b;
+                  return (
+                    <DominoTileView
+                      key={i}
+                      tile={tile}
+                      valid={isValid}
+                      selected={isSelected}
+                      dim={!isValid && isMyTurn}
+                      onClick={() => handleTileClick(tile)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           {!isSpectator && (
@@ -168,7 +187,7 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
                   onClick={() => store.draw(roomId)}
                   style={{ '--background': '#1a2940', '--color': '#c9a84c', '--border-radius': '8px', flex: 1 }}
                 >
-                  {t('APP.DOMINO.DRAW_BTN')}
+                  {t('domino_draw_tile')}
                 </IonButton>
               )}
               {canPass && (
@@ -176,7 +195,7 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
                   onClick={() => store.pass(roomId)}
                   style={{ '--background': '#1a2940', '--color': '#8a9bbf', '--border-radius': '8px', flex: 1 }}
                 >
-                  {t('APP.DOMINO.PASS_BTN')}
+                  {t('domino_pass_turn')}
                 </IonButton>
               )}
             </div>
@@ -189,27 +208,27 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
       {/* Side picker modal */}
       <IonModal isOpen={!!store.sidePickTile} onDidDismiss={() => store.selectTile(null)} breakpoints={[0, 0.35]} initialBreakpoint={0.35}>
         <div style={{ padding: 16 }}>
-          <IonText style={{ color: '#c9a84c', fontSize: 15, fontWeight: 700 }}>{t('APP.DOMINO.SIDE_TITLE')}</IonText>
+          <IonText style={{ color: '#c9a84c', fontSize: 15, fontWeight: 700 }}>{t('domino_select_side_hint')}</IonText>
           <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
             <IonButton
               expand="block"
               onClick={() => store.sidePickTile && store.playSide(roomId, store.sidePickTile, 'left')}
               style={{ '--background': '#131f35', '--color': '#c9a84c', '--border-radius': '10px', flex: 1, border: '1px solid #c9a84c' }}
             >
-              ← {t('APP.DOMINO.SIDE_LEFT')} [{store.leftEnd}]
+              ← {t('domino_place_left')} [{store.leftEnd}]
             </IonButton>
             <IonButton
               expand="block"
               onClick={() => store.sidePickTile && store.playSide(roomId, store.sidePickTile, 'right')}
               style={{ '--background': '#131f35', '--color': '#c9a84c', '--border-radius': '10px', flex: 1, border: '1px solid #c9a84c' }}
             >
-              {t('APP.DOMINO.SIDE_RIGHT')} [{store.rightEnd}] →
+              {t('domino_place_right')} [{store.rightEnd}]
             </IonButton>
           </div>
         </div>
       </IonModal>
 
-      <GameOverModal isOpen={!!store.gameOver} gameOver={store.gameOver} onPlayAgain={onLeaveRequest} onExit={onLeaveRequest} />
+      <GameOverModal isOpen={!!store.gameOver} gameOver={store.gameOver} isSpectator={isSpectator} onExit={onLeaveRequest} gameProfile="DOMINO" />
     </IonPage>
   );
 }

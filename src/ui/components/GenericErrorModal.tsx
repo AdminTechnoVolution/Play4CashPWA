@@ -1,12 +1,7 @@
 import React from 'react';
 import {
   IonModal,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonContent,
   IonIcon,
-  IonText,
 } from '@ionic/react';
 import { alertCircleOutline, closeOutline } from 'ionicons/icons';
 import { SovereignPrimaryButton } from './SovereignButton';
@@ -30,14 +25,22 @@ const GenericErrorModal: React.FC<GenericErrorModalProps> = ({
       initialBreakpoint={1}
       style={{ '--height': 'auto' } as React.CSSProperties}
     >
-      <IonHeader>
-        <IonToolbar
+      <div
+        style={{
+          background: 'var(--sovereign-surface)',
+          borderTop: '1px solid var(--sovereign-border)',
+        }}
+      >
+        {/* Header */}
+        <div
           style={{
-            '--background': 'var(--sovereign-surface)',
-            '--border-color': 'var(--sovereign-border)',
-          } as React.CSSProperties}
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 16px 0 16px',
+          }}
         >
-          <IonTitle
+          <span
             style={{
               color: 'var(--sovereign-error)',
               fontWeight: 700,
@@ -45,33 +48,26 @@ const GenericErrorModal: React.FC<GenericErrorModalProps> = ({
             }}
           >
             Error
-          </IonTitle>
+          </span>
           <IonIcon
             icon={closeOutline}
-            slot="end"
             onClick={onDismiss}
             style={{
               color: 'var(--sovereign-text-muted)',
               fontSize: '24px',
               cursor: 'pointer',
-              marginRight: '16px',
             }}
           />
-        </IonToolbar>
-      </IonHeader>
+        </div>
 
-      <IonContent
-        style={{
-          '--background': 'var(--sovereign-surface)',
-        } as React.CSSProperties}
-      >
+        {/* Body */}
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             gap: '16px',
-            padding: '32px 24px',
+            padding: '24px 24px 32px 24px',
           }}
         >
           <IonIcon
@@ -82,19 +78,17 @@ const GenericErrorModal: React.FC<GenericErrorModalProps> = ({
             }}
           />
 
-          <IonText>
-            <p
-              style={{
-                color: 'var(--sovereign-text)',
-                textAlign: 'center',
-                fontSize: '15px',
-                lineHeight: '1.6',
-                margin: 0,
-              }}
-            >
-              {message}
-            </p>
-          </IonText>
+          <p
+            style={{
+              color: 'var(--sovereign-text)',
+              textAlign: 'center',
+              fontSize: '15px',
+              lineHeight: '1.6',
+              margin: 0,
+            }}
+          >
+            {message}
+          </p>
 
           <SovereignPrimaryButton
             onClick={onDismiss}
@@ -103,7 +97,7 @@ const GenericErrorModal: React.FC<GenericErrorModalProps> = ({
             OK
           </SovereignPrimaryButton>
         </div>
-      </IonContent>
+      </div>
     </IonModal>
   );
 };

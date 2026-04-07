@@ -13,16 +13,16 @@ const RoomLeaveDialog: React.FC<RoomLeaveDialogProps> = ({ isOpen, onConfirm, on
   return (
     <IonAlert
       isOpen={isOpen}
-      header={t('APP.GAME.LEAVE_TITLE')}
-      message={t('APP.GAME.LEAVE_MSG')}
+      header={t('bs_leave_confirm_title')}
+      message={t('bs_leave_confirm_message')}
       buttons={[
         {
-          text: t('APP.GAME.LEAVE_CANCEL'),
+          text: t('bs_leave_confirm_stay'),
           role: 'cancel',
           handler: onCancel,
         },
         {
-          text: t('APP.GAME.LEAVE_CONFIRM'),
+          text: t('bs_leave_confirm_leave'),
           role: 'destructive',
           cssClass: 'alert-button-danger',
           handler: onConfirm,

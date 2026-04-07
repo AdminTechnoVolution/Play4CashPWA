@@ -14,6 +14,7 @@ import TurnTimer from '../components/TurnTimer';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import { useT } from '../../../i18n/translations';
+import { applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
 
 const isDark = (r: number, c: number) => (r + c) % 2 !== 0;
 
@@ -84,11 +85,15 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
           {isSpectator && <SpectatorBadge />}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <IonText style={{ color: isMyTurn ? '#c9a84c' : '#8a9bbf', fontSize: 13 }}>
-              {isMyTurn ? `▶ ${t('APP.GAME.YOUR_TURN')}` : `${opponentName}'s ${t('APP.GAME.OPPONENT_TURN')}`}
+            <IonText style={{ color: isMyTurn && !isSpectator ? '#c9a84c' : '#8a9bbf', fontSize: 13 }}>
+              {isSpectator
+                ? applyWsMessagePlaceholders(t('spectator_generic_turn_x'), { username: store.currentPlayer })
+                : isMyTurn
+                  ? `▶ ${t('ws.games.yourTurn')}`
+                  : `${opponentName}'s ${t('halma_opponent_turn')}`}
             </IonText>
             {store.inJumpSequence && (
-              <IonText style={{ color: '#c9a84c', fontSize: 12 }}>{t('APP.HALMA.JUMP_HINT')}</IonText>
+              <IonText style={{ color: '#c9a84c', fontSize: 12 }}>{t('ws.games.canJumpAgain')}</IonText>
             )}
           </div>
 
@@ -159,7 +164,7 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
           <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#c9a84c' }} />
-              <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>{t('APP.HALMA.YOU')}</IonText>
+              <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>{t('label_you') || 'You'}</IonText>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#cf4a5a' }} />
@@ -173,7 +178,7 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
               onClick={() => store.endTurn(roomId)}
               style={{ marginTop: 12, '--background': 'rgba(201,168,76,0.15)', '--color': '#c9a84c', '--border-radius': '10px', border: '1px solid rgba(201,168,76,0.4)' }}
             >
-              {t('APP.HALMA.END_TURN')}
+              {t('halma_end_turn')}
             </IonButton>
           )}
 
@@ -181,7 +186,7 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
         </div>
       </IonContent>
 
-      <GameOverModal isOpen={!!store.gameOver} gameOver={store.gameOver} onPlayAgain={onLeaveRequest} onExit={onLeaveRequest} />
+      <GameOverModal isOpen={!!store.gameOver} gameOver={store.gameOver} isSpectator={isSpectator} onExit={onLeaveRequest} gameProfile="HALMA" />
     </IonPage>
   );
 }

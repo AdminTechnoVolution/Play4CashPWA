@@ -21,6 +21,7 @@ import { apiRepository } from '../../data/network/ApiRepository';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
+import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
@@ -53,8 +54,8 @@ const WithdrawalPage: React.FC = () => {
         const data = await apiRepository.getWallets();
         setWallets(data);
         if (data.length > 0) setSelectedWallet(data[0]);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load wallets.');
+      } catch (err: any) {
+        setError(formatApiMessageForDisplay(err));
       } finally {
         setWalletsLoading(false);
       }
@@ -66,12 +67,12 @@ const WithdrawalPage: React.FC = () => {
   const youReceive = Math.max(0, amountNum - fee);
 
   const validate = (): string => {
-    if (!walletAddress.trim()) return 'Wallet address is required.';
-    if (!selectedWallet) return 'Please select a network.';
-    if (isNaN(amountNum) || amountNum <= 0) return 'Enter a valid amount.';
-    if (amountNum < selectedWallet.minAmount) return `Minimum withdrawal is $${selectedWallet.minAmount}.`;
-    if (amountNum > balance) return 'Amount exceeds your balance.';
-    if (amountNum > remainingDailyLimit) return `Amount exceeds your daily withdrawal limit of $${remainingDailyLimit}.`;
+    if (!walletAddress.trim()) return t('recharge_error_tx_required');
+    if (!selectedWallet) return t('error_generic');
+    if (isNaN(amountNum) || amountNum <= 0) return t('recharge_error_amount_invalid');
+    if (amountNum < selectedWallet.minAmount) return `${t('label_min_withdrawal')} $${selectedWallet.minAmount}.`;
+    if (amountNum > balance) return t('ERROR_WITHDRAWAL_INSUFFICIENT_BALANCE');
+    if (amountNum > remainingDailyLimit) return t('daily_withdrawal_limit_exceeded_warning').replace('%s', `$${remainingDailyLimit}`);
     return '';
   };
 
@@ -88,8 +89,8 @@ const WithdrawalPage: React.FC = () => {
     try {
       await apiRepository.withdrawal({ amount: amountNum });
       navigate('/withdrawal-verify');
-    } catch (err) {
-      setFieldError(err instanceof Error ? err.message : 'Failed to submit withdrawal.');
+    } catch (err: any) {
+      setFieldError(formatApiMessageForDisplay(err));
     } finally {
       setLoading(false);
     }
@@ -102,7 +103,7 @@ const WithdrawalPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.WITHDRAWAL.TITLE')}</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('withdrawal_title')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -125,7 +126,7 @@ const WithdrawalPage: React.FC = () => {
             <div>
               <IonText>
                 <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', letterSpacing: '1px', margin: '0 0 4px 0', textTransform: 'uppercase' }}>
-                  {t('APP.WITHDRAWAL.AVAILABLE')}
+                  {t('withdrawal_available_balance')}
                 </p>
               </IonText>
               <IonText>
@@ -165,8 +166,7 @@ const WithdrawalPage: React.FC = () => {
             <IonIcon icon={informationCircleOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '18px', flexShrink: 0 }} />
             <IonText>
               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', margin: 0 }}>
-                {t('APP.WITHDRAWAL.DAILY_LIMIT')}: <strong style={{ color: 'var(--sovereign-text)' }}>${dailyLimit.toFixed(2)}</strong>
-                &nbsp;— {t('APP.WITHDRAWAL.REMAINING')}: <strong style={{ color: 'var(--sovereign-gold)' }}>${remainingDailyLimit.toFixed(2)}</strong>
+                {t('daily_withdrawal_limit_label').replace('%s', dailyLimit.toFixed(2))}
               </p>
             </IonText>
           </div>
@@ -183,7 +183,7 @@ const WithdrawalPage: React.FC = () => {
           >
             {/* Network */}
             <div style={{ marginBottom: '20px' }}>
-              <SectionLabel>{t('APP.COMMON.NETWORK')}</SectionLabel>
+              <SectionLabel>{t('label_network')}</SectionLabel>
               {walletsLoading ? (
                 <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
               ) : (
@@ -215,7 +215,7 @@ const WithdrawalPage: React.FC = () => {
 
             {/* Wallet address */}
             <div style={{ marginBottom: '20px' }}>
-              <SectionLabel>{t('APP.WITHDRAWAL.WALLET_LABEL')}</SectionLabel>
+              <SectionLabel>{t('label_wallet')}</SectionLabel>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <IonIcon icon={walletOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '18px', flexShrink: 0 }} />
                 <IonInput
@@ -232,7 +232,7 @@ const WithdrawalPage: React.FC = () => {
 
             {/* Amount */}
             <div style={{ marginBottom: '20px' }}>
-              <SectionLabel>{t('APP.WITHDRAWAL.AMOUNT_LABEL')}</SectionLabel>
+              <SectionLabel>{t('label_amount')}</SectionLabel>
               <IonInput
                 type="number"
                 value={amount}
@@ -261,7 +261,7 @@ const WithdrawalPage: React.FC = () => {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <IonText>
-                    <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>Withdrawal amount</span>
+                    <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>{t('label_amount')}</span>
                   </IonText>
                   <IonText>
                     <span style={{ color: 'var(--sovereign-text)', fontSize: '13px' }}>${amountNum.toFixed(2)}</span>
@@ -269,7 +269,7 @@ const WithdrawalPage: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <IonText>
-                    <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>{t('APP.COMMON.FEE')}</span>
+                    <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>{t('label_network_withdrawal_fee')}</span>
                   </IonText>
                   <IonText>
                     <span style={{ color: 'var(--sovereign-error)', fontSize: '13px' }}>-${fee.toFixed(2)}</span>
@@ -284,7 +284,7 @@ const WithdrawalPage: React.FC = () => {
                   }}
                 >
                   <IonText>
-                    <span style={{ color: 'var(--sovereign-text)', fontWeight: '600', fontSize: '14px' }}>{t('APP.COMMON.YOU_RECEIVE')}</span>
+                    <span style={{ color: 'var(--sovereign-text)', fontWeight: '600', fontSize: '14px' }}>{t('withdrawal_you_will_receive').replace('%s', '')}</span>
                   </IonText>
                   <IonText>
                     <span style={{ color: 'var(--sovereign-gold)', fontWeight: '800', fontSize: '16px' }}>
@@ -317,7 +317,7 @@ const WithdrawalPage: React.FC = () => {
             )}
 
             <SovereignPrimaryButton onClick={handleSubmit} loading={loading} expand="block">
-              {loading ? t('APP.COMMON.LOADING') : t('APP.WITHDRAWAL.REQUEST_BTN')}
+              {loading ? t('loading') : t('withdrawal_request_button')}
             </SovereignPrimaryButton>
           </div>
 
@@ -326,7 +326,7 @@ const WithdrawalPage: React.FC = () => {
 
         <IonToast
           isOpen={toast.isOpen}
-          message={toast.message}
+          message={formatApiMessageForDisplay(toast.message)}
           duration={3000}
           color={toast.color}
           onDidDismiss={() => setToast({ ...toast, isOpen: false })}

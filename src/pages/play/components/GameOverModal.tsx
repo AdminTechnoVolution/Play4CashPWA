@@ -1,157 +1,163 @@
 import React from 'react';
-import { IonModal, IonContent } from '@ionic/react';
+import { IonModal } from '@ionic/react';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../../ui/components/SovereignButton';
 import type { GameOverPayload } from '../../../data/models/ApiModels';
 import { useT } from '../../../i18n/translations';
+import { 
+  resolveGameEndFallbackMessage, 
+  playerGameEndReasonFallback, 
+  PlayerGameEndReasonProfile,
+  GameEndMessageKeys,
+  applyWsMessagePlaceholders
+} from '../../../i18n/ApiMessageDisplay';
 
 interface GameOverModalProps {
   isOpen: boolean;
   gameOver: GameOverPayload | null;
-  onPlayAgain: () => void;
+  isSpectator?: boolean;
   onExit: () => void;
+  gameProfile?: PlayerGameEndReasonProfile;
 }
 
-const GameOverModal: React.FC<GameOverModalProps> = ({ isOpen, gameOver, onPlayAgain, onExit }) => {
+
+const GameOverModal: React.FC<GameOverModalProps> = ({
+  isOpen,
+  gameOver,
+  isSpectator = false,
+  onExit,
+  gameProfile = 'CHESS', // Default to CHESS if not provided
+}) => {
   const t = useT();
   if (!gameOver) return null;
 
-  const isWin = gameOver.youWon;
+  const isWin  = !isSpectator && gameOver.youWon;
   const isDraw = gameOver.isDraw;
 
-  const icon = isWin ? '🏆' : isDraw ? '🤝' : '💔';
-  const title = isWin ? t('APP.GAME.GAME_OVER_WIN') : isDraw ? t('APP.GAME.GAME_OVER_DRAW') : t('APP.GAME.GAME_OVER_LOSE');
-  const titleColor = isWin
-    ? 'var(--sovereign-gold)'
-    : isDraw
-      ? '#8a9bbf'
-      : '#cf6679';
-
-  const reasonLabel: Record<string, string> = {
-    checkmate: t('APP.GAME.REASON_CHECKMATE'),
-    stalemate: t('APP.GAME.REASON_STALEMATE'),
-    timeout: t('APP.GAME.REASON_TIMEOUT'),
-    forfeit: t('APP.GAME.REASON_FORFEIT'),
-    all_sunk: 'All ships sunk',
-    blocked: 'No moves available',
-    resigned: t('APP.GAME.REASON_RESIGN'),
+  const msgKeys: GameEndMessageKeys = {
+    victoryOpponentTimeout: 'room_winner_reason_timeout_won',
+    defeatOwnTimeout: 'room_winner_reason_timeout_lost',
+    victoryOpponentDisconnected: 'room_winner_reason_forfeit_won',
+    victoryDefault: 'bs_victory', // Generic victory
+    defeatDefault: 'bs_defeat',  // Generic defeat
+    victoryCheckmate: 'spectator_end_checkmate', // used as key name in resolve
+    defeatCheckmate: 'spectator_end_checkmate',  // used as key name in resolve
+    draw: 'spectator_match_draw_result',
+    stalemate: 'chess_stalemate',
+    insufficientMaterial: 'chess_insufficient_material',
   };
-  const reasonText = gameOver.reason
-    ? (reasonLabel[gameOver.reason] ?? gameOver.reason)
-    : null;
+
+  // ── Title ───────────────────────────────────────────────────────────────────
+  const title = isSpectator 
+    ? t('spectator_match_finished')
+    : isWin 
+      ? t('bs_victory') 
+      : isDraw 
+        ? t('spectator_match_draw_result') 
+        : t('bs_defeat');
+
+  // ── Reason / Body ──────────────────────────────────────────────────────────
+  const reasonText = playerGameEndReasonFallback(
+    gameOver,
+    gameOver.outcome,
+    gameOver.youWon,
+    gameOver.isDraw,
+    gameProfile
+  );
+
+  const accentColor = isSpectator
+    ? (isDraw ? 'var(--sovereign-text-muted)' : 'var(--sovereign-gold)')
+    : isWin
+      ? 'var(--sovereign-gold)'
+      : isDraw
+        ? '#8a9bbf'
+        : '#cf6679';
+
+  // ── Body ────────────────────────────────────────────────────────────────────
+  const renderBody = () => {
+    if (isSpectator) {
+      const line1 = isDraw
+        ? t('spectator_match_draw_result')
+        : applyWsMessagePlaceholders(t('spectator_match_winner_x'), { username: gameOver.winner || '---' });
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <p style={{ color: 'var(--sovereign-text)', fontSize: 14, lineHeight: 1.6, margin: 0, textAlign: 'center' }}>
+            {line1}
+          </p>
+          {reasonText && (
+            <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 13, lineHeight: 1.5, margin: 0, textAlign: 'center' }}>
+              {t('game_history_label_reason')}: {reasonText}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <p style={{ color: 'var(--sovereign-text)', fontSize: 14, lineHeight: 1.6, margin: 0, textAlign: 'center', whiteSpace: 'pre-line' }}>
+        {reasonText}
+      </p>
+    );
+  };
 
   return (
     <IonModal
       isOpen={isOpen}
       backdropDismiss={false}
-      style={{ '--background': 'rgba(10,22,40,0.95)', '--border-radius': '0' }}
+      style={{
+        '--background': 'transparent',
+        '--backdrop-opacity': '0.65',
+      } as React.CSSProperties}
     >
-      <IonContent
-        style={{ '--background': 'transparent' }}
-      >
+      {/* Centering wrapper */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '24px' }}>
+        {/* Card — matches Android AlertDialog */}
         <div
           style={{
+            background: 'var(--sovereign-surface)',
+            borderRadius: 16,
+            padding: '24px 24px 20px',
+            width: '100%',
+            maxWidth: 340,
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100%',
-            padding: '40px 24px',
-            textAlign: 'center',
+            gap: 12,
           }}
         >
-          {/* Icon */}
-          <div
-            style={{
-              fontSize: 80,
-              marginBottom: 16,
-              filter: isWin ? 'drop-shadow(0 0 24px rgba(201,168,76,0.6))' : 'none',
-              animation: isWin ? 'pulse 2s ease-in-out infinite' : 'none',
-            }}
-          >
-            {icon}
-          </div>
-
           {/* Title */}
-          <h1
-            style={{
-              color: titleColor,
-              fontSize: 36,
-              fontWeight: 800,
-              margin: '0 0 8px',
-              letterSpacing: 1,
-            }}
-          >
+          <p style={{ color: accentColor, fontSize: 20, fontWeight: 800, margin: 0, textAlign: 'center' }}>
             {title}
-          </h1>
+          </p>
 
-          {/* Reason */}
-          {reasonText && (
-            <p
-              style={{
-                color: 'var(--sovereign-text-muted)',
-                fontSize: 16,
-                margin: '0 0 24px',
-                fontWeight: 500,
-              }}
-            >
-              {reasonText}
-            </p>
-          )}
+          {/* Body */}
+          {renderBody()}
 
-          {/* Prize */}
+          {/* Prize — only for winners */}
           {isWin && gameOver.prize != null && gameOver.prize > 0 && (
-            <div
-              style={{
-                background: 'rgba(201,168,76,0.12)',
-                border: '1.5px solid var(--sovereign-gold)',
-                borderRadius: 16,
-                padding: '12px 32px',
-                marginBottom: 32,
-              }}
+            <div style={{
+              background: 'rgba(201,168,76,0.15)',
+              border: '1px solid rgba(201,168,76,0.5)',
+              borderRadius: 8,
+              padding: '8px 20px',
+              alignSelf: 'center',
+            }}>
+              <p style={{ color: 'var(--sovereign-gold)', fontSize: 18, fontWeight: 800, margin: 0, textAlign: 'center' }}>
+                + {gameOver.prize.toFixed(2)} USDT
+              </p>
+            </div>
+          )}
+
+          {/* Buttons ────────────────────────────────────────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            <SovereignPrimaryButton
+              onClick={onExit}
+              style={{ backgroundColor: accentColor } as React.CSSProperties}
             >
-              <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 12, margin: '0 0 2px' }}>
-                {t('APP.GAME.PRIZE')}
-              </p>
-              <p
-                style={{
-                  color: 'var(--sovereign-gold)',
-                  fontSize: 28,
-                  fontWeight: 800,
-                  margin: 0,
-                }}
-              >
-                ${gameOver.prize.toFixed(2)}
-              </p>
-            </div>
-          )}
-
-          {!isWin && !isDraw && (
-            <div style={{ marginBottom: 32 }}>
-              <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 14, margin: 0 }}>
-                Better luck next time!
-              </p>
-            </div>
-          )}
-
-          {isDraw && (
-            <div style={{ marginBottom: 32 }}>
-              <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 14, margin: 0 }}>
-                It's a tie — no one wins this round.
-              </p>
-            </div>
-          )}
-
-          {/* Buttons */}
-          <div style={{ width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <SovereignPrimaryButton onClick={onPlayAgain}>
-              {t('APP.GAME.PLAY_AGAIN')}
+              {t('ok')}
             </SovereignPrimaryButton>
-            <SovereignSecondaryButton onClick={onExit}>
-              {t('APP.GAME.EXIT')}
-            </SovereignSecondaryButton>
           </div>
         </div>
-      </IonContent>
+      </div>
     </IonModal>
   );
 };

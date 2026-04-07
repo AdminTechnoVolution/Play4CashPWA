@@ -30,6 +30,7 @@ import {
   hourglassOutline,
 } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
+import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import '../../ui/theme/variables.css';
 import type { RechargeHistoryItem, WithdrawalHistoryItem, GameHistoryItem } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
@@ -58,8 +59,8 @@ const TransactionHistoryPage: React.FC = () => {
       const data = await apiRepository.getRechargeHistory();
       setDeposits(data);
       setDepositsLoaded(true);
-    } catch {
-      // ignore
+    } catch (err: any) {
+      console.error(formatApiMessageForDisplay(err));
     } finally {
       setDepositsLoading(false);
     }
@@ -71,8 +72,8 @@ const TransactionHistoryPage: React.FC = () => {
       const data = await apiRepository.getWithdrawalHistory();
       setWithdrawals(data);
       setWithdrawalsLoaded(true);
-    } catch {
-      // ignore
+    } catch (err: any) {
+      console.error(formatApiMessageForDisplay(err));
     } finally {
       setWithdrawalsLoading(false);
     }
@@ -84,8 +85,8 @@ const TransactionHistoryPage: React.FC = () => {
       const data = await apiRepository.getGameHistory();
       setGames(data);
       setGamesLoaded(true);
-    } catch {
-      // ignore
+    } catch (err: any) {
+      console.error(formatApiMessageForDisplay(err));
     } finally {
       setGamesLoading(false);
     }
@@ -141,16 +142,14 @@ const TransactionHistoryPage: React.FC = () => {
 
   const statusLabel = (status: string): string => {
     const s = status.toLowerCase();
-    if (s.includes('success') || s.includes('approved') || s.includes('complete')) return t('APP.HISTORY.STATUS_COMPLETED');
-    if (s.includes('pending') || s.includes('processing')) return t('APP.HISTORY.STATUS_PENDING');
-    if (s.includes('fail') || s.includes('reject') || s.includes('error')) return t('APP.HISTORY.STATUS_FAILED');
-    return status;
+    // Android history screen displays raw status with first letter uppercased
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   const gameResultStyle = (result: 'win' | 'lose' | 'draw'): { bg: string; color: string; label: string } => {
-    if (result === 'win') return { bg: 'rgba(76,175,80,0.15)', color: '#4caf50', label: t('APP.HISTORY.RESULT_WIN') };
-    if (result === 'lose') return { bg: 'rgba(207,102,121,0.15)', color: 'var(--sovereign-error)', label: t('APP.HISTORY.RESULT_LOSE') };
-    return { bg: 'rgba(138,155,191,0.15)', color: 'var(--sovereign-text-muted)', label: t('APP.HISTORY.RESULT_DRAW') };
+    if (result === 'win') return { bg: 'rgba(76,175,80,0.15)', color: '#4caf50', label: t('game_history_status_won') };
+    if (result === 'lose') return { bg: 'rgba(207,102,121,0.15)', color: 'var(--sovereign-error)', label: t('game_history_status_lost') };
+    return { bg: 'rgba(138,155,191,0.15)', color: 'var(--sovereign-text-muted)', label: t('game_history_status_draw') };
   };
 
   const SkeletonItem = () => (
@@ -184,7 +183,7 @@ const TransactionHistoryPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.HISTORY.TITLE')}</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('history_hub_title')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -201,13 +200,13 @@ const TransactionHistoryPage: React.FC = () => {
             style={{ '--background': 'var(--sovereign-surface)', borderRadius: '10px' } as React.CSSProperties}
           >
             <IonSegmentButton value="deposits">
-              <IonLabel style={{ fontSize: '13px' }}>{t('APP.HISTORY.TAB_DEPOSITS')}</IonLabel>
+              <IonLabel style={{ fontSize: '13px' }}>{t('history_tab_deposits')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="withdrawals">
-              <IonLabel style={{ fontSize: '13px' }}>{t('APP.HISTORY.TAB_WITHDRAWALS')}</IonLabel>
+              <IonLabel style={{ fontSize: '13px' }}>{t('history_tab_withdrawals')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="games">
-              <IonLabel style={{ fontSize: '13px' }}>{t('APP.HISTORY.TAB_GAMES')}</IonLabel>
+              <IonLabel style={{ fontSize: '13px' }}>{t('history_tab_games')}</IonLabel>
             </IonSegmentButton>
           </IonSegment>
         </div>
@@ -220,7 +219,7 @@ const TransactionHistoryPage: React.FC = () => {
               {depositsLoading ? (
                 [0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)
               ) : deposits.length === 0 ? (
-                <EmptyState icon={arrowDownOutline} message={t('APP.HISTORY.EMPTY_DEPOSITS')} />
+                <EmptyState icon={arrowDownOutline} message={t('deposit_history_empty')} />
               ) : (
                 <IonList style={{ background: 'transparent' }}>
                   {deposits.map((item, idx) => (
@@ -258,7 +257,7 @@ const TransactionHistoryPage: React.FC = () => {
                             </IonText>
                             <IonText>
                               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: 0, fontFamily: 'monospace' }}>
-                                {t('APP.HISTORY.TX_ID')}: {truncate(item.txId ?? '')}
+                                {t('transaction_label_tx_id')}: {truncate(item.txId ?? '')}
                               </p>
                             </IonText>
                           </div>
@@ -303,7 +302,7 @@ const TransactionHistoryPage: React.FC = () => {
               {withdrawalsLoading ? (
                 [0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)
               ) : withdrawals.length === 0 ? (
-                <EmptyState icon={arrowUpOutline} message={t('APP.HISTORY.EMPTY_WITHDRAWALS')} />
+                <EmptyState icon={arrowUpOutline} message={t('withdrawal_history_empty')} />
               ) : (
                 <IonList style={{ background: 'transparent' }}>
                   {withdrawals.map((item, idx) => (
@@ -391,7 +390,7 @@ const TransactionHistoryPage: React.FC = () => {
               {gamesLoading ? (
                 [0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)
               ) : games.length === 0 ? (
-                <EmptyState icon={trophyOutline} message={t('APP.HISTORY.EMPTY_GAMES')} />
+                <EmptyState icon={trophyOutline} message={t('game_history_empty')} />
               ) : (
                 <IonList style={{ background: 'transparent' }}>
                   {games.map((item, idx) => {
@@ -426,7 +425,7 @@ const TransactionHistoryPage: React.FC = () => {
                             <div>
                               <IonText>
                                 <p style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '14px', margin: '0 0 2px 0' }}>
-                                  {t('APP.HISTORY.OPPONENT')} {item.opponentName}
+                                  {t('game_history_label_opponent')}: {item.opponentName}
                                 </p>
                               </IonText>
                               <IonText>

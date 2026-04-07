@@ -21,6 +21,7 @@ import { copyOutline, checkmarkOutline, informationCircleOutline } from 'ionicon
 import { apiRepository } from '../../data/network/ApiRepository';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
+import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
@@ -44,8 +45,8 @@ const AddFundsPage: React.FC = () => {
         const data = await apiRepository.getWallets();
         setWallets(data);
         if (data.length > 0) setSelectedWallet(data[0]);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load wallets.');
+      } catch (err: any) {
+        setError(formatApiMessageForDisplay(err));
       } finally {
         setWalletsLoading(false);
       }
@@ -84,9 +85,9 @@ const AddFundsPage: React.FC = () => {
       await apiRepository.recharge({ txId: txId.trim(), amount: amountNum, coin: 'usdt' });
       setTxId('');
       setAmount('');
-      setToast({ isOpen: true, message: t('APP.ADD_FUNDS.SUCCESS'), color: 'success' });
-    } catch (err) {
-      setToast({ isOpen: true, message: err instanceof Error ? err.message : 'Failed to submit recharge.', color: 'danger' });
+      setToast({ isOpen: true, message: t('recharge_success'), color: 'success' });
+    } catch (err: any) {
+      setToast({ isOpen: true, message: formatApiMessageForDisplay(err), color: 'danger' });
     } finally {
       setLoading(false);
     }
@@ -103,7 +104,7 @@ const AddFundsPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('APP.ADD_FUNDS.TITLE')}</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('add_funds_title')}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -112,7 +113,7 @@ const AddFundsPage: React.FC = () => {
 
           {/* Select network */}
           <div style={{ marginBottom: '24px' }}>
-            <SectionLabel>{t('APP.ADD_FUNDS.SELECT_NETWORK')}</SectionLabel>
+            <SectionLabel>{t('label_network')}</SectionLabel>
             {walletsLoading ? (
               <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
             ) : (
@@ -176,15 +177,15 @@ const AddFundsPage: React.FC = () => {
 
               {/* Network info */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <InfoChip label="Coin" value={selectedWallet.coin} />
-                <InfoChip label="Network" value={selectedWallet.network} />
-                <InfoChip label="Min Amount" value={`$${selectedWallet.minAmount}`} />
-                <InfoChip label="Fee" value={`$${selectedWallet.fee}`} />
+                <InfoChip label={t('label_coin') || 'Coin'} value={selectedWallet.coin} />
+                <InfoChip label={t('label_network') || 'Network'} value={selectedWallet.network} />
+                <InfoChip label={t('label_min_withdrawal') || 'Min Amount'} value={`$${selectedWallet.minAmount}`} />
+                <InfoChip label={t('label_network_withdrawal_fee') || 'Fee'} value={`$${selectedWallet.fee}`} />
               </div>
 
               {/* Address */}
               <div>
-                <SectionLabel>{t('APP.ADD_FUNDS.WALLET_ADDRESS')}</SectionLabel>
+                <SectionLabel>{t('deposit_address')}</SectionLabel>
                 <div
                   style={{
                     background: 'var(--sovereign-bg)',
@@ -245,22 +246,22 @@ const AddFundsPage: React.FC = () => {
               </IonText>
 
               <div style={{ marginBottom: '16px' }}>
-                <SectionLabel>{t('APP.ADD_FUNDS.TX_ID')}</SectionLabel>
+                <SectionLabel>{t('label_transaction_id')}</SectionLabel>
                 <IonInput
                   value={txId}
                   onIonInput={(e) => setTxId(e.detail.value ?? '')}
-                  placeholder={t('APP.ADD_FUNDS.TX_ID_PLACEHOLDER')}
+                  placeholder={t('label_transaction_id')}
                   style={inputStyle}
                 />
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <SectionLabel>{t('APP.ADD_FUNDS.AMOUNT_LABEL')}</SectionLabel>
+                <SectionLabel>{t('label_amount')}</SectionLabel>
                 <IonInput
                   type="number"
                   value={amount}
                   onIonInput={(e) => setAmount(e.detail.value ?? '')}
-                  placeholder={`${t('APP.ADD_FUNDS.MIN_AMOUNT')} $${selectedWallet.minAmount}`}
+                  placeholder={`${t('label_min_withdrawal')} $${selectedWallet.minAmount}`}
                   min={String(selectedWallet.minAmount)}
                   step="0.01"
                   style={inputStyle}
@@ -282,12 +283,12 @@ const AddFundsPage: React.FC = () => {
                 >
                   <IonText>
                     <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>
-                      {t('APP.COMMON.FEE')}: -${selectedWallet.fee}
+                      {t('label_network_withdrawal_fee') || 'Fee'}: -${selectedWallet.fee}
                     </span>
                   </IonText>
                   <IonText>
                     <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '15px' }}>
-                      {t('APP.COMMON.YOU_RECEIVE')}: ${receiveAmount.toFixed(2)}
+                      {t('withdrawal_you_will_receive').replace('%s', '')}: ${receiveAmount.toFixed(2)}
                     </span>
                   </IonText>
                 </div>
@@ -313,7 +314,7 @@ const AddFundsPage: React.FC = () => {
               </div>
 
               <SovereignPrimaryButton onClick={handleSubmit} loading={loading} expand="block">
-                {loading ? <IonSpinner name="crescent" /> : t('APP.ADD_FUNDS.SUBMIT')}
+                {loading ? <IonSpinner name="crescent" /> : t('verify_button')}
               </SovereignPrimaryButton>
             </div>
           )}
