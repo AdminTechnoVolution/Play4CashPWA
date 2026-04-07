@@ -1,49 +1,59 @@
 /* ── Sovereign Design System – CSS Variables ──────────────────────────────── */
 :root {
-  --sovereign-bg: #0a1628;
-  --sovereign-surface: #131f35;
-  --sovereign-surface-high: #1a2940;
-  --sovereign-gold: #c9a84c;
+  --sovereign-bg: #152A3F;
+  --sovereign-surface: #1e3650;
+  --sovereign-surface-high: #244161;
+  --sovereign-gold: #E9C349;
+  --sovereign-title: #E9C349;
   --sovereign-gold-light: #e8c96e;
   --sovereign-text: #ffffff;
   --sovereign-text-muted: #8a9bbf;
   --sovereign-error: #cf6679;
   --sovereign-border: rgba(201, 168, 76, 0.25);
 
+  /* Backgrounds */
+  --sovereign-app-bg: url('/bg_app_play4cash.png');
+
   /* Ionic overrides */
-  --ion-background-color: #0a1628;
-  --ion-background-color-rgb: 10, 22, 40;
-  --ion-color-primary: #c9a84c;
-  --ion-color-primary-rgb: 201, 168, 76;
-  --ion-color-primary-contrast: #0a1628;
-  --ion-color-primary-contrast-rgb: 10, 22, 40;
+  --ion-background-color: #152A3F;
+  --ion-background-color-rgb: 21, 42, 63;
+  --ion-color-primary: #E9C349;
+  --ion-color-primary-rgb: 233, 195, 73;
+  --ion-color-primary-contrast: #152A3F;
+  --ion-color-primary-contrast-rgb: 21, 42, 63;
   --ion-color-primary-shade: #b1943f;
   --ion-color-primary-tint: #d4b35e;
   --ion-text-color: #ffffff;
   --ion-text-color-rgb: 255, 255, 255;
-  --ion-toolbar-background: #0a1628;
+  --ion-toolbar-background: #152A3F;
   --ion-toolbar-color: #ffffff;
-  --ion-item-background: #131f35;
+  --ion-item-background: #1e3650;
   --ion-item-color: #ffffff;
   --ion-border-color: rgba(201, 168, 76, 0.25);
-  --ion-card-background: #131f35;
-  --ion-tab-bar-background: #0a1628;
+  --ion-card-background: #1e3650;
+  --ion-tab-bar-background: #152A3F;
   --ion-tab-bar-border-color: rgba(201, 168, 76, 0.25);
-  --ion-color-step-50: #131f35;
-  --ion-color-step-100: #1a2940;
-  --ion-color-step-150: #1f3050;
-  --ion-color-step-200: #243660;
-  --ion-color-step-250: #2a3d70;
-  --ion-color-step-300: #2f4480;
-  --ion-color-step-400: #3a5098;
-  --ion-color-step-500: #455daf;
-  --ion-color-step-600: #6a7ec4;
-  --ion-color-step-700: #8a9bbf;
-  --ion-color-step-800: #aab5d4;
-  --ion-color-step-900: #cfd5e5;
-  --ion-color-step-950: #e7eaf2;
-  --ion-overlay-background-color: #0a1628;
-  --ion-modal-background: #131f35;
+  --ion-color-step-50: #1e3650;
+  --ion-color-step-100: #244161;
+  --ion-color-step-150: #294c72;
+  --ion-color-step-200: #2f5783;
+  --ion-color-step-250: #346294;
+  --ion-color-step-300: #3a6da5;
+  --ion-color-step-400: #467ebf;
+  --ion-color-step-500: #5290d9;
+  --ion-color-step-600: #6a9ee0;
+  --ion-color-step-700: #82ace7;
+  --ion-color-step-800: #9abbee;
+  --ion-color-step-900: #b2c9f5;
+  --ion-color-step-950: #ca9f8b;
+  --ion-overlay-background-color: #152A3F;
+  --ion-modal-background: #1e3650;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --sovereign-app-bg: url('/bg_app_play4cash_mobile.png');
+  }
 }
 
 /* ── Global resets ────────────────────────────────────────────────────────── */
@@ -51,8 +61,26 @@
   box-sizing: border-box;
 }
 
-ion-content {
-  --background: var(--sovereign-bg);
+h1, h2, h3, h4, h5, h6 {
+  color: var(--sovereign-title) !important;
+}
+
+html,
+body,
+ion-app {
+  /* Using a dark overlay gradient combined with the background image for an opaque, non-bright look */
+  background: linear-gradient(rgba(21, 42, 63, 0.85), rgba(21, 42, 63, 0.85)), 
+              var(--sovereign-app-bg) no-repeat center center / cover fixed !important;
+  background-color: var(--sovereign-bg) !important;
+  height: 100%;
+  width: 100%;
+}
+
+ion-page,
+ion-content,
+ion-router-outlet {
+  --background: transparent !important;
+  background: transparent !important;
 }
 
 ion-header ion-toolbar {

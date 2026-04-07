@@ -89,9 +89,9 @@ export function formatApiMessagesBlockForDisplay(raw: string | null | undefined,
 
 // ── Game End Reasoning (Mirroring GameEndReason.kt logic) ───────────────────
 
-const GAME_END_OPPONENT_TIMEOUT_REASONS = new Set(["timeout", "opponent_timeout", "opponent_timer", "timer", "turn_timeout"]);
-const GAME_END_OWN_TIMEOUT_REASONS = new Set(["timeout", "player_timeout", "timer", "turn_timeout"]);
-const GAME_END_OPPONENT_DISCONNECT_REASONS = new Set(["opponent_disconnect", "opponent_disconnected", "player_disconnected", "disconnect"]);
+const GAME_END_OPPONENT_TIMEOUT_REASONS = new Set(["timeout", "opponent_timeout", "opponent_timer", "timer", "turn_timeout", "timeout_loss"]);
+const GAME_END_OWN_TIMEOUT_REASONS = new Set(["timeout", "player_timeout", "timer", "turn_timeout", "timeout_loss"]);
+const GAME_END_OPPONENT_DISCONNECT_REASONS = new Set(["opponent_disconnect", "opponent_disconnected", "player_disconnected", "disconnect", "offline", "left", "abandoned", "forfeit"]);
 const GAME_END_CHECKMATE_REASONS = new Set(["checkmate", "check_mate", "check-mate"]);
 
 function normalizedGameEndReason(data: any): string {

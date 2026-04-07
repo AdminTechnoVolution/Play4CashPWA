@@ -28,10 +28,13 @@ export interface UserAccountResponse {
 export interface GameResponse {
   id: string;
   name: string;
+  description: string;
   minBet: number;
   socketCode: string;
   turnTimerSeconds: number;
   defaultBets: number[];
+  minPlayers: number;
+  maxPlayers: number;
 }
 
 // ─── Rooms ─────────────────────────────────────────────────────────────────────

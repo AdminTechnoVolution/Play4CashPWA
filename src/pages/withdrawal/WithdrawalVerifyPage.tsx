@@ -64,7 +64,7 @@ const WithdrawalVerifyPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent style={{ '--background': 'var(--sovereign-bg)' } as React.CSSProperties}>
+      <IonContent style={{ '--background': 'transparent' } as React.CSSProperties}>
         <div
           style={{
             display: 'flex',
@@ -156,7 +156,7 @@ const WithdrawalVerifyPage: React.FC = () => {
               placeholder="_ _ _ _ _ _"
               maxlength={6}
               style={{
-                '--background': 'var(--sovereign-bg)',
+                '--background': 'transparent',
                 '--color': 'var(--sovereign-text)',
                 '--placeholder-color': 'var(--sovereign-text-muted)',
                 '--padding-start': '14px',

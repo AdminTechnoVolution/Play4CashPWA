@@ -261,7 +261,7 @@ const RoomsPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent style={{ '--background': 'var(--sovereign-bg)' } as React.CSSProperties}>
+      <IonContent style={{ '--background': 'transparent' } as React.CSSProperties}>
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent pullingText="Pull to refresh" refreshingSpinner="crescent" />
         </IonRefresher>
@@ -502,7 +502,7 @@ const RoomsPage: React.FC = () => {
                   placeholder="Enter room name"
                   maxlength={40}
                   style={{
-                    '--background': 'var(--sovereign-bg)',
+                    '--background': 'transparent',
                     '--color': 'var(--sovereign-text)',
                     '--placeholder-color': 'var(--sovereign-text-muted)',
                     '--border-radius': '10px',
@@ -531,7 +531,7 @@ const RoomsPage: React.FC = () => {
                   max={String(userBalanceNum)}
                   step="0.01"
                   style={{
-                    '--background': 'var(--sovereign-bg)',
+                    '--background': 'transparent',
                     '--color': 'var(--sovereign-text)',
                     '--placeholder-color': 'var(--sovereign-text-muted)',
                     '--border-radius': '10px',
@@ -563,7 +563,7 @@ const RoomsPage: React.FC = () => {
                     onIonChange={(e) => setCreateLimit(Number(e.detail.value))}
                     interface="popover"
                     style={{
-                      '--background': 'var(--sovereign-bg)',
+                      '--background': 'transparent',
                       '--color': 'var(--sovereign-text)',
                       border: '1px solid var(--sovereign-border)',
                       borderRadius: '10px',

@@ -127,7 +127,7 @@ const SettingsPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent style={{ '--background': 'var(--sovereign-bg)' } as React.CSSProperties}>
+      <IonContent style={{ '--background': 'transparent' } as React.CSSProperties}>
         <div style={{ padding: '24px 20px', maxWidth: '480px', margin: '0 auto', animation: 'fadeInUp 0.5s ease' }}>
 
           {/* Wallet Section */}
@@ -208,7 +208,7 @@ const SettingsPage: React.FC = () => {
                     interface="action-sheet"
                     placeholder="Select network"
                     style={{
-                      '--background': 'var(--sovereign-bg)',
+                      '--background': 'transparent',
                       '--color': 'var(--sovereign-text)',
                       border: '1px solid var(--sovereign-border)',
                       borderRadius: '10px',
@@ -299,7 +299,7 @@ const SettingsPage: React.FC = () => {
                   onIonChange={(e) => setLanguage(e.detail.value)}
                   interface="action-sheet"
                   style={{
-                    '--background': 'var(--sovereign-bg)',
+                    '--background': 'transparent',
                     '--color': 'var(--sovereign-text)',
                     border: '1px solid var(--sovereign-border)',
                     borderRadius: '10px',
@@ -383,7 +383,7 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 );
 
 const inputStyle = {
-  '--background': 'var(--sovereign-bg)',
+  '--background': 'transparent',
   '--color': 'var(--sovereign-text)',
   '--placeholder-color': 'var(--sovereign-text-muted)',
   '--padding-start': '14px',

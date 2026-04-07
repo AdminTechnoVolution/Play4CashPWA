@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -23,6 +23,8 @@ import {
   IonSkeletonText,
   IonMenuToggle,
   IonSplitPane,
+  IonModal,
+  IonButton,
   RefresherEventDetail,
 } from '@ionic/react';
 import { useNavigate } from "react-router-dom";
@@ -40,10 +42,12 @@ import {
   playCircleOutline,
   gridOutline,
   chevronForwardOutline,
+  informationCircleOutline,
 } from 'ionicons/icons';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAuthStore } from '../../store/authStore';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
+import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import { useT } from '../../i18n/translations';
 import '../../ui/theme/variables.css';
 
@@ -55,6 +59,11 @@ const DashboardPage: React.FC = () => {
   const { logout } = useAuthStore();
   const contentRef = useRef<HTMLIonContentElement>(null);
   const t = useT();
+
+  // Modal states
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<any>(null);
 
   useEffect(() => {
     loadDashboard();
@@ -95,6 +104,129 @@ const DashboardPage: React.FC = () => {
       </IonCardContent>
     </IonCard>
   );
+
+  const GameCardCompact: React.FC<{ game: any }> = ({ game }) => {
+    const playerRange = game.minPlayers === game.maxPlayers ? `${game.minPlayers}` : `${game.minPlayers}-${game.maxPlayers}`;
+
+    return (
+      <IonCard
+        style={{
+          background: 'var(--sovereign-surface)',
+          border: '1px solid var(--sovereign-border)',
+          borderRadius: '16px',
+          margin: '6px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Background Image */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          opacity: 0.38,
+          zIndex: 0,
+          pointerEvents: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '12px'
+        }}>
+          <img
+            src={`/${game.socketCode.includes('naval') ? 'battleship' : game.socketCode}/bg_${game.socketCode.includes('naval') ? 'battleship' : game.socketCode}_home_card.png`}
+            alt=""
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            onError={(e) => (e.currentTarget.style.display = 'none')}
+          />
+        </div>
+
+        <IonCardContent style={{ padding: '16px', position: 'relative', zIndex: 1 }}>
+          {/* Header Icons */}
+          <div style={{ display: 'flex', justifyContent: 'center', position: 'relative', marginBottom: '12px' }}>
+            {/* Center: Gamepad */}
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #b8922a, #e8c96b)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+              }}
+            >
+              <IonIcon icon={gameControllerOutline} style={{ color: '#000', fontSize: '24px' }} />
+            </div>
+
+            {/* Right: Info button for video */}
+            <div
+              onClick={(e) => { e.stopPropagation(); setSelectedGame(game); setShowVideoModal(true); }}
+              style={{ padding: '4px', cursor: 'pointer', position: 'absolute', right: '-4px', top: '-4px' }}
+            >
+              <IonIcon icon={informationCircleOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '22px' }} />
+            </div>
+          </div>
+
+          {/* Game Identification */}
+          <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+            <IonText>
+              <h4 style={{ color: 'var(--sovereign-text)', fontSize: '15px', fontWeight: '700', margin: '0 0 4px 0', lineHeight: '1.2' }}>
+                {game.name}
+              </h4>
+            </IonText>
+            <IonText>
+              <p style={{
+                color: 'var(--sovereign-text-muted)',
+                fontSize: '12px',
+                margin: '0 0 6px 0',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                lineHeight: '1.3'
+              }}>
+                {game.description || t('dashboard_no_games_subtitle')}
+              </p>
+            </IonText>
+            <IonText
+              style={{ color: 'var(--sovereign-gold)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={(e) => { e.stopPropagation(); setSelectedGame(game); setShowRulesModal(true); }}
+            >
+              {t('game_read_full_description')}
+            </IonText>
+          </div>
+
+          {/* Stats Column (Bottom Left Style) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IonIcon icon={peopleOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px' }} />
+              <span style={{ color: 'var(--sovereign-text)', fontSize: '12px', fontWeight: '600' }}>{playerRange}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IonText style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px', fontWeight: '700', width: '14px', textAlign: 'center' }}>$</IonText>
+              <span style={{ color: 'var(--sovereign-text)', fontSize: '12px', fontWeight: '600' }}>${game.minBet}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IonIcon icon={timeOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px' }} />
+              <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>{game.turnTimerSeconds}s</span>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <SovereignPrimaryButton
+            expand="block"
+            onClick={() => handleGameCard(game)}
+            style={{ '--padding-top': '8px', '--padding-bottom': '8px', height: '36px' } as React.CSSProperties}
+          >
+            <span style={{ fontSize: '13px', fontWeight: '700' }}>{t('see_rooms')}</span>
+          </SovereignPrimaryButton>
+        </IonCardContent>
+      </IonCard>
+    );
+  };
 
   return (
     <IonSplitPane contentId={MENU_ID} when="lg">
@@ -224,28 +356,12 @@ const DashboardPage: React.FC = () => {
           </IonToolbar>
         </IonHeader>
 
-        <IonContent ref={contentRef} style={{ '--background': 'var(--sovereign-bg)' } as React.CSSProperties}>
+        <IonContent ref={contentRef} style={{ '--background': 'transparent' } as React.CSSProperties}>
           <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
             <IonRefresherContent pullingText="Pull to refresh" refreshingSpinner="crescent" />
           </IonRefresher>
 
           <div style={{ padding: '20px 16px', maxWidth: '900px', margin: '0 auto' }}>
-
-            {/* Greeting */}
-            {account && (
-              <div style={{ marginBottom: '20px', animation: 'fadeInUp 0.5s ease' }}>
-                <IonText>
-                  <h2 style={{ color: 'var(--sovereign-text)', fontSize: '20px', fontWeight: '700', margin: '0 0 4px 0' }}>
-                    {t('login_welcome_title')} {account.username}
-                  </h2>
-                </IonText>
-                <IonText>
-                  <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px', margin: 0 }}>
-                    {t('login_welcome_subtitle')}
-                  </p>
-                </IonText>
-              </div>
-            )}
 
             {/* Live stats bar */}
             <div
@@ -370,83 +486,10 @@ const DashboardPage: React.FC = () => {
               </IonGrid>
             ) : (
               <IonGrid style={{ padding: 0, animation: 'fadeInUp 0.8s ease' }}>
-                <IonRow>
+                <IonRow style={{ margin: '-6px' }}>
                   {games.map((game) => (
-                    <IonCol key={game.id} size="6" sizeMd="4" sizeLg="3">
-                      <IonCard
-                        button
-                        onClick={() => handleGameCard(game)}
-                        style={{
-                          background: 'var(--sovereign-surface)',
-                          border: '1px solid var(--sovereign-border)',
-                          borderRadius: '16px',
-                          margin: '6px',
-                          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <IonCardContent style={{ padding: '20px 16px' }}>
-                          {/* Game icon */}
-                          <div
-                            style={{
-                              width: '48px',
-                              height: '48px',
-                              borderRadius: '12px',
-                              background: 'rgba(201,168,76,0.15)',
-                              border: '1px solid var(--sovereign-border)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              marginBottom: '14px',
-                            }}
-                          >
-                            <IonIcon
-                              icon={gameControllerOutline}
-                              style={{ color: 'var(--sovereign-gold)', fontSize: '26px' }}
-                            />
-                          </div>
-
-                          <IonText>
-                            <h4
-                              style={{
-                                color: 'var(--sovereign-text)',
-                                fontSize: '15px',
-                                fontWeight: '700',
-                                margin: '0 0 6px 0',
-                                lineHeight: '1.3',
-                              }}
-                            >
-                              {game.name}
-                            </h4>
-                          </IonText>
-
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                            }}
-                          >
-                            <div
-                              style={{
-                                background: 'rgba(201,168,76,0.12)',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
-                              }}
-                            >
-                              <IonText>
-                                <span style={{ color: 'var(--sovereign-gold)', fontSize: '12px', fontWeight: '600' }}>
-                                  {t('rooms_filter_min_bet')} ${game.minBet}
-                                </span>
-                              </IonText>
-                            </div>
-                            <IonIcon
-                              icon={playCircleOutline}
-                              style={{ color: 'var(--sovereign-gold)', fontSize: '22px' }}
-                            />
-                          </div>
-                        </IonCardContent>
-                      </IonCard>
+                    <IonCol key={game.id} size="6" sizeMd="4" sizeLg="3" style={{ padding: 0 }}>
+                      <GameCardCompact game={game} />
                     </IonCol>
                   ))}
                 </IonRow>
@@ -531,6 +574,71 @@ const DashboardPage: React.FC = () => {
         </IonContent>
 
         <GenericErrorModal isOpen={!!error} message={error ?? ''} onDismiss={clearError} />
+
+        {/* Video Modal */}
+        <IonModal
+          isOpen={showVideoModal}
+          onDidDismiss={() => setShowVideoModal(false)}
+          className="sovereign-modal"
+          style={{ '--height': 'auto', '--border-radius': '20px' }}
+        >
+          <div style={{ padding: '20px', background: 'var(--sovereign-surface)', color: 'var(--sovereign-text)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>{selectedGame?.name}</h2>
+              <IonIcon
+                icon={chevronForwardOutline}
+                style={{ fontSize: '24px', cursor: 'pointer', transform: 'rotate(90deg)' }}
+                onClick={() => setShowVideoModal(false)}
+              />
+            </div>
+            <div style={{ background: '#000', borderRadius: '12px', overflow: 'hidden', minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {selectedGame && (
+                <video
+                  controls
+                  autoPlay
+                  style={{ width: '100%', display: 'block' }}
+                  src={`/assets/videos/${selectedGame.socketCode.includes('naval') ? 'battleship' : selectedGame.socketCode}.mp4`}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              )}
+            </div>
+          </div>
+        </IonModal>
+
+        {/* Rules/Description Modal */}
+        <IonModal
+          isOpen={showRulesModal}
+          onDidDismiss={() => setShowRulesModal(false)}
+          style={{ '--height': '80%', '--border-radius': '20.dp' } as any}
+        >
+          <div style={{ padding: '24px', background: 'var(--sovereign-surface)', color: 'var(--sovereign-text)', height: '100%', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--sovereign-gold)', marginBottom: '16px' }}>
+              {selectedGame?.name}
+            </h2>
+            <div style={{ lineHeight: '1.6', fontSize: '15px' }}>
+              {selectedGame?.description || t('dashboard_no_games_subtitle')}
+
+              {selectedGame?.defaultBets?.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--sovereign-gold)', marginBottom: '8px' }}>
+                    {t('game_suggested_bets')}
+                  </h3>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {selectedGame.defaultBets.map((bet: number) => (
+                      <span key={bet} style={{ background: 'rgba(201,168,76,0.15)', padding: '4px 10px', borderRadius: '6px', fontSize: '13px', fontWeight: '700', color: 'var(--sovereign-gold)' }}>
+                        ${bet}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <SovereignPrimaryButton expand="block" onClick={() => setShowRulesModal(false)} style={{ marginTop: '32px' }}>
+              {t('ok')}
+            </SovereignPrimaryButton>
+          </div>
+        </IonModal>
       </IonPage>
     </IonSplitPane>
   );

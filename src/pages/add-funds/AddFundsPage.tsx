@@ -108,7 +108,7 @@ const AddFundsPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent style={{ '--background': 'var(--sovereign-bg)' } as React.CSSProperties}>
+      <IonContent style={{ '--background': 'transparent' } as React.CSSProperties}>
         <div style={{ padding: '24px 20px', maxWidth: '480px', margin: '0 auto', animation: 'fadeInUp 0.5s ease' }}>
 
           {/* Select network */}
@@ -379,7 +379,7 @@ const InfoChip: React.FC<{ label: string; value: string }> = ({ label, value }) 
 );
 
 const inputStyle: React.CSSProperties = {
-  '--background': 'var(--sovereign-bg)',
+  '--background': 'transparent',
   '--color': 'var(--sovereign-text)',
   '--placeholder-color': 'var(--sovereign-text-muted)',
   '--padding-start': '14px',

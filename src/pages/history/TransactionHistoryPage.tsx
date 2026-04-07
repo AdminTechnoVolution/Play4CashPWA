@@ -187,7 +187,7 @@ const TransactionHistoryPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent style={{ '--background': 'var(--sovereign-bg)' } as React.CSSProperties}>
+      <IonContent style={{ '--background': 'transparent' } as React.CSSProperties}>
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent pullingText="Pull to refresh" refreshingSpinner="crescent" />
         </IonRefresher>

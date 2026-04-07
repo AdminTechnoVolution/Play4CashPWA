@@ -398,6 +398,8 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       spectatorsCount: 0,
       turnTimerSeconds: 30,
       shotCount: 0,
+      selectedShipType: 'Carrier',
+      selectedHorizontal: true,
     });
   },
 

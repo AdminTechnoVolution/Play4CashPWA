@@ -87,6 +87,9 @@ export const apiService = {
       socketCode: g.socket_code ?? '',
       turnTimerSeconds: g.turn_timer_seconds ?? 0,
       defaultBets: g.default_bets ?? [],
+      description: g.description ?? '',
+      minPlayers: g.min_players ?? g.minPlayers ?? 2,
+      maxPlayers: g.max_players ?? g.maxPlayers ?? 2,
     }));
   },
 
