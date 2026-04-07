@@ -421,6 +421,7 @@
   "bs_outcome_you_miss": "Miss! Opponent's turn.",
   "bs_outcome_you_sunk": "You sunk their %s!",
   "bs_placement_hint": "Tap a cell to place • Tap a placed ship to remove it",
+  "bs_placement_instruction": "Select a ship and tap the grid to place it",
   "bs_placement_waiting_opponent": "Waiting for an opponent to join… Place your ships in the meantime!",
   "bs_play_again": "Play Again",
   "bs_ready_button": "READY",

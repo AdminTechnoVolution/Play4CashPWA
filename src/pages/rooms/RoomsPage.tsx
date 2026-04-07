@@ -571,8 +571,8 @@ const RoomsPage: React.FC = () => {
                       width: '100%',
                     } as React.CSSProperties}
                   >
-                    <IonSelectOption value={2}>2 Players</IonSelectOption>
-                    <IonSelectOption value={4}>4 Players</IonSelectOption>
+                    <IonSelectOption value={2}>{t('domino_player_count_short').replace('%d', '2')}</IonSelectOption>
+                    <IonSelectOption value={4}>{t('domino_player_count_short').replace('%d', '4')}</IonSelectOption>
                   </IonSelect>
                 </div>
               )}

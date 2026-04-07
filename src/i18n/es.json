@@ -421,6 +421,7 @@
   "bs_outcome_you_miss": "¡Fallo! Turno del oponente.",
   "bs_outcome_you_sunk": "¡Hundiste su %s!",
   "bs_placement_hint": "Toca una celda para colocar • Toca un barco colocado para quitarlo",
+  "bs_placement_instruction": "Selecciona un barco y toca la cuadrícula para colocarlo",
   "bs_placement_waiting_opponent": "Esperando a que un oponente se una… ¡Coloca tus barcos mientras tanto!",
   "bs_play_again": "Jugar de nuevo",
   "bs_ready_button": "LISTO",

@@ -117,7 +117,7 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
                 ? applyWsMessagePlaceholders(t('spectator_chess_turn_x'), { username: store.currentPlayer })
                 : isMyTurn
                   ? `▶ ${t('ws.games.yourTurn')}`
-                  : `${opponentName}'s ${t('chess_opponent_turn')}`}
+                  : applyWsMessagePlaceholders(t('bs_named_opponent_turn'), { username: opponentName })}
             </IonText>
           </div>
 

@@ -20,6 +20,10 @@ const englishApiLiteralToKey: Record<string, string> = {
   [normalizeEnglishApiLiteral("Reconnected to room")]: "ws.games.roomReconnected",
   [normalizeEnglishApiLiteral("Waiting for opponent")]: "ws.games.waitingOpponent",
   [normalizeEnglishApiLiteral("Game started! Good luck")]: "ws.games.startedRoom",
+  [normalizeEnglishApiLiteral("Game started! Good luck.")]: "ws.games.startedRoom",
+  [normalizeEnglishApiLiteral("Game started!")]: "ws.games.startedRoom",
+  [normalizeEnglishApiLiteral("Opponent joined! Game starting")]: "halma_status_place_pieces",
+  [normalizeEnglishApiLiteral("Opponent joined! Game starting…")]: "halma_status_place_pieces",
   [normalizeEnglishApiLiteral("It is not your turn")]: "ws.games.notYourTurn",
   [normalizeEnglishApiLiteral("Invalid move")]: "ws.games.invalidMove",
 };
@@ -234,7 +238,7 @@ export type RoomLobbyKind = 'WAITING' | 'STARTED' | 'OTHER';
 const waitingKeys = new Set([
   "waiting", "wait", "pending", "esperando", "en espera", "pendiente",
   "en attente", "attente", "wartend", "warten", "in attesa",
-  "aguardando", "pendente"
+  "aguardando", "pendente", "room_status_waiting"
 ]);
 
 export function classifyRoomLobbyStatus(raw: string): RoomLobbyKind {

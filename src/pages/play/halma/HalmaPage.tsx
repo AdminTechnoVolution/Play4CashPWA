@@ -90,7 +90,7 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
                 ? applyWsMessagePlaceholders(t('spectator_generic_turn_x'), { username: store.currentPlayer })
                 : isMyTurn
                   ? `▶ ${t('ws.games.yourTurn')}`
-                  : `${opponentName}'s ${t('halma_opponent_turn')}`}
+                  : applyWsMessagePlaceholders(t('bs_named_opponent_turn'), { username: opponentName })}
             </IonText>
             {store.inJumpSequence && (
               <IonText style={{ color: '#c9a84c', fontSize: 12 }}>{t('ws.games.canJumpAgain')}</IonText>
@@ -164,7 +164,7 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
           <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#c9a84c' }} />
-              <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>{t('label_you') || 'You'}</IonText>
+              <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>{t('label_you') || t('recharge_important_information')}</IonText>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#cf4a5a' }} />

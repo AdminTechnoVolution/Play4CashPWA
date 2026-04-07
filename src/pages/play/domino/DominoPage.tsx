@@ -110,7 +110,7 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
                 ? applyWsMessagePlaceholders(t('spectator_generic_turn_x'), { username: store.currentPlayer })
                 : isMyTurn
                   ? `▶ ${t('domino_your_turn')}`
-                  : `${opponentName}'s ${t('domino_opponent_turn')}`}
+                  : applyWsMessagePlaceholders(t('bs_named_opponent_turn'), { username: opponentName })}
             </IonText>
             <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>
               {applyWsMessagePlaceholders(t('domino_boneyard_count'), { count: store.boneyardCount })}
@@ -154,7 +154,7 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
               fontSize: 13,
               textAlign: 'center',
             }}>
-              Players&apos; tiles are hidden from spectators
+              {t('spectator_domino_hidden_hand')}
             </div>
           ) : (
             <div>

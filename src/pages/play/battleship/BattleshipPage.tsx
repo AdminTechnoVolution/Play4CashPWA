@@ -12,7 +12,7 @@ import TurnTimer from '../components/TurnTimer';
 import SpectatorBadge from '../components/SpectatorBadge';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import { useT } from '../../../i18n/translations';
-import { formatApiMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
+import { formatApiMessageForDisplay, applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
 import OceanCanvas from './OceanCanvas';
 
 // ── Grid constants ─────────────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ export default function BattleshipPage({
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
       }}>
         <p style={{ color: 'rgba(201,168,76,0.75)', fontSize: 12, margin: 0, textAlign: 'center' }}>
-          Tap a cell to place the selected ship
+          {t('bs_placement_hint') || t('recharge_important_information')}
         </p>
 
         {/* Opponent joined status banner */}
@@ -230,7 +230,7 @@ export default function BattleshipPage({
             borderRadius: 8, padding: '8px 16px',
             color: '#81c784', fontSize: 12, textAlign: 'center',
           }}>
-            ✓ {store.opponentName || 'Opponent'} joined — Place your ships!
+            ✓ {applyWsMessagePlaceholders(t('bs_status_joined_room'), { username: store.opponentName || opponentName })}
           </div>
         )}
 
@@ -286,7 +286,7 @@ export default function BattleshipPage({
           }}
         >
           <IonIcon icon={swapHorizontalOutline} style={{ fontSize: 16 }} />
-          {store.selectedHorizontal ? 'Horizontal' : 'Vertical'}
+          {store.selectedHorizontal ? t('bs_horizontal') : t('bs_vertical')}
         </button>
 
         {/* Ship list */}
@@ -386,11 +386,11 @@ export default function BattleshipPage({
   const renderWaiting = () => {
     const waitingForJoin = !store.opponentConfirmed;
     const waitingLabel = waitingForJoin
-      ? 'Waiting for opponent to join…'
-      : `${store.opponentName || 'Opponent'} joined! Waiting for them to place ships…`;
+      ? t('bs_status_waiting_opponent')
+      : applyWsMessagePlaceholders(t('bs_status_joined_room'), { username: store.opponentName || opponentName });
     const waitingDesc = waitingForJoin
-      ? 'Your ships are ready. The battle begins once your opponent joins.'
-      : 'Your ships are deployed. The battle will start once your opponent is ready.';
+      ? t('bs_placement_waiting_opponent')
+      : t('bs_status_joined_room');
     return (
       <IonContent style={{ '--background': '#060e1e' }}>
         <div style={{
@@ -445,7 +445,7 @@ export default function BattleshipPage({
             }}>
               {isSpectator
                 ? `⚡ ${store.spectatorOpponentFleetName || store.opponentName || opponentName}`
-                : `⚡ Enemy Waters — ${store.opponentName || opponentName}`}
+                : `⚡ ${t('bs_enemy_waters')} — ${store.opponentName || opponentName}`}
             </span>
             {store.isMyTurn && !isSpectator && (
               <span style={{ color: '#c9a84c', fontSize: 11, fontWeight: 600 }}>{t('bs_your_turn')}</span>
@@ -579,7 +579,7 @@ export default function BattleshipPage({
           }}>
             <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>⚠️</span>
             <span style={{ color: '#ff8a5c', fontSize: 13, lineHeight: 1.4 }}>
-              {t('bs_confirm_ready_warning') || t('recharge_important_information') || 'Warning'}
+              {t('rooms_join_forfeit_warning') || t('recharge_important_information')}
             </span>
           </div>
 
