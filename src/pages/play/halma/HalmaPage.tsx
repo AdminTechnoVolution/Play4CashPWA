@@ -1,22 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
-  IonButtons, IonButton, IonIcon, IonText,
+  IonButtons, IonButton, IonIcon, IonText, IonCard, IonCardContent, IonSpinner
 } from '@ionic/react';
-import { arrowBackOutline, checkmarkDoneOutline } from 'ionicons/icons';
+import { arrowBackOutline, flame } from 'ionicons/icons';
 import { useAuthStore } from '../../../store/authStore';
-import { useHalmaStore } from '../../../store/halmaStore';
+import { useHalmaStore, HalmaPhase, HalmaCellState } from '../../../store/halmaStore';
 import { ChatSocketManager } from '../../../data/network/ChatSocketManager';
 import { apiRepository } from '../../../data/network/ApiRepository';
 import type { GreetingResponse, ChatMessage } from '../../../data/models/ApiModels';
 import GameOverModal from '../components/GameOverModal';
-import TurnTimer from '../components/TurnTimer';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
+import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import { useT } from '../../../i18n/translations';
 import { applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
-
-const isDark = (r: number, c: number) => (r + c) % 2 !== 0;
 
 interface Props {
   roomId: string;
@@ -24,10 +22,11 @@ interface Props {
   roomName: string;
   opponentName: string;
   isSpectator: boolean;
+  isPlayer1: boolean;
   onLeaveRequest: () => void;
 }
 
-export default function HalmaPage({ roomId, betAmount, roomName, opponentName, isSpectator, onLeaveRequest }: Props) {
+export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectator, opponentName: initialOpponentName }: Props) {
   const { user } = useAuthStore();
   const store = useHalmaStore();
   const t = useT();
@@ -36,20 +35,25 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
   const [lastMsg, setLastMsg] = useState<ChatMessage | null>(null);
 
   useEffect(() => {
-    store.initGame(roomId, user?.username ?? '');
+    if (!roomId) return;
+    store.initGame(roomId, user?.username ?? '', betAmount, false, initialOpponentName, isSpectator);
+    
     const chat = chatRef.current;
     chat.connect(roomId);
     chat.onMessage(setLastMsg);
+    
     apiRepository.getGreetings().then(setGreetings).catch(() => {});
-    return () => { store.cleanup(); chat.disconnect(); };
+    return () => { 
+      store.cleanup(); 
+      chat.disconnect();
+    };
   }, [roomId]);
 
-  const isMyTurn = store.currentPlayer === store.myUsername;
-  const cellSize = Math.min(Math.floor((window.innerWidth - 32) / 8), 48);
+  const cellSize = Math.min(Math.floor((window.innerWidth - 32) / 8), 44);
 
-  const getCellBg = (row: number, col: number) => {
-    const dark = isDark(row, col);
-    return dark ? '#1a2940' : '#0d1520';
+  const getCellBg = (r: number, c: number) => {
+    const dark = (r + c) % 2 !== 0;
+    return dark ? '#769656' : '#EEEED2';
   };
 
   const isTrail = (row: number, col: number) =>
@@ -59,7 +63,91 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
     store.validMoves.some((m) => m.row === row && m.col === col);
 
   const isSelected = (row: number, col: number) =>
-    store.selectedCell?.row === row && store.selectedCell?.col === col;
+    store.selectedRow === row && store.selectedCol === col;
+
+  const isPendingCapture = (row: number, col: number) =>
+    store.pendingCaptures.some(p => p.row === row && p.col === col);
+
+  const renderWaiting = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}>
+      <IonCard style={{ width: '85%', maxWidth: '340px', '--background': '#1a2940', borderRadius: '24px', textAlign: 'center', border: '2px solid rgba(255,255,255,0.1)' }}>
+        <IonCardContent style={{ padding: '32px 24px' }}>
+          <IonText style={{ color: '#fff', fontSize: '20px', fontWeight: '800', display: 'block', marginBottom: '16px', letterSpacing: '2px' }}>
+            {t('bs_waiting_title').toUpperCase()}
+          </IonText>
+          <IonSpinner name="crescent" style={{ color: '#c9a84c', marginBottom: '24px', width: '48px', height: '48px' }} />
+          <IonText style={{ color: '#8a9bbf', fontSize: '15px', display: 'block', marginBottom: '32px', lineHeight: '1.4' }}>
+            {store.statusMessage}
+          </IonText>
+          <IonButton expand="block" onClick={onLeaveRequest} style={{ '--background': 'transparent', '--color': '#8a9bbf', '--border-radius': '12px', border: '1px solid rgba(138,155,191,0.3)', fontWeight: 'bold' }}>
+            {t('bs_leave_room')}
+          </IonButton>
+        </IonCardContent>
+      </IonCard>
+    </div>
+  );
+
+  const renderHeader = () => {
+    const turnColor = store.isSpectator ? '#8a9bbf' : (store.isPlayerTurn ? '#4CAF50' : '#E53935');
+    const time = store.turnTimeLeft;
+    const isRedZone = time <= 10;
+    
+    return (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        background: `${turnColor}20`, 
+        border: `1px solid ${turnColor}40`, 
+        borderRadius: '12px', 
+        padding: '10px 14px', 
+        marginBottom: '16px',
+        animation: store.isPlayerTurn ? 'pulse 2s infinite' : 'none'
+      }}>
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: turnColor, marginRight: 12 }} />
+        <div style={{ flex: 1 }}>
+          <IonText style={{ color: turnColor, fontWeight: '800', fontSize: '14px' }}>
+            {store.statusMessage || (store.isPlayerTurn ? t('halma_your_turn') : (store.opponentName || t('halma_opponent_turn')))}
+          </IonText>
+        </div>
+        <div style={{ 
+          background: `${turnColor}40`, 
+          padding: '4px 10px', 
+          borderRadius: '8px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 4 
+        }}>
+          {isRedZone && store.isPlayerTurn && <IonIcon icon={flame} style={{ color: '#FF9800', fontSize: '14px' }} />}
+          <IonText style={{ color: turnColor, fontWeight: '900', fontSize: '14px' }}>{time}s</IonText>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPiece = (cell: HalmaCellState, size: number) => {
+    const isMine = cell === HalmaCellState.PLAYER || cell === HalmaCellState.PLAYER_KING;
+    const isKing = cell === HalmaCellState.PLAYER_KING || cell === HalmaCellState.OPPONENT_KING;
+    
+    const borderColor = isMine ? '#D4C090' : '#111111';
+    const crownColor = isMine ? '#B8860B' : '#E8C547';
+
+    return (
+      <div style={{
+        width: size * 0.75, height: size * 0.75,
+        borderRadius: '50%',
+        background: `radial-gradient(circle at 35% 35%, ${isMine ? '#fff, #F0E8D0, #D4C090' : '#606060, #282828, #111111'})`,
+        boxShadow: '0 4px 6px rgba(0,0,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.3)',
+        border: `1px solid ${borderColor}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative',
+        transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+      }}>
+        {isKing && (
+          <span style={{ color: crownColor, fontSize: size * 0.45, fontWeight: '900', position: 'relative', top: -1 }}>♔</span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <IonPage style={{ '--background': '#0a1628' }}>
@@ -68,92 +156,74 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
           <IonButtons slot="start">
             <IonButton onClick={onLeaveRequest}><IonIcon icon={arrowBackOutline} style={{ color: '#c9a84c' }} /></IonButton>
           </IonButtons>
-          <IonTitle style={{ color: '#fff', fontSize: 16 }}>{roomName}</IonTitle>
+          <IonTitle style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>{t('halma_screen_title')}</IonTitle>
           <IonButtons slot="end">
-            {store.inJumpSequence && !isSpectator && (
-              <IonButton onClick={() => store.endTurn(roomId)} style={{ '--color': '#c9a84c' }}>
-                <IonIcon icon={checkmarkDoneOutline} />
-              </IonButton>
-            )}
-            <IonText style={{ color: '#c9a84c', fontSize: 14, paddingRight: 12 }}>${betAmount}</IonText>
+            <IonText style={{ color: '#c9a84c', fontSize: 14, paddingRight: 12, fontWeight: '800' }}>${betAmount}</IonText>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
 
       <IonContent style={{ '--background': '#0a1628' }}>
-        <div style={{ padding: '8px 16px' }}>
-          {isSpectator && <SpectatorBadge />}
+        {store.phase === HalmaPhase.WAITING && renderWaiting()}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <IonText style={{ color: isMyTurn && !isSpectator ? '#c9a84c' : '#8a9bbf', fontSize: 13 }}>
-              {isSpectator
-                ? applyWsMessagePlaceholders(t('spectator_generic_turn_x'), { username: store.currentPlayer })
-                : isMyTurn
-                  ? `▶ ${t('ws.games.yourTurn')}`
-                  : applyWsMessagePlaceholders(t('bs_named_opponent_turn'), { username: opponentName })}
-            </IonText>
-            {store.inJumpSequence && (
-              <IonText style={{ color: '#c9a84c', fontSize: 12 }}>{t('ws.games.canJumpAgain')}</IonText>
-            )}
-          </div>
-
-          <TurnTimer seconds={30} isMyTurn={isMyTurn} onTimeout={() => {}} />
+        <div style={{ padding: '16px', opacity: store.phase === HalmaPhase.WAITING ? 0.3 : 1 }}>
+          {store.isSpectator && <SpectatorBadge />}
+          
+          {renderHeader()}
 
           {/* Board */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(8, ${cellSize}px)`,
             gridTemplateRows: `repeat(8, ${cellSize}px)`,
-            border: '2px solid #1a3050',
-            borderRadius: 4,
+            border: '6px solid #3e2723',
+            borderRadius: '8px',
             overflow: 'hidden',
             margin: '0 auto',
             width: 8 * cellSize,
+            boxShadow: '0 12px 24px rgba(0,0,0,0.6)',
+            background: '#3e2723'
           }}>
-            {store.board.map((row, r) =>
-              row.map((cell, c) => {
-                const dark = isDark(r, c);
+            {store.board.map((rowArr, r) =>
+              rowArr.map((cell, c) => {
                 const selected = isSelected(r, c);
                 const valid = isValidMove(r, c);
                 const trail = isTrail(r, c);
+                const pending = isPendingCapture(r, c);
 
                 let bg = getCellBg(r, c);
-                if (trail) bg = 'rgba(100, 80, 200, 0.4)';
-                if (valid && dark) bg = 'rgba(80, 160, 80, 0.35)';
-                if (selected) bg = 'rgba(201, 168, 76, 0.3)';
+                if (selected) bg = '#c9a84c99';
 
                 return (
                   <div
                     key={`${r}-${c}`}
-                    onClick={() => !isSpectator && store.cellTapped(r, c, roomId)}
+                    onClick={() => store.onCellTap(r, c, roomId)}
                     style={{
                       width: cellSize, height: cellSize,
                       background: bg,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: dark && !isSpectator ? 'pointer' : 'default',
                       position: 'relative',
                       boxSizing: 'border-box',
-                      border: selected ? '2px solid #c9a84c' : 'none',
+                      border: '0.5px solid rgba(0,0,0,0.1)'
                     }}
                   >
-                    {valid && cell === 'empty' && dark && (
-                      <div style={{ width: cellSize * 0.3, height: cellSize * 0.3, borderRadius: '50%', background: 'rgba(80,200,80,0.6)' }} />
+                    {trail && (
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'rgba(232, 213, 176, 0.4)' }} />
                     )}
-                    {cell === 'mine' && (
-                      <div style={{
-                        width: cellSize * 0.65, height: cellSize * 0.65,
-                        borderRadius: '50%',
-                        background: selected ? '#e8c96e' : '#c9a84c',
-                        boxShadow: selected ? '0 0 8px rgba(201,168,76,0.8)' : '0 2px 4px rgba(0,0,0,0.4)',
-                      }} />
+                    
+                    {cell !== HalmaCellState.EMPTY && renderPiece(cell, cellSize)}
+
+                    {valid && cell === HalmaCellState.EMPTY && (
+                      <div style={{ width: cellSize * 0.38, height: cellSize * 0.38, borderRadius: '50%', background: 'rgba(255,255,255,0.6)' }} />
                     )}
-                    {cell === 'opponent' && (
+
+                    {pending && (
                       <div style={{
-                        width: cellSize * 0.65, height: cellSize * 0.65,
-                        borderRadius: '50%',
-                        background: '#cf4a5a',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
-                      }} />
+                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(255,0,0,0.4)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontSize: '20px', fontWeight: 'bold', pointerEvents: 'none'
+                      }}>×</div>
                     )}
                   </div>
                 );
@@ -161,32 +231,91 @@ export default function HalmaPage({ roomId, betAmount, roomName, opponentName, i
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#c9a84c' }} />
-              <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>{t('label_you') || t('recharge_important_information')}</IonText>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 0', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #fff, #F0E8D0, #D4C090)', border: '1px solid #D4C090' }} />
+              <IonText style={{ color: '#8a9bbf', fontSize: 13, fontWeight: 'bold' }}>{user?.username || 'Tú'}</IonText>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#cf4a5a' }} />
-              <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>{opponentName}</IonText>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <IonText style={{ color: '#8a9bbf', fontSize: 13, fontWeight: 'bold' }}>{store.opponentName || 'Oponente'}</IonText>
+              <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #606060, #282828, #111111)', border: '1px solid #111' }} />
             </div>
           </div>
 
-          {!isSpectator && store.inJumpSequence && (
+          {(store.mustEndTurn || store.isContinuingJump) && !store.isSpectator && (
             <IonButton
               expand="block"
-              onClick={() => store.endTurn(roomId)}
-              style={{ marginTop: 12, '--background': 'rgba(201,168,76,0.15)', '--color': '#c9a84c', '--border-radius': '10px', border: '1px solid rgba(201,168,76,0.4)' }}
+              onClick={() => store.endTurnManually(roomId)}
+              className={store.turnTimeLeft <= 10 ? 'red-zone-btn' : ''}
+              style={{ 
+                margin: '16px 0', 
+                '--background': store.turnTimeLeft <= 10 ? '#E53935' : '#4CAF50', 
+                '--color': '#fff', 
+                '--border-radius': '14px',
+                '--box-shadow': '0 4px 12px rgba(0,0,0,0.3)',
+                fontWeight: '900',
+                fontSize: '17px',
+                height: '56px'
+              }}
             >
-              {t('halma_end_turn')}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {store.turnTimeLeft <= 10 && <span>🔥</span>}
+                {t('halma_send_move').toUpperCase()}
+                {store.turnTimeLeft <= 10 && <span>🔥</span>}
+              </div>
             </IonButton>
           )}
 
-          <ChatGreetingChips greetings={greetings} onSend={(id) => chatRef.current.sendGreeting(roomId, id)} lastReceivedMessage={lastMsg} />
+          {store.isContinuingJump && (
+            <IonText style={{ color: '#FF9800', fontSize: '12px', textAlign: 'center', display: 'block', marginBottom: '12px', fontWeight: 'bold' }}>
+              {t('halma_continue_jump')}
+            </IonText>
+          )}
+
+          <div style={{ marginTop: 'auto', paddingBottom: '20px' }}>
+            <ChatGreetingChips greetings={greetings} onSend={(id) => chatRef.current.sendGreeting(roomId, id)} lastReceivedMessage={lastMsg} />
+          </div>
         </div>
+
+        <style>{`
+          @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+          }
+          .red-zone-btn {
+            animation: shake 0.5s infinite;
+          }
+          @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-2px); }
+            50% { transform: translateX(2px); }
+            75% { transform: translateX(-1px); }
+            100% { transform: translateX(0); }
+          }
+        `}</style>
       </IonContent>
 
-      <GameOverModal isOpen={!!store.gameOver} gameOver={store.gameOver} isSpectator={isSpectator} onExit={onLeaveRequest} gameProfile="HALMA" />
+      <GameOverModal 
+        isOpen={store.phase === HalmaPhase.GAME_OVER} 
+        gameOver={{
+          outcome: store.gameOverIsDraw ? 'draw' : (store.winner === 'You' ? 'win' : 'lose'),
+          youWon: store.winner === 'You',
+          winner: store.winner || '',
+          reason: store.statusMessage,
+          prize: store.prize || 0,
+          isDraw: store.gameOverIsDraw
+        }} 
+        isSpectator={store.isSpectator} 
+        onExit={onLeaveRequest} 
+        gameProfile="HALMA" 
+      />
+      
+      <GenericErrorModal 
+        isOpen={!!store.apiErrorRawMessage} 
+        message={store.apiErrorRawMessage || ''} 
+        onDismiss={() => { store.clearError(); onLeaveRequest(); }} 
+      />
     </IonPage>
   );
 }

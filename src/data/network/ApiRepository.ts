@@ -110,7 +110,7 @@ export const apiRepository = {
     return apiService.readyRoom(roomId);
   },
 
-  async leaveRoom(roomId: string): Promise<void> {
+  async leaveRoom(roomId: string): Promise<RoomStatusResponse> {
     return apiService.leaveRoom(roomId);
   },
 

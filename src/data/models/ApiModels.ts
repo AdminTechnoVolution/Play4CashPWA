@@ -232,16 +232,23 @@ export interface DominoState {
   gameOver?: GameOverPayload;
 }
 
-export type HalmaCell = 'empty' | 'mine' | 'opponent';
+export type HalmaCell = 'empty' | 'mine' | 'opponent' | 'mine_king' | 'opponent_king';
+
+export type HalmaPhase = 'WAITING' | 'PLAY' | 'GAME_OVER';
 
 export interface HalmaState {
   board: HalmaCell[][];
   currentPlayer: string;
   myUsername: string;
+  phase: HalmaPhase;
+  statusMessage?: string;
+  turnTimeLeft?: number;
   selectedCell?: { row: number; col: number };
-  validMoves: { row: number; col: number }[];
+  validMoves: { row: number; col: number; isJump?: boolean }[];
   jumpTrail: { row: number; col: number }[];
   inJumpSequence: boolean;
+  mustEndTurn?: boolean;
+  pendingCaptures?: { row: number; col: number }[];
   gameOver?: GameOverPayload;
 }
 

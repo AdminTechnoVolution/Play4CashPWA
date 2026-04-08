@@ -10,6 +10,7 @@ export interface PlayContext {
   opponentName: string;
   hasOpponent: boolean;
   isSpectator: boolean;
+  isPlayer1: boolean;
 }
 
 const GAME_CTX_KEY = 'p4c_game_context';
@@ -39,6 +40,10 @@ export const getPlayContext = (): PlayContext | null => {
   } catch (e) {
     return null;
   }
+};
+
+export const clearPlayContext = () => {
+  sessionStorage.removeItem(PLAY_CTX_KEY);
 };
 
 export const clearRoutingContext = () => {

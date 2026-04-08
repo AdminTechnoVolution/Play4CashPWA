@@ -1,144 +1,470 @@
 import { create } from 'zustand';
 import { HalmaSocketManager } from '../data/network/HalmaSocketManager';
-import type { HalmaCell, HalmaState, GameOverPayload } from '../data/models/ApiModels';
+import { apiService } from '../data/network/ApiService';
+import { apiRepository } from '../data/network/ApiRepository';
+import type { GameOverPayload } from '../data/models/ApiModels';
 
-const EMPTY_BOARD = (): HalmaCell[][] =>
-  Array.from({ length: 8 }, () => Array(8).fill('empty') as HalmaCell[]);
+// Mirroring Android: HalmaViewModel.kt
+const HALMA_BOARD_SIZE = 8;
+const HALMA_DIAGONAL_UNIT_STEPS = [
+  { dr: 1, dc: -1 }, { dr: 1, dc: 1 }, { dr: -1, dc: -1 }, { dr: -1, dc: 1 }
+];
 
-const isDark = (r: number, c: number) => (r + c) % 2 !== 0;
+export enum HalmaPhase { WAITING = 'WAITING', PLAY = 'PLAY', GAME_OVER = 'GAME_OVER' }
 
-// Diagonal directions for halma
-const DIAGS = [[-1,-1],[-1,1],[1,-1],[1,1]] as const;
-
-function computeValidMoves(
-  board: HalmaCell[][],
-  row: number,
-  col: number,
-  visited: Set<string>
-): { row: number; col: number; isJump: boolean }[] {
-  const moves: { row: number; col: number; isJump: boolean }[] = [];
-  for (const [dr, dc] of DIAGS) {
-    const nr = row + dr, nc = col + dc;
-    // Single step
-    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && isDark(nr, nc) && board[nr][nc] === 'empty') {
-      moves.push({ row: nr, col: nc, isJump: false });
-    }
-    // Jump
-    const jr = row + 2 * dr, jc = col + 2 * dc;
-    const key = `${jr},${jc}`;
-    if (
-      nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] !== 'empty' &&
-      jr >= 0 && jr < 8 && jc >= 0 && jc < 8 && isDark(jr, jc) && board[jr][jc] === 'empty' &&
-      !visited.has(key)
-    ) {
-      moves.push({ row: jr, col: jc, isJump: true });
-    }
-  }
-  return moves;
+export enum HalmaCellState {
+  EMPTY = 'EMPTY',
+  PLAYER = 'PLAYER',
+  OPPONENT = 'OPPONENT',
+  PLAYER_KING = 'PLAYER_KING',
+  OPPONENT_KING = 'OPPONENT_KING'
 }
 
-interface HalmaStoreState {
-  board: HalmaCell[][];
-  currentPlayer: string;
-  myUsername: string;
-  selectedCell: { row: number; col: number } | null;
-  validMoves: { row: number; col: number; isJump: boolean }[];
-  jumpTrail: { row: number; col: number }[];
-  inJumpSequence: boolean;
-  gameOver: GameOverPayload | null;
-  error: string | null;
-  socket: HalmaSocketManager | null;
+function isPlayerPiece(s: HalmaCellState): boolean {
+  return s === HalmaCellState.PLAYER || s === HalmaCellState.PLAYER_KING;
+}
+
+function isKing(s: HalmaCellState): boolean {
+  return s === HalmaCellState.PLAYER_KING || s === HalmaCellState.OPPONENT_KING;
+}
+
+// Mirrored from HalmaUiState in Android
+export interface HalmaUiState {
+  phase: HalmaPhase;
+  board: HalmaCellState[][];
+  isPlayerTurn: boolean;
+  turnTimeLeft: number;
+  turnTimerTotal: number;
+  selectedRow: number | null;
+  selectedCol: number | null;
+  validMoves: { row: number, col: number }[];
+  isContinuingJump: boolean;
+  mustEndTurn: boolean;
+  isMovePending: boolean;
+  statusMessage: string;
+  opponentName: string;
+  opponentConfirmed: boolean;
+  winner: string | null;
+  prize: number | null;
+  betAmount: number;
+  apiErrorRawMessage: string | null;
+  navigateBack: boolean;
+  matchCancelledMessage: string | null;
+  opponentLeftMessage: string | null;
+  isLeaving: boolean;
+  moveCount: number;
+  lastLandedRow: number | null;
+  lastLandedCol: number | null;
+  jumpTrail: { row: number, col: number }[];
+  pendingCaptures: { row: number, col: number }[];
+  isSpectator: boolean;
+  spectatorsCount: number;
+  gameOverIsDraw: boolean;
+  gameOverWinnerDisplayName: string | null;
 }
 
 interface HalmaStoreActions {
-  initGame: (roomId: string, myUsername: string) => void;
+  initGame: (roomId: string, myUsername: string, bet: number, hasOpponent: boolean, initialOpponentName: string, isSpectator: boolean) => void;
   cleanup: () => void;
-  cellTapped: (row: number, col: number, roomId: string) => void;
-  endTurn: (roomId: string) => void;
+  onCellTap: (row: number, col: number, roomId: string) => void;
+  endTurnManually: (roomId: string) => void;
   clearError: () => void;
+  clearOpponentLeft: () => void;
+  leaveRoom: (roomId: string) => void;
 }
 
-export const useHalmaStore = create<HalmaStoreState & HalmaStoreActions>((set, get) => ({
-  board: EMPTY_BOARD(),
-  currentPlayer: '',
-  myUsername: '',
-  selectedCell: null,
+const INITIAL_STATE: HalmaUiState = {
+  phase: HalmaPhase.WAITING,
+  board: Array.from({ length: HALMA_BOARD_SIZE }, () => Array(HALMA_BOARD_SIZE).fill(HalmaCellState.EMPTY)),
+  isPlayerTurn: false,
+  turnTimeLeft: 0,
+  turnTimerTotal: 0,
+  selectedRow: null,
+  selectedCol: null,
   validMoves: [],
+  isContinuingJump: false,
+  mustEndTurn: false,
+  isMovePending: false,
+  statusMessage: '',
+  opponentName: '',
+  opponentConfirmed: false,
+  winner: null,
+  prize: null,
+  betAmount: 0,
+  apiErrorRawMessage: null,
+  navigateBack: false,
+  matchCancelledMessage: null,
+  opponentLeftMessage: null,
+  isLeaving: false,
+  moveCount: 0,
+  lastLandedRow: null,
+  lastLandedCol: null,
   jumpTrail: [],
-  inJumpSequence: false,
-  gameOver: null,
-  error: null,
-  socket: null,
+  pendingCaptures: [],
+  isSpectator: false,
+  spectatorsCount: 0,
+  gameOverIsDraw: false,
+  gameOverWinnerDisplayName: null,
+};
 
-  initGame(roomId, myUsername) {
-    const socket = new HalmaSocketManager();
-    socket.connect(roomId);
-    socket.onGameUpdate((state: HalmaState) => {
-      set({
-        board: state.board,
-        currentPlayer: state.currentPlayer,
-        myUsername: state.myUsername || myUsername,
-        gameOver: state.gameOver ?? null,
-        selectedCell: null,
-        validMoves: [],
-        jumpTrail: [],
-        inJumpSequence: false,
+export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get) => {
+  let socketManager: HalmaSocketManager | null = null;
+  let pollingInterval: number | null = null;
+  let isPlayerOne = true; // authoritative from socket
+  let jumpTrailAccumulator: { row: number, col: number }[] = [];
+
+  // Helper functions ported from Android
+  const isDarkSquare = (row: number, col: number) => (row + col) % 2 !== 0;
+
+  const toRawCoord = (displayRow: number, displayCol: number): { row: number, col: number } => {
+    if (isPlayerOne) return { row: displayRow, col: displayCol };
+    return { row: HALMA_BOARD_SIZE - 1 - displayRow, col: HALMA_BOARD_SIZE - 1 - displayCol };
+  };
+
+  const rawToDisplayCoord = (rawRow: number, rawCol: number): { row: number, col: number } => {
+    if (isPlayerOne) return { row: rawRow, col: rawCol };
+    return { row: HALMA_BOARD_SIZE - 1 - rawRow, col: HALMA_BOARD_SIZE - 1 - rawCol };
+  };
+
+  const findLandedCell = (oldBoard: HalmaCellState[][], newBoard: HalmaCellState[][]) => {
+    const landed: { row: number, col: number }[] = [];
+    for (let r = 0; r < HALMA_BOARD_SIZE; r++) {
+      for (let c = 0; c < HALMA_BOARD_SIZE; c++) {
+        if (oldBoard[r][c] === HalmaCellState.EMPTY && newBoard[r][c] !== HalmaCellState.EMPTY) {
+          landed.push({ row: r, col: c });
+        }
+      }
+    }
+    return landed.length === 1 ? landed[0] : null;
+  };
+
+  const cellsStrictlyBetween = (fR: number, fC: number, tR: number, tC: number) => {
+    const dr = tR - fR;
+    const dc = tC - fC;
+    const steps = Math.abs(dr);
+    if (steps !== Math.abs(dc) || steps === 0) return [];
+    const stepR = dr / steps;
+    const stepC = dc / steps;
+    return Array.from({ length: steps - 1 }, (_, i) => ({ row: fR + stepR * (i + 1), col: fC + stepC * (i + 1) }));
+  };
+
+  const parseBoard = (arr: any[]): HalmaCellState[][] | null => {
+    if (!arr || arr.length !== HALMA_BOARD_SIZE) return null;
+    const raw = arr.map((rowJson: any[]) => {
+      return rowJson.map((val: number) => {
+        switch (val) {
+          case 1: return isPlayerOne ? HalmaCellState.PLAYER : HalmaCellState.OPPONENT;
+          case 2: return isPlayerOne ? HalmaCellState.OPPONENT : HalmaCellState.PLAYER;
+          case 3: return isPlayerOne ? HalmaCellState.PLAYER_KING : HalmaCellState.OPPONENT_KING;
+          case 4: return isPlayerOne ? HalmaCellState.OPPONENT_KING : HalmaCellState.PLAYER_KING;
+          default: return HalmaCellState.EMPTY;
+        }
       });
     });
-    set({ socket, myUsername });
-  },
+    return isPlayerOne ? raw : [...raw].reverse().map(row => [...row].reverse());
+  };
 
-  cleanup() {
-    get().socket?.disconnect();
-    set({ socket: null, board: EMPTY_BOARD(), gameOver: null, selectedCell: null, validMoves: [], jumpTrail: [], inJumpSequence: false });
-  },
-
-  cellTapped(row, col, roomId) {
-    const { board, currentPlayer, myUsername, selectedCell, validMoves, inJumpSequence, jumpTrail, socket } = get();
-    if (!socket || currentPlayer !== myUsername) return;
-
-    if (selectedCell) {
-      const target = validMoves.find((m) => m.row === row && m.col === col);
-      if (target) {
-        // Execute move
-        socket.move(roomId, selectedCell.row, selectedCell.col, row, col);
-        const isJump = target.isJump;
-
-        if (isJump) {
-          const newBoard = board.map((r) => [...r]) as HalmaCell[][];
-          newBoard[row][col] = newBoard[selectedCell.row][selectedCell.col];
-          newBoard[selectedCell.row][selectedCell.col] = 'empty';
-          const visited = new Set(jumpTrail.map((c) => `${c.row},${c.col}`));
-          visited.add(`${row},${col}`);
-          const furtherJumps = computeValidMoves(newBoard, row, col, visited).filter((m) => m.isJump);
-          if (furtherJumps.length > 0) {
-            set({
-              board: newBoard,
-              selectedCell: { row, col },
-              validMoves: furtherJumps,
-              jumpTrail: [...jumpTrail, { row: selectedCell.row, col: selectedCell.col }],
-              inJumpSequence: true,
-            });
-          } else {
-            set({ selectedCell: null, validMoves: [], jumpTrail: [], inJumpSequence: false });
-          }
-        } else {
-          set({ selectedCell: null, validMoves: [], jumpTrail: [], inJumpSequence: false });
-        }
-        return;
+  const getNormalPieceMoves = (fromRow: number, fromCol: number, board: HalmaCellState[][]) => {
+    const moves: { row: number, col: number }[] = [];
+    for (const { dr, dc } of HALMA_DIAGONAL_UNIT_STEPS) {
+      const tr = fromRow + dr;
+      const tc = fromCol + dc;
+      if (tr >= 0 && tr < HALMA_BOARD_SIZE && tc >= 0 && tc < HALMA_BOARD_SIZE && board[tr][tc] === HalmaCellState.EMPTY && isDarkSquare(tr, tc)) {
+        moves.push({ row: tr, col: tc });
       }
-      // Clicking own piece again — reselect
+      const midR = fromRow + dr;
+      const midC = fromCol + dc;
+      const tr2 = fromRow + dr * 2;
+      const tc2 = fromCol + dc * 2;
+      if (tr2 >= 0 && tr2 < HALMA_BOARD_SIZE && tc2 >= 0 && tc2 < HALMA_BOARD_SIZE && midR >= 0 && midR < HALMA_BOARD_SIZE && midC >= 0 && midC < HALMA_BOARD_SIZE && board[midR][midC] !== HalmaCellState.EMPTY && board[tr2][tc2] === HalmaCellState.EMPTY && isDarkSquare(tr2, tc2)) {
+        moves.push({ row: tr2, col: tc2 });
+      }
     }
+    return moves;
+  };
 
-    if (board[row]?.[col] !== 'mine') return;
-    const moves = computeValidMoves(board, row, col, new Set());
-    set({ selectedCell: { row, col }, validMoves: moves, jumpTrail: [], inJumpSequence: false });
-  },
+  const getKingSlides = (fromRow: number, fromCol: number, board: HalmaCellState[][]) => {
+    const moves: { row: number, col: number }[] = [];
+    for (const { dr, dc } of HALMA_DIAGONAL_UNIT_STEPS) {
+      let t = 1;
+      while (true) {
+        const r = fromRow + dr * t;
+        const c = fromCol + dc * t;
+        if (r < 0 || r >= HALMA_BOARD_SIZE || c < 0 || c >= HALMA_BOARD_SIZE) break;
+        if (board[r][c] === HalmaCellState.EMPTY && isDarkSquare(r, c)) {
+          moves.push({ row: r, col: c });
+          t++;
+        } else break;
+      }
+    }
+    return moves;
+  };
 
-  endTurn(roomId) {
-    get().socket?.endTurn(roomId);
-    set({ selectedCell: null, validMoves: [], jumpTrail: [], inJumpSequence: false });
-  },
+  const getValidJumpsOnly = (fromRow: number, fromCol: number, board: HalmaCellState[][]) => {
+    const moves: { row: number, col: number }[] = [];
+    for (const { dr, dc } of HALMA_DIAGONAL_UNIT_STEPS) {
+      const midR = fromRow + dr;
+      const midC = fromCol + dc;
+      const tr2 = fromRow + dr * 2;
+      const tc2 = fromCol + dc * 2;
+      if (tr2 >= 0 && tr2 < HALMA_BOARD_SIZE && tc2 >= 0 && tc2 < HALMA_BOARD_SIZE && midR >= 0 && midR < HALMA_BOARD_SIZE && midC >= 0 && midC < HALMA_BOARD_SIZE && board[midR][midC] !== HalmaCellState.EMPTY && board[tr2][tc2] === HalmaCellState.EMPTY && isDarkSquare(tr2, tc2)) {
+        moves.push({ row: tr2, col: tc2 });
+      }
+    }
+    return moves;
+  };
 
-  clearError() { set({ error: null }); },
-}));
+  const getValidKingJumpMovesOnly = (fromRow: number, fromCol: number, board: HalmaCellState[][]) => {
+    const moves: { row: number, col: number }[] = [];
+    for (const { dr, dc } of HALMA_DIAGONAL_UNIT_STEPS) {
+      let t = 1;
+      while (true) {
+        const r = fromRow + dr * t;
+        const c = fromCol + dc * t;
+        if (r < 0 || r >= HALMA_BOARD_SIZE || c < 0 || c >= HALMA_BOARD_SIZE) break;
+        if (board[r][c] !== HalmaCellState.EMPTY) {
+          let u = t + 1;
+          while (true) {
+            const r2 = fromRow + dr * u;
+            const c2 = fromCol + dc * u;
+            if (r2 < 0 || r2 >= HALMA_BOARD_SIZE || c2 < 0 || c2 >= HALMA_BOARD_SIZE) break;
+            if (board[r2][c2] === HalmaCellState.EMPTY && isDarkSquare(r2, c2)) {
+              moves.push({ row: r2, col: c2 });
+              u++;
+            } else break;
+          }
+          break;
+        }
+        t++;
+      }
+    }
+    return moves;
+  };
+
+  return {
+    ...INITIAL_STATE,
+
+    initGame(roomId, myUsername, bet, hasOpponent, initialOpponentName, isSpectator) {
+      set({ 
+        ...INITIAL_STATE, 
+        betAmount: bet, 
+        opponentConfirmed: hasOpponent || isSpectator, 
+        opponentName: initialOpponentName, 
+        isSpectator,
+        statusMessage: isSpectator ? 'Observando partida' : (hasOpponent ? '¡Oponente unido! Iniciando partida...' : 'Esperando oponente...')
+      });
+
+      // Polling mirrored from Android (HalmaViewModel.kt:150)
+      if (!isSpectator) {
+        pollingInterval = window.setInterval(async () => {
+          if (get().phase !== HalmaPhase.WAITING) return;
+          try {
+            const res = await apiService.getRoomStatus(roomId);
+            if (res.status === 'started') {
+              socketManager?.requestSync(roomId);
+            }
+          } catch {}
+        }, 5000);
+      }
+
+      socketManager = new HalmaSocketManager();
+      
+      // onConnected mirrored from Android (HalmaViewModel.kt:179)
+      socketManager.connect(roomId);
+      if (hasOpponent && !isSpectator) {
+        apiRepository.readyRoom(roomId).catch(() => {});
+        socketManager.requestSync(roomId);
+      }
+      
+      socketManager.onGameUpdate((json: any) => {
+        const data = json.data || json;
+        // Literal translation of handleHalmaMessage (Android 255-450)
+        const opponentJoined = data.opponentJoined || data.opponent_joined || false;
+        const opponentName = data.opponentName || data.userName || '';
+        const outcome = data.outcome || '';
+        const isDraw = data.isDraw || data.draw || false;
+        
+        if (data.isPlayerOne !== undefined) isPlayerOne = data.isPlayerOne;
+        else if (data.is_player_one !== undefined) isPlayerOne = data.is_player_one;
+
+        if (opponentJoined && opponentName) {
+          set({ opponentConfirmed: true, opponentName });
+          if (!isSpectator) apiRepository.readyRoom(roomId).catch(() => {});
+        }
+
+        // Android match end logic (HalmaViewModel.kt:344)
+        const gameEndedRaw = data.gameEnded || data.game_ended || false;
+        if (gameEndedRaw || outcome === 'win' || outcome === 'lose' || outcome === 'timeout_loss' ||
+            outcome === 'opponent_disconnected' || outcome === 'forfeit' || isDraw) {
+          
+          if (pollingInterval) clearInterval(pollingInterval);
+          const youWonFlag = data.youWon || data.you_won || false;
+          let winnerLabel = 'Opponent';
+          if (outcome === 'win' || outcome === 'opponent_disconnected') winnerLabel = 'You';
+          else if (outcome === 'forfeit') winnerLabel = youWonFlag ? 'You' : 'Opponent';
+          else if (outcome === 'lose' || outcome === 'timeout_loss') winnerLabel = 'Opponent';
+          else if (data.winner === 'mine') winnerLabel = 'You';
+
+          set({
+            phase: HalmaPhase.GAME_OVER,
+            winner: winnerLabel,
+            prize: data.prize || 0,
+            statusMessage: data.reason || 'Partida finalizada',
+            gameOverIsDraw: isDraw,
+            isMovePending: false
+          });
+          return;
+        }
+
+        const newBoard = parseBoard(data.board);
+        const yourTurn = data.yourTurn || data.your_turn || false;
+        const timerSeconds = data.turnTimeLeft ?? data.turn_timer_seconds ?? data.turnTimerSeconds ?? 0;
+        const mustEndTurn = data.mustEndTurn ?? data.must_end_turn ?? false;
+        const continuingJump = data.continuingJump ?? data.continuing_jump ?? false;
+        const jumpingPiece = data.jumpingPiece || data.jumping_piece;
+
+        if (newBoard) {
+          const landed = findLandedCell(get().board, newBoard);
+          if (landed) jumpTrailAccumulator.push(landed);
+          
+          if (mustEndTurn) {
+            // Android 389: mustEndTurn
+            const trail = [...jumpTrailAccumulator];
+            jumpTrailAccumulator = [];
+            set({
+              phase: HalmaPhase.PLAY,
+              board: newBoard,
+              isPlayerTurn: !isSpectator,
+              turnTimeLeft: timerSeconds,
+              selectedRow: null,
+              selectedCol: null,
+              validMoves: [],
+              isContinuingJump: false,
+              mustEndTurn: !isSpectator,
+              isMovePending: false,
+              statusMessage: isSpectator ? 'Turno del oponente' : 'Debes terminar tu turno',
+              moveCount: get().moveCount + 1,
+              lastLandedRow: landed?.row || null,
+              lastLandedCol: landed?.col || null,
+              jumpTrail: trail,
+            });
+            return;
+          }
+
+          if (continuingJump && jumpingPiece) {
+            // Android 417: continuingJump
+            const rawR = jumpingPiece.row !== undefined ? jumpingPiece.row : jumpingPiece.r;
+            const rawC = jumpingPiece.col !== undefined ? jumpingPiece.col : jumpingPiece.c;
+            const r = isPlayerOne ? rawR : 7 - rawR;
+            const c = isPlayerOne ? rawC : 7 - rawC;
+
+            if (r >= 0 && r < 8 && c >= 0 && c < 8) {
+              const piece = newBoard[r][c];
+              const jumpMoves = (piece === HalmaCellState.PLAYER_KING || piece === HalmaCellState.OPPONENT_KING)
+                ? getValidKingJumpMovesOnly(r, c, newBoard)
+                : getValidJumpsOnly(r, c, newBoard);
+
+              if (jumpMoves.length === 0) {
+                // Android 429: No more jumps -> end turn automatically
+                if (!isSpectator) socketManager?.endTurn(roomId);
+                set({
+                  phase: HalmaPhase.PLAY,
+                  board: newBoard,
+                  isPlayerTurn: !isSpectator,
+                  turnTimeLeft: timerSeconds,
+                  selectedRow: null,
+                  selectedCol: null,
+                  validMoves: [],
+                  isContinuingJump: false,
+                  mustEndTurn: !isSpectator,
+                  isMovePending: false,
+                  moveCount: get().moveCount + 1,
+                });
+              } else {
+                set({
+                  phase: HalmaPhase.PLAY,
+                  board: newBoard,
+                  isPlayerTurn: !isSpectator,
+                  turnTimeLeft: timerSeconds,
+                  selectedRow: r,
+                  selectedCol: c,
+                  validMoves: jumpMoves,
+                  isContinuingJump: !isSpectator,
+                  mustEndTurn: false,
+                  isMovePending: false,
+                  moveCount: get().moveCount + 1,
+                });
+              }
+            }
+            return;
+          }
+
+          // Default / Turn Flip branch (Android 469+)
+          const trail = [...jumpTrailAccumulator];
+          jumpTrailAccumulator = [];
+          
+          set({
+            phase: HalmaPhase.PLAY,
+            board: newBoard,
+            isPlayerTurn: yourTurn && !isSpectator,
+            turnTimeLeft: timerSeconds,
+            selectedRow: null,
+            selectedCol: null,
+            validMoves: [],
+            isContinuingJump: false,
+            mustEndTurn: false,
+            isMovePending: false,
+            statusMessage: (yourTurn && !isSpectator) ? 'Tu turno' : 'Turno del oponente',
+            moveCount: get().moveCount + 1,
+            lastLandedRow: landed?.row || null,
+            lastLandedCol: landed?.col || null,
+            jumpTrail: trail,
+          });
+        }
+      });
+    },
+
+    onCellTap(row, col, roomId) {
+      const state = get();
+      if (state.isSpectator || state.phase !== HalmaPhase.PLAY || !state.isPlayerTurn || state.isMovePending || state.mustEndTurn) return;
+
+      const isValid = state.validMoves.some(m => m.row === row && m.col === col);
+      if (state.selectedRow !== null && state.selectedCol !== null && isValid) {
+        const rawFrom = toRawCoord(state.selectedRow, state.selectedCol);
+        const rawTo = toRawCoord(row, col);
+        socketManager?.move(roomId, rawFrom.row, rawFrom.col, rawTo.row, rawTo.col);
+        set({ isMovePending: true });
+      } else {
+        const piece = state.board[row][col];
+        if (isPlayerPiece(piece)) {
+          const moves = isKing(piece) ? [...getKingSlides(row, col, state.board), ...getValidKingJumpMovesOnly(row, col, state.board)] : getNormalPieceMoves(row, col, state.board);
+          set({ selectedRow: row, selectedCol: col, validMoves: moves });
+        } else {
+          set({ selectedRow: null, selectedCol: null, validMoves: [] });
+        }
+      }
+    },
+
+    endTurnManually(roomId) {
+      const state = get();
+      if (state.isSpectator || state.phase !== HalmaPhase.PLAY || !state.isPlayerTurn || state.isMovePending) return;
+      socketManager?.endTurn(roomId);
+      set({ isMovePending: true, selectedRow: null, selectedCol: null, validMoves: [], isContinuingJump: false, mustEndTurn: false });
+    },
+
+    cleanup() {
+      if (pollingInterval) clearInterval(pollingInterval);
+      socketManager?.disconnect();
+      socketManager = null;
+      set(INITIAL_STATE);
+    },
+
+    clearError() { set({ apiErrorRawMessage: null }); },
+    clearOpponentLeft() { set({ opponentLeftMessage: null }); },
+    leaveRoom(roomId) {
+      apiRepository.leaveRoom(roomId).catch(() => {});
+      get().cleanup();
+      set({ navigateBack: true });
+    }
+  };
+});

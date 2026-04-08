@@ -131,11 +131,12 @@ export const useChessStore = create<ChessStore>((set, get) => ({
   socket: null,
 
   initGame(roomId, myColor, myUsername) {
+    if (!roomId) return;
     const socket = new ChessSocketManager();
     socket.connect(roomId);
     socket.onGameUpdate((state: ChessState) => {
       set({
-        board: state.board,
+        board: state.board || get().board || INITIAL_BOARD(),
         currentPlayer: state.currentPlayer,
         myColor: state.myColor ?? myColor,
         isCheck: state.isCheck,

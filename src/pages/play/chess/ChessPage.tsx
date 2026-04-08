@@ -46,13 +46,30 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
   const isMyTurn = store.currentPlayer === myColor;
 
   useEffect(() => {
+    if (!roomId) {
+      console.error('[ChessPage] CRITICAL: roomId is missing!');
+      return;
+    }
+
+    console.log('[ChessPage] Initializing game for room:', roomId);
     const username = user?.username ?? '';
     store.initGame(roomId, myColor, username);
+    
     const chat = chatRef.current;
-    chat.connect(roomId);
-    chat.onMessage(setLastMsg);
+    if (chat && typeof chat.connect === 'function') {
+      chat.connect(roomId);
+      if (typeof chat.onMessage === 'function') {
+        chat.onMessage(setLastMsg);
+      }
+    }
+    
     apiRepository.getGreetings().then(setGreetings).catch(() => {});
-    return () => { store.cleanup(); chat.disconnect(); };
+    return () => { 
+      store.cleanup(); 
+      if (chat && typeof chat.disconnect === 'function') {
+        chat.disconnect();
+      }
+    };
   }, [roomId]);
 
   useEffect(() => {
@@ -136,7 +153,7 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, i
           }}>
             {displayRows.map((row) =>
               displayCols.map((col) => {
-                const piece = store.board[row]?.[col] as ChessPiece;
+                const piece = (store.board?.[row] || [])[col] as ChessPiece;
                 const isValidMove = store.validMoves.some((m) => m.row === row && m.col === col);
                 return (
                   <div

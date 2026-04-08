@@ -173,8 +173,9 @@ export const apiService = {
   },
 
   // Android: POST /api/rooms/{id}/leave
-  async leaveRoom(roomId: string): Promise<void> {
-    await apiClient.post<ApiResponse<void>>(`/api/rooms/${roomId}/leave`);
+  async leaveRoom(roomId: string): Promise<RoomStatusResponse> {
+    const res = await apiClient.post<ApiResponse<RoomStatusResponse>>(`/api/rooms/${roomId}/leave`);
+    return unwrap(res.data);
   },
 
   // Android: GET /api/rooms/{id}/status

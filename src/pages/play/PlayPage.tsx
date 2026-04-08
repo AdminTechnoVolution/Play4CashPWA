@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { IonAlert, IonLoading, IonModal, IonText } from '@ionic/react';
 import { useT } from '../../i18n/translations';
@@ -7,37 +7,43 @@ import { apiRepository } from '../../data/network/ApiRepository';
 import { useBattleshipStore } from '../../store/battleshipStore';
 import { useChessStore } from '../../store/chessStore';
 import { useDominoStore } from '../../store/dominoStore';
-import { useHalmaStore } from '../../store/halmaStore';
+import { useHalmaStore, HalmaPhase } from '../../store/halmaStore';
 import type { RoomStatusResponse } from '../../data/models/ApiModels';
 import BattleshipPage from './battleship/BattleshipPage';
 import ChessPage from './chess/ChessPage';
 import DominoPage from './domino/DominoPage';
 import HalmaPage from './halma/HalmaPage';
-import { getPlayContext } from '../../util/routingStorage';
+import { getPlayContext, clearPlayContext } from '../../util/routingStorage';
 
 // ── Leave-context snapshot (called at the moment the user requests to leave) ──
 function getLeaveContext(gameSocketCode: string): {
   gameIsOver: boolean;
   isPastPlacement: boolean;
+  opponentConfirmed: boolean;
 } {
   switch (gameSocketCode) {
     case 'chess': {
       const s = useChessStore.getState();
-      return { gameIsOver: !!s.gameOver, isPastPlacement: true };
+      return { gameIsOver: !!s.gameOver, isPastPlacement: true, opponentConfirmed: true };
     }
     case 'domino': {
       const s = useDominoStore.getState();
-      return { gameIsOver: !!s.gameOver, isPastPlacement: true };
+      return { gameIsOver: !!s.gameOver, isPastPlacement: true, opponentConfirmed: true };
     }
     case 'halma': {
       const s = useHalmaStore.getState();
-      return { gameIsOver: !!s.gameOver, isPastPlacement: true };
+      return { 
+        gameIsOver: s.phase === HalmaPhase.GAME_OVER, 
+        isPastPlacement: true, 
+        opponentConfirmed: s.opponentConfirmed 
+      };
     }
     default: { // battleship (and any unknown code)
       const s = useBattleshipStore.getState();
       return {
         gameIsOver: s.phase === 'finished' || !!s.gameOver,
         isPastPlacement: s.phase === 'waiting' || s.phase === 'battle',
+        opponentConfirmed: s.opponentConfirmed
       };
     }
   }
@@ -50,13 +56,15 @@ export default function PlayPage() {
 
   const playCtx = getPlayContext();
 
+  useEffect(() => {
+    if (!playCtx || !gameSocketCode) {
+      console.warn('[PlayPage] Missing play context, redirecting to dashboard');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [playCtx, gameSocketCode, navigate]);
+
   // ── Protection / Fallback ──────────────────────────────────────────────────
   if (!playCtx || !gameSocketCode) {
-    console.warn('[PlayPage] Missing play context, redirecting to dashboard');
-    // We cannot use navigate inside the render body like this without a useEffect
-    // but in this specific architecture, a direct return + redirect in useEffect is safer.
-    // However, for immediate feedback if coming from a bookmark, we redirect.
-    window.location.href = '/dashboard';
     return null;
   }
 
@@ -67,6 +75,7 @@ export default function PlayPage() {
     opponentName: opponent,
     hasOpponent,
     isSpectator,
+    isPlayer1,
   } = playCtx;
 
   // ── Leave state ─────────────────────────────────────────────────────────────
@@ -76,8 +85,21 @@ export default function PlayPage() {
   const [finishedStatus,   setFinishedStatus]   = useState<RoomStatusResponse | null>(null);
 
   // ── Best-effort leave API + navigate back ───────────────────────────────────
-  const doLeave = async () => {
-    try { await apiRepository.leaveRoom(roomId); } catch { /* best-effort */ }
+  const doLeave = async (silent = false) => {
+    try {
+      const status = await apiRepository.leaveRoom(roomId);
+      const serverFinished = !!status.winner || ['finished', 'completed', 'game_over'].includes(status.status?.toLowerCase() ?? '');
+
+      if (serverFinished && !isSpectator && !silent) {
+        // If the game ended because we left (or just now), show the result alert
+        setFinishedStatus(status);
+        setShowFinished(true);
+        return;
+      }
+    } catch (e) {
+      console.error('[PlayPage] Error during leaveRoom:', e);
+    }
+    clearPlayContext();
     navigate(-1);
   };
 
@@ -89,23 +111,23 @@ export default function PlayPage() {
   //      b. Server reports active          → show forfeit warning
   //   3. spectator || placement || alone  → leave immediately, no warning
   const handleLeaveRequest = async () => {
-    const { gameIsOver, isPastPlacement } = getLeaveContext(gameSocketCode);
+    const { gameIsOver, isPastPlacement, opponentConfirmed: liveOpponentConfirmed } = getLeaveContext(gameSocketCode);
 
-    // Rule 1: game already over locally → leave with no warning
+    // Rule 1: game already over locally → leave with no warning, and no redundant alert
     if (gameIsOver) {
-      await doLeave();
+      await doLeave(true);
       return;
     }
 
-    // Rule 2: real game in progress with an opponent
-    const shouldWarn = !isSpectator && hasOpponent && isPastPlacement;
+    // Rule 2: real game in progress with an opponent (Android HalmaScreen.kt:124)
+    const shouldWarn = !isSpectator && liveOpponentConfirmed && isPastPlacement;
     if (shouldWarn) {
       setCheckingLeave(true);
       try {
         const status = await apiRepository.getRoomStatus(roomId);
         const serverFinished =
           !!status.winner ||
-          ['finished', 'completed', 'game_over'].includes(status.status ?? '');
+          ['finished', 'completed', 'game_over'].includes(status.status?.toLowerCase() ?? '');
 
         setCheckingLeave(false);
         if (serverFinished) {
@@ -153,6 +175,7 @@ export default function PlayPage() {
     opponentName: opponent,
     hasOpponent,
     isSpectator,
+    isPlayer1,
     onLeaveRequest: handleLeaveRequest,
   };
 

@@ -147,6 +147,7 @@ const RoomsPage: React.FC = () => {
         opponentName,
         hasOpponent: true,
         isSpectator: false,
+        isPlayer1: false,
       });
       navigate(`/play/${gameSocketCode}`);
     } catch (err) {
@@ -172,6 +173,7 @@ const RoomsPage: React.FC = () => {
         opponentName: firstPlayerName,
         hasOpponent: true,
         isSpectator: true,
+        isPlayer1: false,
       });
       navigate(`/play/${gameSocketCode}`);
     } catch (err) {
@@ -219,6 +221,7 @@ const RoomsPage: React.FC = () => {
         opponentName: 'Waiting',
         hasOpponent: false,
         isSpectator: false,
+        isPlayer1: true,
       });
       
       setCreateName('');

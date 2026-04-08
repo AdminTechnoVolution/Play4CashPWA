@@ -100,6 +100,10 @@ export class HalmaSocketManager {
     this.socket?.on('halma', cb);
   }
 
+  requestSync(roomId: string): void {
+    this.socket?.emit('join', { room_id: roomId });
+  }
+
   offAll(): void {
     this.socket?.removeAllListeners();
   }

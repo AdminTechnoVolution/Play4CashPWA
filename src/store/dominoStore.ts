@@ -58,18 +58,24 @@ export const useDominoStore = create<DominoStoreState & DominoStoreActions>((set
   socket: null,
 
   initGame(roomId, myUsername) {
+    if (!roomId) return;
     const socket = new DominoSocketManager();
     socket.connect(roomId);
     socket.onGameUpdate((state: DominoState) => {
-      const valid = computeValidMoves(state.myHand, state.leftEnd, state.rightEnd, state.board.length === 0);
+      const valid = computeValidMoves(
+        state?.myHand || [], 
+        state?.leftEnd ?? -1, 
+        state?.rightEnd ?? -1, 
+        (state?.board || []).length === 0
+      );
       set({
-        myHand: state.myHand,
-        opponents: state.opponents,
-        board: state.board,
-        leftEnd: state.leftEnd,
-        rightEnd: state.rightEnd,
-        boneyardCount: state.boneyardCount,
-        currentPlayer: state.currentPlayer,
+        myHand: state.myHand || [],
+        opponents: state.opponents || [],
+        board: state.board || [],
+        leftEnd: state.leftEnd ?? -1,
+        rightEnd: state.rightEnd ?? -1,
+        boneyardCount: state.boneyardCount ?? 0,
+        currentPlayer: state.currentPlayer || '',
         myUsername: state.myUsername || myUsername,
         validMoves: valid,
         gameOver: state.gameOver ?? null,

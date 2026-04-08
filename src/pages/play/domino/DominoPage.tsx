@@ -62,12 +62,29 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
   const [lastMsg, setLastMsg] = useState<ChatMessage | null>(null);
 
   useEffect(() => {
+    if (!roomId) {
+      console.error('[DominoPage] CRITICAL: roomId is missing!');
+      return;
+    }
+
+    console.log('[DominoPage] Initializing game for room:', roomId);
     store.initGame(roomId, user?.username ?? '');
+    
     const chat = chatRef.current;
-    chat.connect(roomId);
-    chat.onMessage(setLastMsg);
+    if (chat && typeof chat.connect === 'function') {
+      chat.connect(roomId);
+      if (typeof chat.onMessage === 'function') {
+        chat.onMessage(setLastMsg);
+      }
+    }
+    
     apiRepository.getGreetings().then(setGreetings).catch(() => {});
-    return () => { store.cleanup(); chat.disconnect(); };
+    return () => { 
+      store.cleanup(); 
+      if (chat && typeof chat.disconnect === 'function') {
+        chat.disconnect();
+      }
+    };
   }, [roomId]);
 
   const isMyTurn = store.currentPlayer === store.myUsername;
@@ -129,12 +146,12 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
           {/* Board */}
           <div style={{ background: '#0d1a2a', borderRadius: 12, padding: 8, minHeight: 80, border: '1px solid rgba(255,255,255,0.08)' }}>
             <IonText style={{ color: '#8a9bbf', fontSize: 11, marginBottom: 6 }}>{t('play_room_label') || 'Board'}</IonText>
-            {store.board.length === 0 ? (
+            {(store.board || []).length === 0 ? (
               <IonText style={{ color: '#4a5a7a', fontSize: 13 }}>{t('domino_board_empty')}</IonText>
             ) : (
               <div style={{ display: 'flex', overflowX: 'auto', gap: 4, paddingBottom: 4, alignItems: 'center' }}>
                 <IonText style={{ color: '#c9a84c', fontSize: 12, flexShrink: 0 }}>[{store.leftEnd}]</IonText>
-                {store.board.slice(0, 12).map((t_tile, i) => (
+                {(store.board || []).slice(0, 12).map((t_tile, i) => (
                   <DominoTileView key={i} tile={t_tile} dim />
                 ))}
                 {store.board.length > 12 && <IonText style={{ color: '#4a5a7a' }}>…</IonText>}
@@ -158,9 +175,9 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
             </div>
           ) : (
             <div>
-              <IonText style={{ color: '#8a9bbf', fontSize: 12, marginBottom: 8 }}>{t('domino_your_hand')} ({store.myHand.length})</IonText>
+              <IonText style={{ color: '#8a9bbf', fontSize: 12, marginBottom: 8 }}>{t('domino_your_hand')} ({(store.myHand || []).length})</IonText>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                {store.myHand.map((tile, i) => {
+                {(store.myHand || []).map((tile, i) => {
                   const vm = store.validMoves.find((m) => m.tile.a === tile.a && m.tile.b === tile.b);
                   const isValid = !!vm && isMyTurn;
                   const isSelected = store.sidePickTile?.a === tile.a && store.sidePickTile?.b === tile.b;
