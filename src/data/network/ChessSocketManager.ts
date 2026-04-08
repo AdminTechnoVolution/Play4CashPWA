@@ -1,7 +1,7 @@
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
-import { getAccessToken, getRefreshToken, saveTokens } from '../auth/AuthSessionStore';
+import { getAccessToken, getRefreshToken, saveTokens, getLanguage } from '../auth/AuthSessionStore';
 import { bareClient } from './ApiClient';
 import type { ApiResponse, LoginResponse, ChessState } from '../models/ApiModels';
 
@@ -26,7 +26,10 @@ async function refreshSocketToken(socket: Socket): Promise<void> {
 
     const newToken = data.token;
     (socket.io.opts as Record<string, unknown>).query = { token: newToken };
-    (socket.io.opts as Record<string, unknown>).extraHeaders = { Authorization: `Bearer ${newToken}` };
+    (socket.io.opts as Record<string, unknown>).extraHeaders = { 
+      Authorization: `Bearer ${newToken}`,
+      'accept-language': getLanguage()
+    };
   })().finally(() => {
     socketRefreshPromise = null;
   });
@@ -53,7 +56,10 @@ export class ChessSocketManager {
       reconnectionDelayMax: 5000,
       timeout: SOCKET_TIMEOUT_MS,
       query: { token },
-      extraHeaders: { Authorization: `Bearer ${token}` },
+      extraHeaders: { 
+        Authorization: `Bearer ${token}`,
+        'accept-language': getLanguage()
+      },
     });
 
     this.socket.on('connect', () => {

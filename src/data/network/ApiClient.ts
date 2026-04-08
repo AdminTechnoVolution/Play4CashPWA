@@ -59,14 +59,19 @@ function extractErrorMessage(error: AxiosError): string {
   return error.message ?? 'Unknown error';
 }
 
-// ─── Request interceptor ──────────────────────────────────────────────────────
+// ─── Request interceptors ─────────────────────────────────────────────────────
+
+bareClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  config.headers.set('accept-language', getLanguage());
+  return config;
+});
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getAccessToken();
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
-  config.headers.set('Accept-Language', getLanguage());
+  config.headers.set('accept-language', getLanguage());
   return config;
 });
 

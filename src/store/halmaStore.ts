@@ -109,9 +109,33 @@ const INITIAL_STATE: HalmaUiState = {
 
 export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get) => {
   let socketManager: HalmaSocketManager | null = null;
-  let pollingInterval: number | null = null;
+  let pollingInterval: any = null;
+  let turnTimerInterval: any = null;
   let isPlayerOne = true; // authoritative from socket
   let jumpTrailAccumulator: { row: number, col: number }[] = [];
+
+  const startCountdown = (seconds: number) => {
+    if (turnTimerInterval) clearInterval(turnTimerInterval);
+    set({ turnTimeLeft: Math.max(0, seconds) });
+    turnTimerInterval = setInterval(() => {
+      const current = get().turnTimeLeft;
+      if (current > 0) {
+        set({ turnTimeLeft: current - 1 });
+      } else {
+        if (turnTimerInterval) {
+          clearInterval(turnTimerInterval);
+          turnTimerInterval = null;
+        }
+      }
+    }, 1000);
+  };
+
+  const stopCountdown = () => {
+    if (turnTimerInterval) {
+      clearInterval(turnTimerInterval);
+      turnTimerInterval = null;
+    }
+  };
 
   // Helper functions ported from Android
   const isDarkSquare = (row: number, col: number) => (row + col) % 2 !== 0;
@@ -298,6 +322,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
             outcome === 'opponent_disconnected' || outcome === 'forfeit' || isDraw) {
           
           if (pollingInterval) clearInterval(pollingInterval);
+          stopCountdown();
           const youWonFlag = data.youWon || data.you_won || false;
           let winnerLabel = 'Opponent';
           if (outcome === 'win' || outcome === 'opponent_disconnected') winnerLabel = 'You';
@@ -420,6 +445,14 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
             lastLandedCol: landed?.col || null,
             jumpTrail: trail,
           });
+
+          if (timerSeconds > 0) {
+            const current = get().turnTimeLeft;
+            // Only restart if the difference is significant (> 2s) to maintain a smooth local tick
+            if (Math.abs(current - timerSeconds) > 2 || !turnTimerInterval) {
+              startCountdown(timerSeconds);
+            }
+          }
         }
       });
     },
@@ -454,6 +487,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
 
     cleanup() {
       if (pollingInterval) clearInterval(pollingInterval);
+      stopCountdown();
       socketManager?.disconnect();
       socketManager = null;
       set(INITIAL_STATE);

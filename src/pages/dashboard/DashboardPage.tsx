@@ -26,7 +26,6 @@ import {
   IonModal,
   IonButton,
   RefresherEventDetail,
-  useIonViewWillEnter,
 } from '@ionic/react';
 import { useNavigate } from "react-router-dom";
 import {
@@ -66,10 +65,6 @@ const DashboardPage: React.FC = () => {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [selectedGame, setSelectedGame] = useState<any>(null);
-
-  useIonViewWillEnter(() => {
-    loadDashboard();
-  });
 
   useEffect(() => {
     loadDashboard();
@@ -454,7 +449,7 @@ const DashboardPage: React.FC = () => {
                     <IonIcon icon={trophyOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '22px', display: 'block', margin: '0 auto 4px' }} />
                     <IonText>
                       <p style={{ color: 'var(--sovereign-gold)', fontWeight: '800', fontSize: '18px', margin: '0 0 2px 0' }}>
-                        ${(roomStats?.totalBet ?? 0).toFixed(0)}
+                        ${(roomStats?.totalBetAmount ?? 0).toFixed(0)}
                       </p>
                     </IonText>
                     <IonText>

@@ -18,6 +18,7 @@ interface AuthState {
   signInWithGoogle: (idToken: string) => Promise<void>;
   loadSession: () => Promise<void>;
   logout: () => Promise<void>;
+  syncUser: () => void;
   clearError: () => void;
 }
 
@@ -32,6 +33,13 @@ export const useAuthStore = create<AuthState>((set) => {
     user: null,
     isLoading: false,
     error: null,
+
+    syncUser: () => {
+      const account = getUserAccount();
+      if (account) {
+        set({ user: account });
+      }
+    },
 
     signInWithGoogle: async (idToken: string) => {
       set({ isLoading: true, error: null });

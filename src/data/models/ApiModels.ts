@@ -68,7 +68,7 @@ export interface RoomStatusResponse {
 export interface RoomStatsResponse {
   playersOnline: number;
   activeGames: number;
-  totalBet: number;
+  totalBetAmount: number;
 }
 
 // ─── Request bodies — exact backend field names ────────────────────────────────

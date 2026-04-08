@@ -78,12 +78,17 @@ const RoomsPage: React.FC = () => {
   const decodedGameName = decodeURIComponent(gameName);
 
   // Read balance and minBet from local store — no need to pass through URL
-  const { account, games } = useDashboardStore();
+  const { account, games, refreshAccount } = useDashboardStore();
   const userBalanceNum = account?.balance ?? 0;
   const minBetNum = games.find((g) => g.id === gameId)?.minBet ?? 0;
 
   const { rooms, isLoading, error, showCreateDialog, loadRooms, createRoom, joinRoom, spectateRoom, setShowCreateDialog, addOrUpdateRoom, updateRoom, removeRoom, clearError } = useRoomsStore();
   const lobbySocketRef = useRef<LobbySocketManager | null>(null);
+
+  useEffect(() => {
+    refreshAccount();
+    if (gameId) loadRooms(gameId);
+  }, [gameId]);
 
   const [filter, setFilter] = useState<'all' | 'waiting' | 'started'>('all');
   const [createName, setCreateName] = useState('');

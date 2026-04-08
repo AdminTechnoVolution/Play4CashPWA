@@ -133,9 +133,9 @@ export const apiService = {
     const res = await apiClient.get<ApiResponse<any>>('/api/rooms/stats');
     const raw = unwrap(res.data);
     return {
-      playersOnline: raw.players_online ?? raw.playersOnline ?? raw.online_players ?? 0,
-      activeGames: raw.active_games ?? raw.activeGames ?? raw.active_rooms ?? raw.activeRooms ?? 0,
-      totalBet: raw.total_bet_amount ?? raw.totalBet ?? raw.total_bet ?? 0,
+      playersOnline: raw.playersOnline ?? 0,
+      activeGames: raw.activeGames ?? 0,
+      totalBetAmount: raw.totalBetAmount ?? 0,
     };
   },
 
