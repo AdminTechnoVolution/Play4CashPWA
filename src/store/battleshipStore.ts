@@ -83,6 +83,7 @@ interface BattleshipStoreActions {
   clearShotMessage: () => void;
   clearOpponentJoinedToast: () => void;
   clearOpponentLeftDialog: () => void;
+  resetFleet: () => void;
 }
 
 type BattleshipStore = BattleshipStoreState & BattleshipStoreActions;
@@ -417,11 +418,11 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
     const filtered = placedShips.filter(s => s.type !== selectedShipType);
 
     if (selectedHorizontal && col + catalog.size > 10) {
-      set({ placementError: 'bs_error_fit_left' });
+      set({ placementError: 'bs_error_ship_out' });
       return;
     }
     if (!selectedHorizontal && row + catalog.size > 10) {
-      set({ placementError: 'bs_error_fit_up' });
+      set({ placementError: 'bs_error_ship_out' });
       return;
     }
 
@@ -446,7 +447,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       const r = selectedHorizontal ? row : row + i;
       const c = selectedHorizontal ? col + i : col;
       if (newBoard[r][c] !== 'empty') {
-        set({ placementError: 'bs_error_occupied' });
+        set({ placementError: 'bs_error_overlapping' });
         return;
       }
       newBoard[r][c] = 'ship';
@@ -510,6 +511,14 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
   clearShotMessage()        { set({ shotMessage: null }); },
   clearOpponentJoinedToast(){ set({ opponentJoinedToast: null }); },
   clearOpponentLeftDialog() { set({ opponentLeftDialog: false }); },
+  resetFleet() {
+    set({
+      playerBoard: EMPTY_BOARD(),
+      placedShips: [],
+      selectedShipType: SHIP_CATALOG[0].type,
+      placementError: null,
+    });
+  },
 }));
 
 // ── Full state sync (reconnection / spectator join) ───────────────────────────

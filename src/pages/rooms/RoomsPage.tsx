@@ -25,6 +25,8 @@ import {
   IonRefresherContent,
   IonSkeletonText,
   IonToast,
+  IonCard,
+  IonCardContent,
   RefresherEventDetail,
 } from '@ionic/react';
 import { useParams, useNavigate } from "react-router-dom";
@@ -48,6 +50,7 @@ import {
   classifyRoomLobbyStatus,
   RoomLobbyKind 
 } from '../../i18n/ApiMessageDisplay';
+import { getGameContext, savePlayContext } from '../../util/routingStorage';
 import '../../ui/theme/variables.css';
 type RoomStatus = 'waiting' | 'started' | 'finished';
 
@@ -64,12 +67,13 @@ const STATUS_COLORS: Record<RoomStatus, string> = {
 };
 
 const RoomsPage: React.FC = () => {
-  const {
-    gameId = '',
-    gameName = '',
-    gameSocketCode = '',
-  } = useParams();
+  const { gameSocketCode = '' } = useParams<{ gameSocketCode: string }>();
   const navigate = useNavigate();
+  
+  // Get context from sessionStorage
+  const gameCtx = getGameContext();
+  const gameId = gameCtx?.gameId || '';
+  const gameName = gameCtx?.gameName || '';
   const t = useT();
   const decodedGameName = decodeURIComponent(gameName);
 
@@ -92,6 +96,11 @@ const RoomsPage: React.FC = () => {
   const [spectatingId, setSpectatingId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!gameId || !gameSocketCode) {
+      console.warn('[RoomsPage] Missing game context, redirecting to dashboard');
+      navigate('/dashboard', { replace: true });
+      return;
+    }
     loadRooms(gameId);
 
     // Own the socket lifecycle directly — same pattern as game pages
@@ -131,9 +140,15 @@ const RoomsPage: React.FC = () => {
     setJoiningId(roomId);
     try {
       await joinRoom(roomId);
-      navigate(
-        `/play/${gameSocketCode}/${roomId}/${betAmount}/${encodeURIComponent(roomName)}/${encodeURIComponent(opponentName)}/true/false`,
-      );
+      savePlayContext({
+        roomId,
+        betAmount,
+        roomName,
+        opponentName,
+        hasOpponent: true,
+        isSpectator: false,
+      });
+      navigate(`/play/${gameSocketCode}`);
     } catch (err) {
       setToast({ 
         isOpen: true, 
@@ -150,9 +165,15 @@ const RoomsPage: React.FC = () => {
     setSpectatingId(roomId);
     try {
       await spectateRoom(roomId);
-      const url = `/play/${gameSocketCode}/${roomId}/${betAmount}/${encodeURIComponent(roomName)}/${encodeURIComponent(firstPlayerName)}/true/true`;
-      console.log('[SPECTATOR][4] Navigating to game as spectator →', url);
-      navigate(url);
+      savePlayContext({
+        roomId,
+        betAmount,
+        roomName,
+        opponentName: firstPlayerName,
+        hasOpponent: true,
+        isSpectator: true,
+      });
+      navigate(`/play/${gameSocketCode}`);
     } catch (err) {
       console.error('[SPECTATOR][ERROR] spectateRoom failed:', err);
       setToast({ 
@@ -175,7 +196,7 @@ const RoomsPage: React.FC = () => {
       return;
     }
     if (createBet > userBalanceNum) {
-      setCreateError('Bet exceeds your balance.');
+      setCreateError(t('room_bet_exceeds_balance_error').replace('%s', `$${userBalanceNum.toFixed(2)}`));
       return;
     }
     setCreateLoading(true);
@@ -190,12 +211,20 @@ const RoomsPage: React.FC = () => {
       });
       const roomName = createName.trim();
       setShowCreateDialog(false);
+      
+      savePlayContext({
+        roomId,
+        betAmount: createBet,
+        roomName,
+        opponentName: 'Waiting',
+        hasOpponent: false,
+        isSpectator: false,
+      });
+      
       setCreateName('');
       setCreateBet(minBetNum);
       setCreateLimit(2);
-      navigate(
-        `/play/${gameSocketCode}/${roomId}/${createBet}/${encodeURIComponent(roomName)}/Waiting/false/false`,
-      );
+      navigate(`/play/${gameSocketCode}`);
     } catch (err) {
       setCreateError(formatApiMessageForDisplay(err instanceof Error ? err.message : null, 'error_create_room_failed'));
     } finally {
@@ -305,22 +334,38 @@ const RoomsPage: React.FC = () => {
               ))}
             </IonList>
           ) : filteredRooms.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-              <IonIcon
-                icon={gameControllerOutline}
-                style={{ fontSize: '64px', color: 'var(--sovereign-text-muted)', display: 'block', margin: '0 auto 16px' }}
-              />
-              <IonText>
-                <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '15px', margin: '0 0 8px 0' }}>
-                  {t('rooms_filter_empty_title')}
-                </p>
-              </IonText>
-              <IonText>
-                <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', margin: 0 }}>
-                  {t('rooms_filter_empty_subtitle')}
-                </p>
-              </IonText>
-            </div>
+            <IonCard
+              style={{
+                background: 'var(--sovereign-surface)',
+                border: '1px solid var(--sovereign-border)',
+                borderRadius: '16px',
+                margin: '20px 16px',
+                textAlign: 'center',
+                animation: 'fadeInUp 0.6s ease',
+              }}
+            >
+              <IonCardContent style={{ padding: '32px 24px' }}>
+                <IonIcon
+                  icon={gameControllerOutline}
+                  style={{ fontSize: '64px', color: 'var(--sovereign-gold)', display: 'block', margin: '0 auto 16px', filter: 'drop-shadow(0 0 12px rgba(233,195,73,0.3))' }}
+                />
+                <IonText>
+                  <h3 style={{ color: 'var(--sovereign-gold)', fontSize: '20px', fontWeight: '800', margin: '0 0 10px 0' }}>
+                    {t('rooms_empty_title')}
+                  </h3>
+                </IonText>
+                <IonText>
+                  <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px', lineHeight: '1.5', margin: '0 0 24px 0' }}>
+                    {t('rooms_empty_subtitle')}
+                  </p>
+                </IonText>
+                
+                <SovereignPrimaryButton onClick={() => setShowCreateDialog(true)}>
+                  <IonIcon icon={addOutline} slot="start" style={{ fontSize: '20px' }} />
+                  {t('create_room')}
+                </SovereignPrimaryButton>
+              </IonCardContent>
+            </IonCard>
           ) : (
             <IonList style={{ background: 'transparent' }}>
               {filteredRooms.map((room) => {
@@ -496,11 +541,11 @@ const RoomsPage: React.FC = () => {
                     {t('label_room').toUpperCase()}
                   </label>
                 </IonText>
-                <IonInput
-                  value={createName}
-                  onIonInput={(e) => setCreateName(e.detail.value ?? '')}
-                  placeholder="Enter room name"
-                  maxlength={40}
+                  <IonInput
+                    value={createName}
+                    onIonInput={(e) => setCreateName(e.detail.value ?? '')}
+                    placeholder={t('placeholder_enter_room_name')}
+                    maxlength={40}
                   style={{
                     '--background': 'transparent',
                     '--color': 'var(--sovereign-text)',
@@ -545,7 +590,7 @@ const RoomsPage: React.FC = () => {
                 />
                 <IonText>
                   <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: '6px 0 0 2px' }}>
-                    Your balance: ${userBalanceNum.toFixed(2)}
+                    {t('your_balance')}: ${userBalanceNum.toFixed(2)}
                   </p>
                 </IonText>
               </div>

@@ -26,6 +26,7 @@ import {
   IonModal,
   IonButton,
   RefresherEventDetail,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import { useNavigate } from "react-router-dom";
 import {
@@ -49,6 +50,7 @@ import { useAuthStore } from '../../store/authStore';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import { useT } from '../../i18n/translations';
+import { saveGameContext } from '../../util/routingStorage';
 import '../../ui/theme/variables.css';
 
 const MENU_ID = 'dashboard-menu';
@@ -64,6 +66,10 @@ const DashboardPage: React.FC = () => {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [selectedGame, setSelectedGame] = useState<any>(null);
+
+  useIonViewWillEnter(() => {
+    loadDashboard();
+  });
 
   useEffect(() => {
     loadDashboard();
@@ -85,7 +91,8 @@ const DashboardPage: React.FC = () => {
   };
 
   const handleGameCard = (game: { id: string; name: string; socketCode: string }) => {
-    navigate(`/rooms/${game.id}/${encodeURIComponent(game.name)}/${game.socketCode}`);
+    saveGameContext({ gameId: game.id, gameName: game.name });
+    navigate(`/rooms/${game.socketCode}`);
   };
 
   const navItems = [

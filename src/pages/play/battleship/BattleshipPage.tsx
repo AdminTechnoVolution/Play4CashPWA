@@ -3,7 +3,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonIcon, IonText, IonToast, IonModal,
 } from '@ionic/react';
-import { arrowBackOutline, swapHorizontalOutline } from 'ionicons/icons';
+import { arrowBackOutline, refreshOutline, swapHorizontalOutline } from 'ionicons/icons';
 import { useAuthStore } from '../../../store/authStore';
 import { useBattleshipStore, SHIP_CATALOG } from '../../../store/battleshipStore';
 import type { PlacedShip } from '../../../store/battleshipStore';
@@ -345,35 +345,57 @@ export default function BattleshipPage({
           })}
         </div>
 
-        {/* Ready button */}
-        <div style={{ width: GRID_PX + 16, paddingBottom: 20 }}>
-          <button
-            onClick={() => store.placedShips.length >= SHIP_CATALOG.length && setShowReadyConfirm(true)}
-            disabled={store.placedShips.length < SHIP_CATALOG.length}
-            style={{
-              width: '100%',
-              padding: '14px',
-              borderRadius: 12,
-              background: store.placedShips.length < SHIP_CATALOG.length
-                ? 'rgba(201,168,76,0.25)'
-                : 'linear-gradient(135deg, #b8922a, #e8c96b)',
-              border: 'none',
-              color: store.placedShips.length < SHIP_CATALOG.length ? 'rgba(255,255,255,0.4)' : '#0a1628',
-              fontWeight: 700,
-              fontSize: 15,
-              cursor: store.placedShips.length < SHIP_CATALOG.length ? 'not-allowed' : 'pointer',
-              letterSpacing: '0.5px',
-              transition: 'opacity 0.2s',
-            }}
-          >
-            {t('bs_ready_button')} ({store.placedShips.length}/{SHIP_CATALOG.length})
-          </button>
-        </div>
+        {/* Action Buttons — only shown when opponent is confirmed */}
+        {store.opponentConfirmed && (
+          <div style={{ width: GRID_PX + 16, display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 20 }}>
+            {/* Reset Fleet Button */}
+            <button
+              onClick={() => store.resetFleet()}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: 'rgba(255,255,255,0.7)',
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              <IonIcon icon={refreshOutline} style={{ marginRight: '6px', fontSize: '16px', verticalAlign: 'middle' }} />
+              {t('bs_reset_button')}
+            </button>
+
+            {/* Ready button */}
+            <button
+              onClick={() => store.placedShips.length >= SHIP_CATALOG.length && setShowReadyConfirm(true)}
+              disabled={store.placedShips.length < SHIP_CATALOG.length}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: 12,
+                background: store.placedShips.length < SHIP_CATALOG.length
+                  ? 'rgba(201,168,76,0.25)'
+                  : 'linear-gradient(135deg, #b8922a, #e8c96b)',
+                border: 'none',
+                color: store.placedShips.length < SHIP_CATALOG.length ? 'rgba(255,255,255,0.4)' : '#0a1628',
+                fontWeight: 700,
+                fontSize: 15,
+                cursor: store.placedShips.length < SHIP_CATALOG.length ? 'not-allowed' : 'pointer',
+                letterSpacing: '0.5px',
+                transition: 'opacity 0.2s',
+              }}
+            >
+              {t('bs_ready_button')} ({store.placedShips.length}/{SHIP_CATALOG.length})
+            </button>
+          </div>
+        )}
       </div>
 
       <IonToast
         isOpen={!!store.placementError}
-        message={store.placementError ?? ''}
+        message={formatApiMessageForDisplay(store.placementError)}
         duration={2000}
         position="top"
         onDidDismiss={() => store.clearPlacementError()}
@@ -387,10 +409,10 @@ export default function BattleshipPage({
     const waitingForJoin = !store.opponentConfirmed;
     const waitingLabel = waitingForJoin
       ? t('bs_status_waiting_opponent')
-      : applyWsMessagePlaceholders(t('bs_status_joined_room'), { username: store.opponentName || opponentName });
+      : t('bs_waiting_title');
     const waitingDesc = waitingForJoin
       ? t('bs_placement_waiting_opponent')
-      : t('bs_status_joined_room');
+      : t('bs_waiting_opponent_ready');
     return (
       <IonContent style={{ '--background': '#060e1e' }}>
         <div style={{
@@ -474,7 +496,7 @@ export default function BattleshipPage({
             }}>
               {isSpectator
                 ? `⚓ ${store.spectatorFleetOwnerName || store.spectatorBoardOwner}`
-                : '⚓ My Fleet'}
+                : `⚓ ${t('bs_your_fleet')}`}
             </span>
             {!store.isMyTurn && !isSpectator && (
               <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{t('bs_opponent_turn')}</span>
@@ -621,7 +643,7 @@ export default function BattleshipPage({
       {/* Opponent joined notification */}
       <IonToast
         isOpen={!!store.opponentJoinedToast}
-        message={formatApiMessageForDisplay(store.opponentJoinedToast)}
+        message={store.opponentJoinedToast ? applyWsMessagePlaceholders(t(store.opponentJoinedToast), { username: store.opponentName }) : ''}
         duration={3000}
         position="top"
         onDidDismiss={() => store.clearOpponentJoinedToast()}
@@ -631,7 +653,7 @@ export default function BattleshipPage({
       {/* Shot result feedback (hit / miss / sunk) */}
       <IonToast
         isOpen={!!store.shotMessage}
-        message={formatApiMessageForDisplay(store.shotMessage)}
+        message={store.shotMessage ? applyWsMessagePlaceholders(t(store.shotMessage), { username: store.opponentName, shipType: store.lastShot?.result === 'sunk' ? 'Ship' : '' }) : ''}
         duration={2500}
         position="bottom"
         onDidDismiss={() => store.clearShotMessage()}

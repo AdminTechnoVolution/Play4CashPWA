@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IonAlert, IonLoading } from '@ionic/react';
+import { IonAlert, IonLoading, IonModal, IonText } from '@ionic/react';
+import { useT } from '../../i18n/translations';
+import { SovereignPrimaryButton, SovereignDangerButton } from '../../ui/components/SovereignButton';
 import { apiRepository } from '../../data/network/ApiRepository';
 import { useBattleshipStore } from '../../store/battleshipStore';
 import { useChessStore } from '../../store/chessStore';
@@ -11,6 +13,7 @@ import BattleshipPage from './battleship/BattleshipPage';
 import ChessPage from './chess/ChessPage';
 import DominoPage from './domino/DominoPage';
 import HalmaPage from './halma/HalmaPage';
+import { getPlayContext } from '../../util/routingStorage';
 
 // ── Leave-context snapshot (called at the moment the user requests to leave) ──
 function getLeaveContext(gameSocketCode: string): {
@@ -41,30 +44,30 @@ function getLeaveContext(gameSocketCode: string): {
 }
 
 export default function PlayPage() {
-  const {
-    gameSocketCode = '',
-    roomId         = '',
-    betAmount      = '0',
-    roomName       = '',
-    opponentName   = '',
-    hasOpponent: hasOpponentParam = 'false',
-    isSpectator: isSpectatorParam = 'false',
-  } = useParams<{
-    gameSocketCode: string;
-    roomId: string;
-    betAmount: string;
-    roomName: string;
-    opponentName: string;
-    hasOpponent: string;
-    isSpectator: string;
-  }>();
-
+  const { gameSocketCode = '' } = useParams<{ gameSocketCode: string }>();
   const navigate    = useNavigate();
-  const isSpectator = isSpectatorParam === 'true';
-  const hasOpponent = hasOpponentParam  === 'true';
-  const bet         = parseFloat(betAmount);
-  const opponent    = decodeURIComponent(opponentName);
-  const room        = decodeURIComponent(roomName);
+  const t           = useT();
+
+  const playCtx = getPlayContext();
+
+  // ── Protection / Fallback ──────────────────────────────────────────────────
+  if (!playCtx || !gameSocketCode) {
+    console.warn('[PlayPage] Missing play context, redirecting to dashboard');
+    // We cannot use navigate inside the render body like this without a useEffect
+    // but in this specific architecture, a direct return + redirect in useEffect is safer.
+    // However, for immediate feedback if coming from a bookmark, we redirect.
+    window.location.href = '/dashboard';
+    return null;
+  }
+
+  const {
+    roomId,
+    betAmount: bet,
+    roomName: room,
+    opponentName: opponent,
+    hasOpponent,
+    isSpectator,
+  } = playCtx;
 
   // ── Leave state ─────────────────────────────────────────────────────────────
   const [checkingLeave,    setCheckingLeave]    = useState(false);
@@ -164,25 +167,40 @@ export default function PlayPage() {
       <IonLoading isOpen={checkingLeave} message="Checking game status…" />
 
       {/* Forfeit warning — game active, opponent present */}
-      <IonAlert
+      <IonModal
         isOpen={showForfeit}
-        header="Leave Game?"
-        message={`If you leave now you will forfeit the match and lose $${bet.toFixed(2)}.`}
-        buttons={[
-          {
-            text: 'Stay',
-            role: 'cancel',
-            handler: () => setShowForfeit(false),
-          },
-          {
-            text: 'Leave',
-            role: 'destructive',
-            cssClass: 'alert-button-danger',
-            handler: () => { setShowForfeit(false); doLeave(); },
-          },
-        ]}
         onDidDismiss={() => setShowForfeit(false)}
-      />
+        style={{ 
+          '--height': 'fit-content', 
+          '--width': '90%', 
+          '--max-width': '340px', 
+          '--border-radius': '16px',
+          '--background': 'var(--sovereign-surface)',
+          padding: '16px'
+        }}
+      >
+        <div style={{ padding: '24px', background: 'var(--sovereign-surface)', textAlign: 'center' }}>
+          <IonText>
+            <h2 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 12px 0', color: 'var(--sovereign-gold)' }}>
+              {t('bs_leave_confirm_title')}
+            </h2>
+          </IonText>
+          <IonText>
+            <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '15px', lineHeight: '1.4', margin: '0 0 24px 0' }}>
+              {t('bs_leave_confirm_message').replace('%s', `$${bet.toFixed(2)}`)}
+            </p>
+          </IonText>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <SovereignPrimaryButton onClick={() => setShowForfeit(false)}>
+              {t('bs_leave_confirm_stay')}
+            </SovereignPrimaryButton>
+            <SovereignDangerButton onClick={() => { setShowForfeit(false); doLeave(); }}>
+              {t('bs_leave_confirm_leave')}
+            </SovereignDangerButton>
+          </div>
+        </div>
+      </IonModal>
 
       {/* Game already finished on server — no forfeit, just show result */}
       <IonAlert

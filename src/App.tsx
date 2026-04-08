@@ -38,11 +38,11 @@ export default function App() {
           <Route path="/withdrawal" element={<WithdrawalPage />} />
           <Route path="/withdrawal-verify" element={<WithdrawalVerifyPage />} />
           <Route
-            path="/rooms/:gameId/:gameName/:gameSocketCode"
+            path="/rooms/:gameSocketCode"
             element={<RoomsPage />}
           />
           <Route
-            path="/play/:gameSocketCode/:roomId/:betAmount/:roomName/:opponentName/:hasOpponent/:isSpectator"
+            path="/play/:gameSocketCode"
             element={<PlayPage />}
           />
           <Route path="/terms" element={<TermsPage />} />

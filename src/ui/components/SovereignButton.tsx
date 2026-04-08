@@ -83,3 +83,38 @@ export const SovereignSecondaryButton: React.FC<SovereignButtonProps> = ({
     </IonButton>
   );
 };
+
+export const SovereignDangerButton: React.FC<SovereignButtonProps> = ({
+  onClick,
+  disabled = false,
+  loading = false,
+  expand = 'block',
+  type = 'button',
+  style,
+  className,
+  children,
+}) => {
+  return (
+    <IonButton
+      expand={expand}
+      onClick={onClick}
+      disabled={disabled || loading}
+      type={type}
+      className={className}
+      style={{
+        '--background': 'var(--sovereign-error)',
+        '--background-activated': 'rgba(207, 102, 121, 0.85)',
+        '--background-hover': 'rgba(207, 102, 121, 0.9)',
+        '--color': '#ffffff',
+        '--border-radius': '12px',
+        '--box-shadow': '0 4px 16px rgba(207, 102, 121, 0.35)',
+        fontWeight: '700',
+        fontSize: '15px',
+        letterSpacing: '0.5px',
+        ...style,
+      } as React.CSSProperties}
+    >
+      {loading ? <IonSpinner name="crescent" style={{ color: '#ffffff', width: 20, height: 20 }} /> : children}
+    </IonButton>
+  );
+};
