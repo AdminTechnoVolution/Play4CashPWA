@@ -221,7 +221,7 @@ export default function BattleshipPage({
             borderRadius: 8, padding: '8px 16px',
             color: '#ffb74d', fontSize: 12, textAlign: 'center',
           }}>
-            ⏳ {t('halma_status_waiting_opponent')}
+            ⏳ {t('status_waiting_opponent')}
           </div>
         ) : (
           <div style={{

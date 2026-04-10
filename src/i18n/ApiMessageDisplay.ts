@@ -26,6 +26,13 @@ const englishApiLiteralToKey: Record<string, string> = {
   [normalizeEnglishApiLiteral("Opponent joined! Game starting…")]: "halma_status_place_pieces",
   [normalizeEnglishApiLiteral("It is not your turn")]: "ws.games.notYourTurn",
   [normalizeEnglishApiLiteral("Invalid move")]: "ws.games.invalidMove",
+  [normalizeEnglishApiLiteral("Room is full")]: "room_full",
+  [normalizeEnglishApiLiteral("The room is full")]: "room_full",
+  [normalizeEnglishApiLiteral("This room is full")]: "room_full",
+  [normalizeEnglishApiLiteral("Amount is too low")]: "ERROR_WITHDRAWAL_INSUFFICIENT_BALANCE",
+  [normalizeEnglishApiLiteral("Room already finished")]: "room_finished",
+  [normalizeEnglishApiLiteral("Match finished")]: "room_finished",
+  [normalizeEnglishApiLiteral("bet_amount must not be less than 1")]: "room_bet_min_error",
 };
 
 const resolveApiMessageLine = (trimmedLine: string): string => {
@@ -40,21 +47,39 @@ const resolveApiMessageLine = (trimmedLine: string): string => {
  * Unknown or empty values leave the placeholder as-is.
  */
 export const applyWsMessagePlaceholders = (template: string, data: any): string => {
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+  if (!template) return '';
+  let res = template;
+
+  // 1. Handle {{key}} placeholders
+  res = res.replace(/\{\{(\w+)\}\}/g, (match, key) => {
     let value: string | undefined;
     if (key === 'username') {
-      value = ['username', 'userName', 'displayName', 'playerName', 'player_name']
-        .map(k => String(data[k] || '').trim())
+      value = ['username', 'userName', 'displayName', 'playerName', 'player_name', 'winner', 'winnerName']
+        .map(k => String(data[k] ?? '').trim())
         .find(v => v.length > 0);
     } else if (key === 'shipType') {
       value = ['shipType', 'ship_type', 'ship']
-        .map(k => String(data[k] || '').trim())
+        .map(k => String(data[k] ?? '').trim())
         .find(v => v.length > 0);
+    } else if (key === 'count' || key === 'amount') {
+      value = String(data[key] ?? data.betAmount ?? data.count ?? '').trim() || undefined;
     } else {
-      value = String(data[key] || '').trim() || undefined;
+      value = String(data[key] ?? '').trim() || undefined;
     }
     return value ?? match;
   });
+
+  // 2. Handle %s and %d (fallback to first available replacement or username)
+  if (res.includes('%s') || res.includes('%d')) {
+    const val = ['username', 'userName', 'displayName', 'playerName', 'player_name', 'winner', 'winnerName', 'count', 'amount']
+      .map(k => String(data[k] ?? '').trim())
+      .find(v => v.length > 0) || '';
+    
+    // Replace all occurrences for simplicity (usually there is only one in these game strings)
+    res = res.replace(/%s/g, val).replace(/%d/g, val);
+  }
+
+  return res;
 };
 
 /**
@@ -89,12 +114,12 @@ export function formatApiMessagesBlockForDisplay(raw: string | null | undefined,
 
 // ── Game End Reasoning (Mirroring GameEndReason.kt logic) ───────────────────
 
-const GAME_END_OPPONENT_TIMEOUT_REASONS = new Set(["timeout", "opponent_timeout", "opponent_timer", "timer", "turn_timeout", "timeout_loss"]);
-const GAME_END_OWN_TIMEOUT_REASONS = new Set(["timeout", "player_timeout", "timer", "turn_timeout", "timeout_loss"]);
-const GAME_END_OPPONENT_DISCONNECT_REASONS = new Set(["opponent_disconnect", "opponent_disconnected", "player_disconnected", "disconnect", "offline", "left", "abandoned", "forfeit"]);
-const GAME_END_CHECKMATE_REASONS = new Set(["checkmate", "check_mate", "check-mate"]);
+export const GAME_END_OPPONENT_TIMEOUT_REASONS = new Set(["timeout", "opponent_timeout", "opponent_timer", "timer", "turn_timeout", "timeout_loss"]);
+export const GAME_END_OWN_TIMEOUT_REASONS = new Set(["timeout", "player_timeout", "timer", "turn_timeout", "timeout_loss"]);
+export const GAME_END_OPPONENT_DISCONNECT_REASONS = new Set(["opponent_disconnect", "opponent_disconnected", "player_disconnected", "disconnect", "offline", "left", "abandoned", "forfeit"]);
+export const GAME_END_CHECKMATE_REASONS = new Set(["checkmate", "check_mate", "check-mate"]);
 
-function normalizedGameEndReason(data: any): string {
+export function normalizedGameEndReason(data: any): string {
   return (data.reason || data.endReason || data.end_reason || data.winnerReason || data.winner_reason || data.gameEndReason || data.game_end_reason || data.result || '')
     .trim()
     .toLowerCase();
@@ -179,7 +204,8 @@ export function playerGameEndReasonFallback(
   outcome: string,
   youWon: boolean,
   isDraw: boolean,
-  profile: PlayerGameEndReasonProfile
+  profile: PlayerGameEndReasonProfile,
+  isSpectator: boolean = false
 ): string {
   const reason = normalizedGameEndReason(data);
   const o = outcome.trim().toLowerCase();
@@ -194,6 +220,33 @@ export function playerGameEndReasonFallback(
     return t('spectator_match_draw_result');
   }
 
+  // Spectator third-person reasons (Mirroring Android SpectatorPayload logic)
+  if (isSpectator) {
+    if (isDraw || o === 'draw' || o === 'stalemate' || reason === 'stalemate' || reason === 'draw') {
+      return t('spectator_match_draw_result');
+    }
+    if (o === 'insufficient_material' || reason === 'insufficient_material') {
+      return t('spectator_end_insufficient_material');
+    }
+    if (o === 'opponent_disconnected' || GAME_END_OPPONENT_DISCONNECT_REASONS.has(reason)) {
+      return t('spectator_end_disconnected');
+    }
+    if (o === 'forfeit' || reason === 'forfeit') {
+      return t('spectator_end_forfeit');
+    }
+    if (o === 'timeout_loss' || GAME_END_OWN_TIMEOUT_REASONS.has(reason) || GAME_END_OPPONENT_TIMEOUT_REASONS.has(reason)) {
+      return t('spectator_end_timeout');
+    }
+    if (o === 'checkmate' || reason === 'checkmate' || (profile === 'CHESS' && (!!data.checkmate || !!data.isCheckmate))) {
+      return t('spectator_end_checkmate');
+    }
+    if (o === 'win' || o === 'lose') {
+      return t('spectator_end_decisive');
+    }
+    return t('spectator_match_finished');
+  }
+
+  // Player first-person reasons
   if (!youWon && (o === 'timeout_loss' || GAME_END_OWN_TIMEOUT_REASONS.has(reason))) {
     return t('room_winner_reason_timeout_lost');
   }
@@ -226,25 +279,110 @@ export function playerGameEndReasonFallback(
     case 'BATTLESHIP':
       return t(youWon ? 'game_over_reason_bs_won' : 'game_over_reason_bs_lost');
     case 'DOMINO':
-      return t(youWon ? 'game_over_reason_domino_won' : 'game_over_reason_domino_lost'); // Added Domino profile support
+      return t(youWon ? 'game_over_reason_domino_won' : 'game_over_reason_domino_lost'); 
     default:
       return '';
   }
 }
 
 /** Normalized lobby lifecycle for a room, derived from the API `status` string. */
-export type RoomLobbyKind = 'WAITING' | 'STARTED' | 'OTHER';
+export type RoomLobbyKind = 'WAITING' | 'STARTED' | 'FINISHED' | 'OTHER';
 
 const waitingKeys = new Set([
   "waiting", "wait", "pending", "esperando", "en espera", "pendiente",
   "en attente", "attente", "wartend", "warten", "in attesa",
-  "aguardando", "pendente", "room_status_waiting"
+  "aguardando", "pendente", "room_status_waiting", "room_waiting"
+]);
+
+const startedKeys = new Set([
+  "started", "running", "playing", "jugando", "iniciado", "em andamento",
+  "en cours", "gestartet", "läuft", "in corso", "room_status_started", "room_started"
+]);
+
+const finishedKeys = new Set([
+  "finished", "completed", "finalizada", "terminada", "terminada", "encerrada",
+  "complete", "termine", "geendet", "beendet", "completato", "terminato",
+  "room_status_finished", "room_finished"
 ]);
 
 export function classifyRoomLobbyStatus(raw: string): RoomLobbyKind {
   const cleaned = (raw || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
   if (!cleaned) return 'OTHER';
   if (waitingKeys.has(cleaned)) return 'WAITING';
-  if (cleaned === 'started' || cleaned.replace(/[\s\-_]+/g, '') === 'started') return 'STARTED';
+  if (startedKeys.has(cleaned)) return 'STARTED';
+  if (finishedKeys.has(cleaned)) return 'FINISHED';
   return 'OTHER';
 }
+
+// ── Spectator Message Resolution (from legacy util) ─────────────────────────
+
+const WS_GAME_END_OUTCOME_ONLY_KEYS = new Set([
+  "ws.games.win", "ws.games.lose", "ws.games.draw", "ws.games.drawGeneric",
+  "ws.games.gameOver", "ws.games.wins", "ws.games.winsForfeit",
+  "ws.games.winsTimeout", "ws.games.winSunk", "ws.games.loseSunk",
+]);
+
+const gameEndSingleLine = (text: string): string =>
+  text.split('\n').map(t => t.trim()).filter(t => t.length > 0).join(' — ');
+
+export const apiMessagesJoinedOrNull = (obj: any): string | null => {
+  const arr = obj?.messages || obj?.apiMessages;
+  if (Array.isArray(arr) && arr.length > 0) {
+    const parts = arr.map((m: any) => m?.toString().trim()).filter((m: any) => m && m.length > 0);
+    if (parts.length > 0) return parts.join('\n');
+  }
+  const msg = obj?.message || obj?.msg;
+  if (typeof msg === 'string' && msg.trim().length > 0) return msg.trim();
+  return null;
+};
+
+const gameEndSingleStringOrNull = (obj: any): string | null => {
+  const keys = [
+    "statusMessage", "status_message",
+    "endMessage", "end_message",
+    "gameEndMessage", "game_end_message",
+  ];
+  for (const key of keys) {
+    const v = obj[key];
+    if (typeof v === 'string' && v.trim().length > 0) return v.trim();
+  }
+  return null;
+};
+
+export const gameEndUserMessagesOrNull = (data: any, envelope: any): string | null => {
+  const dataMsgs = apiMessagesJoinedOrNull(data);
+  if (dataMsgs) return dataMsgs;
+  
+  const dataSingle = gameEndSingleStringOrNull(data);
+  if (dataSingle) return dataSingle;
+
+  if (envelope && envelope !== data) {
+    const envMsgs = apiMessagesJoinedOrNull(envelope);
+    if (envMsgs) return envMsgs;
+    const envSingle = gameEndSingleStringOrNull(envelope);
+    if (envSingle) return envSingle;
+  }
+  return null;
+};
+
+export const gameEndMessageForDisplay = (data: any, envelope: any, fallback: string): string => {
+  const fb = applyWsMessagePlaceholders(fallback.trim(), data).trim();
+  if (fb.length > 0) return gameEndSingleLine(fb);
+
+  const raw = gameEndUserMessagesOrNull(data, envelope)?.trim() || "";
+  if (raw.length === 0) return gameEndSingleLine(fb);
+
+  const lines = raw.split('\n').map(t => t.trim()).filter(t => t.length > 0);
+  const keyLines = lines.filter(l => hasKey(l) || englishApiLiteralToKey[normalizeEnglishApiLiteral(l)]);
+  
+  if (keyLines.length === 0) {
+    return gameEndSingleLine(t("spectator_match_finished"));
+  }
+
+  const nonOutcome = keyLines.filter(l => !WS_GAME_END_OUTCOME_ONLY_KEYS.has(l));
+  const toResolve = nonOutcome.length > 0 ? nonOutcome : keyLines;
+  
+  const mapped = formatApiMessagesBlockForDisplay(toResolve.join('\n'), "").trim();
+  const resolved = applyWsMessagePlaceholders(mapped, data).trim();
+  return gameEndSingleLine(resolved || t("spectator_match_finished"));
+};

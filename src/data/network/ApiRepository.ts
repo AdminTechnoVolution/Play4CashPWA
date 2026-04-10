@@ -110,6 +110,10 @@ export const apiRepository = {
     return apiService.readyRoom(roomId);
   },
 
+  async roomReady(roomId: string): Promise<void> {
+    return apiService.readyRoom(roomId);
+  },
+
   async leaveRoom(roomId: string): Promise<RoomStatusResponse> {
     return apiService.leaveRoom(roomId);
   },

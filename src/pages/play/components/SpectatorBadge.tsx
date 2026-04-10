@@ -13,7 +13,7 @@ const SpectatorBadge: React.FC<SpectatorBadgeProps> = ({ isSpectator = true, cou
 
   const label = count > 0
     ? t('spectator_count_watching').replace('%d', String(count))
-    : t('label_spectating') || 'Watching';
+    : t('APP.GAME.SPECTATING');
 
   return (
     <div style={{

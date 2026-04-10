@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { DominoSocketManager } from '../data/network/DominoSocketManager';
 import type { DominoTile, DominoBoardTile, DominoState, GameOverPayload } from '../data/models/ApiModels';
+import { SpectatorPayload } from '../util/SpectatorPayload';
 
 interface DominoStoreState {
   myHand: DominoTile[];
@@ -18,10 +19,17 @@ interface DominoStoreState {
   gameOver: GameOverPayload | null;
   error: string | null;
   socket: DominoSocketManager | null;
+  isSpectator: boolean;
+  p1Name: string;
+  p2Name: string;
+  turnHolder: string;
+  spectatorCurrentPlayer: string;
+  turnTimeLeft: number;
+  turnTimerTotal: number;
 }
 
 interface DominoStoreActions {
-  initGame: (roomId: string, myUsername: string) => void;
+  initGame: (roomId: string, myUsername: string, isSpectator?: boolean) => void;
   cleanup: () => void;
   selectTile: (tile: DominoTile | null) => void;
   playSide: (roomId: string, tile: DominoTile, side: 'left' | 'right') => void;
@@ -56,12 +64,30 @@ export const useDominoStore = create<DominoStoreState & DominoStoreActions>((set
   gameOver: null,
   error: null,
   socket: null,
+  isSpectator: false,
+  p1Name: '',
+  p2Name: '',
+  turnHolder: '',
+  spectatorCurrentPlayer: '',
+  turnTimeLeft: 0,
+  turnTimerTotal: 0,
 
-  initGame(roomId, myUsername) {
+  initGame(roomId, myUsername, isSpectator = false) {
     if (!roomId) return;
     const socket = new DominoSocketManager();
     socket.connect(roomId);
     socket.onGameUpdate((state: DominoState) => {
+      // ── Spectator refresh: extract player names + turn holder from every event ──
+      // Mirrors Android update (Battleship parity)
+      if (get().isSpectator) {
+        const { p1: ep1, p2: ep2, turnHolder } = SpectatorPayload.extractStandardTurnAndNames(state);
+        const nameUpdates: any = {};
+        if (ep1) nameUpdates.p1Name = ep1;
+        if (ep2) nameUpdates.p2Name = ep2;
+        if (turnHolder) nameUpdates.spectatorCurrentPlayer = turnHolder;
+        if (Object.keys(nameUpdates).length > 0) set(nameUpdates);
+      }
+
       const valid = computeValidMoves(
         state?.myHand || [], 
         state?.leftEnd ?? -1, 
@@ -77,18 +103,26 @@ export const useDominoStore = create<DominoStoreState & DominoStoreActions>((set
         boneyardCount: state.boneyardCount ?? 0,
         currentPlayer: state.currentPlayer || '',
         myUsername: state.myUsername || myUsername,
+        turnTimeLeft: (state as any).turnTimerSeconds ?? (state as any).turn_timer_seconds ?? (state as any).turn_timer ?? (state as any).turnTimeLeft ?? (state as any).turn_time_left ?? 0,
+        turnTimerTotal: (state as any).turnTimerSeconds ?? (state as any).turn_timer_seconds ?? 60,
         validMoves: valid,
-        gameOver: state.gameOver ?? null,
+        ...(isSpectator ? (() => {
+          const { p1, p2, turnHolder } = SpectatorPayload.extractStandardTurnAndNames(state);
+          // Although the refresh block above handles current player name, 
+          // we keep this standard sync structure for full data consistency.
+          return { p1Name: p1, p2Name: p2, turnHolder };
+        })() : {}),
+        gameOver: SpectatorPayload.resolveStandardGameOver(state, myUsername, isSpectator, 'DOMINO'),
         selectedTile: null,
         sidePickTile: null,
       });
     });
-    set({ socket, myUsername });
+    set({ socket, myUsername, isSpectator });
   },
 
   cleanup() {
     get().socket?.disconnect();
-    set({ socket: null, myHand: [], board: [], gameOver: null });
+    set({ socket: null, myHand: [], board: [], gameOver: null, isSpectator: false, turnHolder: '', p1Name: '', p2Name: '' });
   },
 
   selectTile(tile) {

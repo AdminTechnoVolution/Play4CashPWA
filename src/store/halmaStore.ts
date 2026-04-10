@@ -3,6 +3,8 @@ import { HalmaSocketManager } from '../data/network/HalmaSocketManager';
 import { apiService } from '../data/network/ApiService';
 import { apiRepository } from '../data/network/ApiRepository';
 import type { GameOverPayload } from '../data/models/ApiModels';
+import { SpectatorPayload } from '../util/SpectatorPayload';
+import { playerGameEndReasonFallback } from '../i18n/ApiMessageDisplay';
 
 // Mirroring Android: HalmaViewModel.kt
 const HALMA_BOARD_SIZE = 8;
@@ -59,8 +61,12 @@ export interface HalmaUiState {
   pendingCaptures: { row: number, col: number }[];
   isSpectator: boolean;
   spectatorsCount: number;
-  gameOverIsDraw: boolean;
-  gameOverWinnerDisplayName: string | null;
+  gameOver: GameOverPayload | null;
+  p1Name: string;
+  p2Name: string;
+  turnHolder: string;
+  spectatorCurrentPlayer: string;
+  myUsername: string;
 }
 
 interface HalmaStoreActions {
@@ -103,8 +109,12 @@ const INITIAL_STATE: HalmaUiState = {
   pendingCaptures: [],
   isSpectator: false,
   spectatorsCount: 0,
-  gameOverIsDraw: false,
-  gameOverWinnerDisplayName: null,
+  gameOver: null,
+  p1Name: '',
+  p2Name: '',
+  turnHolder: '',
+  spectatorCurrentPlayer: '',
+  myUsername: '',
 };
 
 export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get) => {
@@ -275,6 +285,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
         opponentConfirmed: hasOpponent || isSpectator, 
         opponentName: initialOpponentName, 
         isSpectator,
+        myUsername,
         statusMessage: isSpectator ? 'Observando partida' : (hasOpponent ? '¡Oponente unido! Iniciando partida...' : 'Esperando oponente...')
       });
 
@@ -302,6 +313,19 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
       
       socketManager.onGameUpdate((json: any) => {
         const data = json.data || json;
+
+        // ── Spectator refresh: extract player names + turn holder from every event ──
+        // Mirrors Android update (Battleship/Halma parity)
+        const isSpectator = get().isSpectator;
+        if (isSpectator) {
+          const { p1: ep1, p2: ep2, turnHolder } = SpectatorPayload.extractStandardTurnAndNames(data);
+          const nameUpdates: any = {};
+          if (ep1) nameUpdates.p1Name = ep1;
+          if (ep2) nameUpdates.p2Name = ep2;
+          if (turnHolder) nameUpdates.spectatorCurrentPlayer = turnHolder;
+          if (Object.keys(nameUpdates).length > 0) set(nameUpdates);
+        }
+
         // Literal translation of handleHalmaMessage (Android 255-450)
         const opponentJoined = data.opponentJoined || data.opponent_joined || false;
         const opponentName = data.opponentName || data.userName || '';
@@ -316,26 +340,22 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
           if (!isSpectator) apiRepository.readyRoom(roomId).catch(() => {});
         }
 
-        // Android match end logic (HalmaViewModel.kt:344)
+        // Android match end logic (HalmaViewModel.kt:344) — Standardized Parity
         const gameEndedRaw = data.gameEnded || data.game_ended || false;
         if (gameEndedRaw || outcome === 'win' || outcome === 'lose' || outcome === 'timeout_loss' ||
             outcome === 'opponent_disconnected' || outcome === 'forfeit' || isDraw) {
           
           if (pollingInterval) clearInterval(pollingInterval);
           stopCountdown();
-          const youWonFlag = data.youWon || data.you_won || false;
-          let winnerLabel = 'Opponent';
-          if (outcome === 'win' || outcome === 'opponent_disconnected') winnerLabel = 'You';
-          else if (outcome === 'forfeit') winnerLabel = youWonFlag ? 'You' : 'Opponent';
-          else if (outcome === 'lose' || outcome === 'timeout_loss') winnerLabel = 'Opponent';
-          else if (data.winner === 'mine') winnerLabel = 'You';
+          
+          const myUsername = ''; // Halma store doesn't seem to store myUsername in the closure or I missed it? Wait.
+          // Re-checking... ah, 'myUsername' is passed in initGame.
+          // Let's use the standard resolver.
+          const gameOver = SpectatorPayload.resolveStandardGameOver(data, get().myUsername, isSpectator, 'HALMA');
 
           set({
             phase: HalmaPhase.GAME_OVER,
-            winner: winnerLabel,
-            prize: data.prize || 0,
-            statusMessage: data.reason || 'Partida finalizada',
-            gameOverIsDraw: isDraw,
+            gameOver,
             isMovePending: false
           });
           return;
@@ -343,7 +363,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
 
         const newBoard = parseBoard(data.board);
         const yourTurn = data.yourTurn || data.your_turn || false;
-        const timerSeconds = data.turnTimeLeft ?? data.turn_timer_seconds ?? data.turnTimerSeconds ?? 0;
+        const timerSeconds = data.turnTimerSeconds ?? data.turn_timer_seconds ?? data.turn_timer ?? data.turnTimeLeft ?? data.turn_time_left ?? 0;
         const mustEndTurn = data.mustEndTurn ?? data.must_end_turn ?? false;
         const continuingJump = data.continuingJump ?? data.continuing_jump ?? false;
         const jumpingPiece = data.jumpingPiece || data.jumping_piece;
@@ -356,6 +376,9 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
             // Android 389: mustEndTurn
             const trail = [...jumpTrailAccumulator];
             jumpTrailAccumulator = [];
+
+            const { p1, p2, turnHolder: syncTurnHolder } = SpectatorPayload.extractStandardTurnAndNames(data);
+
             set({
               phase: HalmaPhase.PLAY,
               board: newBoard,
@@ -367,7 +390,12 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
               isContinuingJump: false,
               mustEndTurn: !isSpectator,
               isMovePending: false,
-              statusMessage: isSpectator ? 'Turno del oponente' : 'Debes terminar tu turno',
+              p1Name: p1,
+              p2Name: p2,
+              turnHolder: syncTurnHolder,
+              statusMessage: isSpectator 
+                ? `spectator_turn_of_x|${syncTurnHolder}` 
+                : (isSpectator ? '' : 'halma_must_end_turn'),
               moveCount: get().moveCount + 1,
               lastLandedRow: landed?.row || null,
               lastLandedCol: landed?.col || null,
@@ -427,6 +455,8 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
           // Default / Turn Flip branch (Android 469+)
           const trail = [...jumpTrailAccumulator];
           jumpTrailAccumulator = [];
+
+          const { p1, p2, turnHolder: syncTurnHolder } = SpectatorPayload.extractStandardTurnAndNames(data);
           
           set({
             phase: HalmaPhase.PLAY,
@@ -439,7 +469,12 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
             isContinuingJump: false,
             mustEndTurn: false,
             isMovePending: false,
-            statusMessage: (yourTurn && !isSpectator) ? 'Tu turno' : 'Turno del oponente',
+            p1Name: p1,
+            p2Name: p2,
+            turnHolder: syncTurnHolder,
+            statusMessage: isSpectator 
+              ? `spectator_turn_of_x|${syncTurnHolder}`
+              : (yourTurn ? 'halma_your_turn' : `bs_named_opponent_turn|${syncTurnHolder || get().opponentName}`),
             moveCount: get().moveCount + 1,
             lastLandedRow: landed?.row || null,
             lastLandedCol: landed?.col || null,

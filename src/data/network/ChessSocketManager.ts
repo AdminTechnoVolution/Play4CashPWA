@@ -39,6 +39,12 @@ async function refreshSocketToken(socket: Socket): Promise<void> {
 
 export class ChessSocketManager {
   private socket: Socket | null = null;
+  private chessMessageCb: ((json: any) => void) | null = null;
+  onConnected: (() => void) | null = null;
+
+  onChessMessage(cb: (json: any) => void): void {
+    this.chessMessageCb = cb;
+  }
 
   connect(roomId: string): void {
     const token = getAccessToken();
@@ -77,6 +83,10 @@ export class ChessSocketManager {
           window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
         }
       }
+    });
+
+    this.socket.on('chess', (data) => {
+      if (this.chessMessageCb) this.chessMessageCb(data);
     });
 
     this.socket.connect();

@@ -99,6 +99,16 @@ const RoomsPage: React.FC = () => {
   const [toast, setToast] = useState({ isOpen: false, message: '', color: '' });
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [spectatingId, setSpectatingId] = useState<string | null>(null);
+  
+  // Reset form and default to minBet when modal opens
+  useEffect(() => {
+    if (showCreateDialog) {
+      setCreateName('');
+      setCreateBet(minBetNum);
+      setCreateLimit(2);
+      setCreateError('');
+    }
+  }, [showCreateDialog, minBetNum]);
 
   useEffect(() => {
     if (!gameId || !gameSocketCode) {
@@ -195,11 +205,11 @@ const RoomsPage: React.FC = () => {
 
   const handleCreate = async () => {
     if (!createName.trim()) {
-      setCreateError('Room name is required.');
+      setCreateError(t('room_error_name_required'));
       return;
     }
     if (createBet < minBetNum) {
-      setCreateError(`Minimum bet is $${minBetNum}.`);
+      setCreateError(t('room_bet_min_error').replace('%s', String(minBetNum)));
       return;
     }
     if (createBet > userBalanceNum) {
@@ -252,8 +262,11 @@ const RoomsPage: React.FC = () => {
         return t('rooms_filter_waiting');
       case 'STARTED':
         return t('rooms_filter_started');
+      case 'FINISHED':
+        return t('APP.ROOMS.STATUS_FINISHED');
       default:
-        return status;
+        // Use formatApiMessageForDisplay to resolve raw keys or English literals
+        return formatApiMessageForDisplay(status, '');
     }
   };
 
@@ -261,6 +274,7 @@ const RoomsPage: React.FC = () => {
     const kind = classifyRoomLobbyStatus(status);
     if (kind === 'WAITING') return '#4caf50';
     if (kind === 'STARTED') return 'var(--sovereign-gold)';
+    if (kind === 'FINISHED') return 'var(--sovereign-text-muted)';
     return 'var(--sovereign-text-muted)';
   };
 

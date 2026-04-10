@@ -3,7 +3,8 @@ import { BattleshipSocketManager } from '../data/network/BattleshipSocketManager
 import { apiRepository } from '../data/network/ApiRepository';
 import type { BattleshipCell, GameOverPayload, ShipPlacement } from '../data/models/ApiModels';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+import { SpectatorPayload } from '../util/SpectatorPayload';
+
 const EMPTY_BOARD = (): BattleshipCell[][] =>
   Array.from({ length: 10 }, () => Array(10).fill('empty') as BattleshipCell[]);
 
@@ -155,7 +156,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       // Mirrors Android BattleshipViewModel.refreshSpectatorBattleshipUi()
       const spectatorMode = get().isSpectator;
       if (spectatorMode) {
-        const { p1: ep1, p2: ep2, turnHolder } = extractSpectatorNamesFromPayload(data);
+        const { p1: ep1, p2: ep2, turnHolder } = SpectatorPayload.extractStandardTurnAndNames(data);
         console.log('[SPECTATOR][8] Per-event name refresh → p1:', ep1, '| p2:', ep2, '| turnHolder:', turnHolder, '| raw event keys:', Object.keys(data));
         const prev = get();
         const nameUpdates: Partial<BattleshipStoreState> = {};
@@ -238,27 +239,9 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       if (outcome) {
         // ── Game-over outcomes ────────────────────────────────────────────────
         if (GAME_OVER_OUTCOMES.has(outcome)) {
-          const { isSpectator: spec, hasPendingFire: pendingFire, spectatorBoardOwner: boardOwner } = get();
-          const isDraw  = outcome === 'draw';
-          const youWon  = !spec && (
-            outcome === 'win' ||
-            ((outcome === 'forfeit' || outcome === 'opponent_disconnected') &&
-              (data.youWon as boolean ?? false))
-          );
-          const prize   = typeof data.prize === 'number' ? data.prize : undefined;
-          const winner  = typeof data.winner === 'string' ? data.winner : undefined;
-          // Derive end-reason: server `data.reason` takes priority, then map from outcome code
-          const serverReason = typeof data.reason === 'string' && data.reason ? data.reason : undefined;
-          const OUTCOME_TO_REASON: Record<string, string> = {
-            forfeit: 'forfeit',
-            opponent_disconnected: 'opponent_disconnected',
-            timeout_loss: 'timeout_loss',
-            match_cancelled: 'match_cancelled',
-            win: 'all_sunk',
-            lose: 'all_sunk',
-          };
-          const gameOverReason = serverReason ?? OUTCOME_TO_REASON[outcome];
-
+          const { isSpectator: spec, myUsername, spectatorBoardOwner: boardOwner, hasPendingFire } = get();
+          const gameOver = SpectatorPayload.resolveStandardGameOver(data, myUsername, spec, 'BATTLESHIP');
+          
           const pBoard = get().playerBoard.map(r => [...r]) as BattleshipCell[][];
           const oBoard = get().opponentBoard.map(r => [...r]) as BattleshipCell[][];
 
@@ -267,7 +250,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
             // Use same shot attribution logic as regular shots
             const finalShotFromPlayer1 = spec
               ? (shooter != null ? shooter === boardOwner : false)
-              : pendingFire;
+              : hasPendingFire;
             finalBoard = finalShotFromPlayer1 ? 'opponent' : 'player';
             if (finalShotFromPlayer1) {
               oBoard[row][col] = 'sunk';
@@ -283,14 +266,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
             hasPendingFire: false,
             isMyTurn: false,
             animatingShot: row >= 0 ? { row, col, board: finalBoard } : null,
-            gameOver: {
-              outcome: isDraw ? 'draw' : youWon ? 'win' : 'lose',
-              youWon,
-              isDraw,
-              winner,
-              reason: gameOverReason,
-              prize: youWon ? prize : undefined,
-            },
+            gameOver,
           });
           if (row >= 0) setTimeout(() => set({ animatingShot: null }), 2000);
           return;
@@ -592,67 +568,6 @@ function handleFullSync(
       spectatorCurrentPlayer: syncTurnHolder ?? p1,
     } : {}),
   });
-}
-
-// ── Spectator payload parsing (mirrors Android SpectatorPayload helpers) ──────
-/**
- * Extracts player display names and the current turn holder from a socket event payload.
- * Mirrors Android's SpectatorPayload.creatorOpponentUsernames(), parseSeats(), and
- * spectatorTurnHolderUsername() — with the same priority order.
- */
-function extractSpectatorNamesFromPayload(
-  data: Record<string, unknown>,
-): { p1: string; p2: string; turnHolder: string } {
-  let p1 = '';
-  let p2 = '';
-
-  // Priority 1: explicit player slots (most common in naval-battle events)
-  const p1Slot = (data.player1 as string | undefined)?.trim()
-    || (data.player_1 as string | undefined)?.trim()
-    || (data.attackerUsername as string | undefined)?.trim()
-    || (data.attacker_username as string | undefined)?.trim();
-  const p2Slot = (data.player2 as string | undefined)?.trim()
-    || (data.player_2 as string | undefined)?.trim()
-    || (data.defenderUsername as string | undefined)?.trim()
-    || (data.defender_username as string | undefined)?.trim();
-  if (p1Slot) p1 = p1Slot;
-  if (p2Slot) p2 = p2Slot;
-
-  // Priority 2: players roster array (nested objects with playerId.username or user.username)
-  if (!p1 || !p2) {
-    const players = data.players as Record<string, unknown>[] | undefined;
-    if (Array.isArray(players)) {
-      players.forEach((entry, idx) => {
-        const e = entry as Record<string, unknown>;
-        const pid = e.playerId as Record<string, unknown> | undefined;
-        const usr = e.user as Record<string, unknown> | undefined;
-        const username = (
-          (pid?.username as string | undefined)?.trim()
-          || (usr?.username as string | undefined)?.trim()
-          || (e.username as string | undefined)?.trim()
-          || ''
-        );
-        if (idx === 0 && !p1 && username) p1 = username;
-        if (idx === 1 && !p2 && username) p2 = username;
-      });
-    }
-  }
-
-  // Turn holder: turnOf → shot_from → isTurnOf → currentTurnUsername → currentPlayer
-  const turnHolder = (
-    (data.turnOf as string | undefined)?.trim()
-    || (data.turn_of as string | undefined)?.trim()
-    || (data.shotFrom as string | undefined)?.trim()
-    || (data.shot_from as string | undefined)?.trim()
-    || (data.isTurnOf as string | undefined)?.trim()
-    || (data.is_turn_of as string | undefined)?.trim()
-    || (data.currentTurnUsername as string | undefined)?.trim()
-    || (data.current_turn_username as string | undefined)?.trim()
-    || (data.currentPlayer as string | undefined)?.trim()
-    || ''
-  );
-
-  return { p1, p2, turnHolder };
 }
 
 // ── Utility ───────────────────────────────────────────────────────────────────

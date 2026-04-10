@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useT } from '../../../i18n/translations';
+import { applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
 
 interface TurnTimerProps {
   seconds: number;
+  totalSeconds?: number;
   isMyTurn: boolean;
   onTimeout: () => void;
   /** Spectator mode: name of the player whose turn it is now */
@@ -11,7 +13,7 @@ interface TurnTimerProps {
   resetKey?: string | number;
 }
 
-const TurnTimer: React.FC<TurnTimerProps> = ({ seconds, isMyTurn, onTimeout, turnPlayerName, resetKey }) => {
+const TurnTimer: React.FC<TurnTimerProps> = ({ seconds, totalSeconds, isMyTurn, onTimeout, turnPlayerName, resetKey }) => {
   const t = useT();
   const [remaining, setRemaining] = useState(seconds);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -51,7 +53,7 @@ const TurnTimer: React.FC<TurnTimerProps> = ({ seconds, isMyTurn, onTimeout, tur
     : 'rgba(138, 155, 191, 0.5)';
 
   const label = isSpectatorMode
-    ? `${turnPlayerName}'s turn`
+    ? applyWsMessagePlaceholders(t('spectator_turn_of_x'), { username: turnPlayerName || '' })
     : t('game_turn_timer');
 
   return (

@@ -12,6 +12,7 @@ import type { DominoTile, GreetingResponse, ChatMessage } from '../../../data/mo
 import GameOverModal from '../components/GameOverModal';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
+import TurnTimer from '../components/TurnTimer';
 import { useT } from '../../../i18n/translations';
 import { applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
 
@@ -68,7 +69,7 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
     }
 
     console.log('[DominoPage] Initializing game for room:', roomId);
-    store.initGame(roomId, user?.username ?? '');
+    store.initGame(roomId, user?.username ?? '', isSpectator);
     
     const chat = chatRef.current;
     if (chat && typeof chat.connect === 'function') {
@@ -120,15 +121,14 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
         <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {isSpectator && <SpectatorBadge />}
 
-          {/* Turn + opponent info */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <IonText style={{ color: isSpectator ? '#8a9bbf' : (isMyTurn ? '#c9a84c' : '#8a9bbf'), fontSize: 13 }}>
-              {isSpectator
-                ? applyWsMessagePlaceholders(t('spectator_generic_turn_x'), { username: store.currentPlayer })
-                : isMyTurn
-                  ? `▶ ${t('domino_your_turn')}`
-                  : applyWsMessagePlaceholders(t('bs_named_opponent_turn'), { username: opponentName })}
-            </IonText>
+          <TurnTimer 
+            seconds={store.turnTimeLeft} 
+            totalSeconds={store.turnTimerTotal}
+            isMyTurn={isMyTurn}
+            onTimeout={() => {}}
+            turnPlayerName={isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
             <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>
               {applyWsMessagePlaceholders(t('domino_boneyard_count'), { count: store.boneyardCount })}
             </IonText>

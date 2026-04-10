@@ -9,12 +9,12 @@ import { useHalmaStore, HalmaPhase, HalmaCellState } from '../../../store/halmaS
 import { ChatSocketManager } from '../../../data/network/ChatSocketManager';
 import { apiRepository } from '../../../data/network/ApiRepository';
 import type { GreetingResponse, ChatMessage } from '../../../data/models/ApiModels';
+import { useT } from '../../../i18n/translations';
+import TurnTimer from '../components/TurnTimer';
 import GameOverModal from '../components/GameOverModal';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
-import { useT } from '../../../i18n/translations';
-import { applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
 
 interface Props {
   roomId: string;
@@ -88,38 +88,15 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
   );
 
   const renderHeader = () => {
-    const turnColor = store.isSpectator ? '#8a9bbf' : (store.isPlayerTurn ? '#4CAF50' : '#E53935');
-    const time = store.turnTimeLeft;
-    const isRedZone = time <= 10;
-    
     return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        background: `${turnColor}20`, 
-        border: `1px solid ${turnColor}40`, 
-        borderRadius: '12px', 
-        padding: '10px 14px', 
-        marginBottom: '16px',
-        animation: store.isPlayerTurn ? 'pulse 2s infinite' : 'none'
-      }}>
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: turnColor, marginRight: 12 }} />
-        <div style={{ flex: 1 }}>
-          <IonText style={{ color: turnColor, fontWeight: '800', fontSize: '14px' }}>
-            {store.statusMessage || (store.isPlayerTurn ? t('halma_your_turn') : (store.opponentName || t('halma_opponent_turn')))}
-          </IonText>
-        </div>
-        <div style={{ 
-          background: `${turnColor}40`, 
-          padding: '4px 10px', 
-          borderRadius: '8px', 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 4 
-        }}>
-          {isRedZone && store.isPlayerTurn && <IonIcon icon={flame} style={{ color: '#FF9800', fontSize: '14px' }} />}
-          <IonText style={{ color: turnColor, fontWeight: '900', fontSize: '14px' }}>{time}s</IonText>
-        </div>
+      <div style={{ marginBottom: '16px' }}>
+        <TurnTimer
+          seconds={store.turnTimeLeft}
+          isMyTurn={store.isPlayerTurn}
+          onTimeout={() => {}}
+          turnPlayerName={store.isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
+          resetKey={store.isSpectator ? store.moveCount : undefined}
+        />
       </div>
     );
   };
@@ -272,9 +249,11 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
             </IonText>
           )}
 
-          <div style={{ marginTop: 'auto', paddingBottom: '20px' }}>
-            <ChatGreetingChips greetings={greetings} onSend={(id) => chatRef.current.sendGreeting(roomId, id)} lastReceivedMessage={lastMsg} />
-          </div>
+          {!isSpectator && (
+            <div style={{ marginTop: 'auto', paddingBottom: '20px' }}>
+              <ChatGreetingChips greetings={greetings} onSend={(id) => chatRef.current.sendGreeting(roomId, id)} lastReceivedMessage={lastMsg} />
+            </div>
+          )}
         </div>
 
         <style>{`
@@ -298,14 +277,7 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
 
       <GameOverModal 
         isOpen={store.phase === HalmaPhase.GAME_OVER} 
-        gameOver={{
-          outcome: store.gameOverIsDraw ? 'draw' : (store.winner === 'You' ? 'win' : 'lose'),
-          youWon: store.winner === 'You',
-          winner: store.winner || '',
-          reason: store.statusMessage,
-          prize: store.prize || 0,
-          isDraw: store.gameOverIsDraw
-        }} 
+        gameOver={store.gameOver} 
         isSpectator={store.isSpectator} 
         onExit={onLeaveRequest} 
         gameProfile="HALMA" 

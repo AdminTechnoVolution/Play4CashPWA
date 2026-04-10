@@ -56,13 +56,8 @@ const GameOverModal: React.FC<GameOverModalProps> = ({
         : t('bs_defeat');
 
   // ── Reason / Body ──────────────────────────────────────────────────────────
-  const reasonText = playerGameEndReasonFallback(
-    gameOver,
-    gameOver.outcome,
-    gameOver.youWon,
-    gameOver.isDraw,
-    gameProfile
-  );
+  // Mirroring Battleship's clean display logic: translating the key resolved in the store
+  const reasonText = gameOver.reason ? t(gameOver.reason) : '';
 
   const accentColor = isSpectator
     ? (isDraw ? 'var(--sovereign-text-muted)' : 'var(--sovereign-gold)')
@@ -86,7 +81,7 @@ const GameOverModal: React.FC<GameOverModalProps> = ({
           </p>
           {reasonText && (
             <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 13, lineHeight: 1.5, margin: 0, textAlign: 'center' }}>
-              {t('game_history_label_reason')}: {reasonText}
+              {reasonText}
             </p>
           )}
         </div>
