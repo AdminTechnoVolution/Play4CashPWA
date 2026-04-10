@@ -469,6 +469,7 @@
   "chat_greeting_opponent_fallback": "Avversario",
   "chat_greeting_you_sent": "Hai inviato",
   "chess_castling_banner_title": "Puoi arroccare — scegli il lato: il re salta accanto alla torre",
+  "chess_castling_suggest_desc": "Una volta a partita: il re avanza di due case verso una torre e la torre va dall’altra parte — solo se la strada è libera e nessun pezzo è stato mosso.",
   "chess_castling_cd_dismiss": "Chiudi suggerimento arrocco",
   "chess_castling_kingside": "Arrocco corto — re verso la torre sul lato di re",
   "chess_castling_queenside": "Arrocco lungo — re verso la torre sul lato di donna",

@@ -5,7 +5,7 @@ import { useT } from '../../i18n/translations';
 import { SovereignPrimaryButton, SovereignDangerButton } from '../../ui/components/SovereignButton';
 import { apiRepository } from '../../data/network/ApiRepository';
 import { useBattleshipStore } from '../../store/battleshipStore';
-import { useChessStore } from '../../store/chessStore';
+import { useChessStore, ChessPhase } from '../../store/chessStore';
 import { useDominoStore } from '../../store/dominoStore';
 import { useHalmaStore, HalmaPhase } from '../../store/halmaStore';
 import type { RoomStatusResponse } from '../../data/models/ApiModels';
@@ -14,6 +14,16 @@ import ChessPage from './chess/ChessPage';
 import DominoPage from './domino/DominoPage';
 import HalmaPage from './halma/HalmaPage';
 import { getPlayContext, clearPlayContext } from '../../util/routingStorage';
+import { useAuthStore } from '../../store/authStore';
+import type { UserAccountResponse } from '../../data/models/ApiModels';
+
+/** Room status `winner` is an id or username — compare to the logged-in account, not to `opponentName` (may be a placeholder). */
+function isWinnerCurrentUser(winner: string | undefined, me: UserAccountResponse | null): boolean | null {
+  const w = winner?.trim();
+  if (!w || !me) return null;
+  const wl = w.toLowerCase();
+  return wl === me.id.trim().toLowerCase() || wl === me.username.trim().toLowerCase();
+}
 
 // ── Leave-context snapshot (called at the moment the user requests to leave) ──
 function getLeaveContext(gameSocketCode: string): {
@@ -24,11 +34,21 @@ function getLeaveContext(gameSocketCode: string): {
   switch (gameSocketCode) {
     case 'chess': {
       const s = useChessStore.getState();
-      return { gameIsOver: !!s.gameOver, isPastPlacement: true, opponentConfirmed: true };
+      // Android ChessScreen: warn when opponentConfirmed && (WAITING || PLAY), not only after first move
+      return {
+        gameIsOver: !!s.gameOver,
+        isPastPlacement: s.phase === ChessPhase.WAITING || s.phase === ChessPhase.PLAY,
+        opponentConfirmed: s.opponentConfirmed,
+      };
     }
     case 'domino': {
       const s = useDominoStore.getState();
-      return { gameIsOver: !!s.gameOver, isPastPlacement: true, opponentConfirmed: true };
+      // Android DominoScreen: same — WAITING or PLAY with opponent (board may still be empty)
+      return {
+        gameIsOver: !!s.gameOver,
+        isPastPlacement: s.opponents.length > 0,
+        opponentConfirmed: s.opponents.length > 0,
+      };
     }
     case 'halma': {
       const s = useHalmaStore.getState();
@@ -55,6 +75,7 @@ export default function PlayPage() {
   const t           = useT();
 
   const playCtx = getPlayContext();
+  const me = useAuthStore((s) => s.user);
 
   useEffect(() => {
     if (!playCtx || !gameSocketCode) {
@@ -146,14 +167,13 @@ export default function PlayPage() {
       return;
     }
 
-    // Rule 3: spectator / placement phase / no opponent → leave directly
-    await doLeave();
+    // Rule 3: spectator / placement phase / no opponent → leave directly, no API call needed
+    clearPlayContext();
+    navigate(-1);
   };
 
-  // ── Determine won/lost for the finished dialog ──────────────────────────────
-  const iWon = finishedStatus?.winner
-    ? finishedStatus.winner !== opponent   // winner is me (not the opponent)
-    : null;                                // null = draw / unknown
+  // ── Determine won/lost for the finished dialog (only when opened from server status / pre-check) ──
+  const iWon = isWinnerCurrentUser(finishedStatus?.winner, me);
 
   const finishedHeader =
     iWon === true  ? '🏆 You Won!'  :
@@ -218,7 +238,13 @@ export default function PlayPage() {
             <SovereignPrimaryButton onClick={() => setShowForfeit(false)}>
               {t('bs_leave_confirm_stay')}
             </SovereignPrimaryButton>
-            <SovereignDangerButton onClick={() => { setShowForfeit(false); doLeave(); }}>
+            <SovereignDangerButton
+              onClick={() => {
+                setShowForfeit(false);
+                // User already accepted forfeit — do not show a second "result" alert after POST /leave
+                void doLeave(true);
+              }}
+            >
               {t('bs_leave_confirm_leave')}
             </SovereignDangerButton>
           </div>
@@ -228,15 +254,18 @@ export default function PlayPage() {
       {/* Game already finished on server — no forfeit, just show result */}
       <IonAlert
         isOpen={showFinished}
+        backdropDismiss={false}
         header={finishedHeader}
         message={finishedMessage}
         buttons={[
           {
             text: 'OK',
-            handler: () => { setShowFinished(false); doLeave(); },
+            handler: () => {
+              setShowFinished(false);
+              void doLeave(true);
+            },
           },
         ]}
-        onDidDismiss={() => { setShowFinished(false); doLeave(); }}
       />
     </>
   );

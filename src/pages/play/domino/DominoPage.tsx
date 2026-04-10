@@ -14,7 +14,7 @@ import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import TurnTimer from '../components/TurnTimer';
 import { useT } from '../../../i18n/translations';
-import { applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
+import { applyWsMessagePlaceholders, tStatus } from '../../../i18n/ApiMessageDisplay';
 
 interface Props {
   roomId: string;
@@ -119,7 +119,13 @@ export default function DominoPage({ roomId, betAmount, roomName, opponentName, 
 
       <IonContent style={{ '--background': '#0a1628' }}>
         <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {isSpectator && <SpectatorBadge />}
+          {isSpectator && <SpectatorBadge count={store.spectatorsCount} />}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'center' }}>
+            <IonText style={{ color: isMyTurn ? '#c9a84c' : '#8a9bbf', fontSize: 13, fontWeight: '600' }}>
+              {tStatus(store.statusMessage)}
+            </IonText>
+          </div>
 
           <TurnTimer 
             seconds={store.turnTimeLeft} 

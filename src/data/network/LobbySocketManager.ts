@@ -3,6 +3,7 @@ import type { Socket } from 'socket.io-client';
 import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken, getRefreshToken, saveTokens } from '../auth/AuthSessionStore';
 import { bareClient } from './ApiClient';
+import { socketIoExtraHeaders } from './socketExtraHeaders';
 import type { ApiResponse, LoginResponse, RoomResponse, RoomPlayer } from '../models/ApiModels';
 
 let socketRefreshPromise: Promise<void> | null = null;
@@ -24,6 +25,7 @@ async function refreshSocketToken(socket: Socket): Promise<void> {
     const newToken = data.token;
     socket.auth = { token: newToken };
     (socket.io.opts as Record<string, unknown>).query = { token: newToken };
+    (socket.io.opts as Record<string, unknown>).extraHeaders = socketIoExtraHeaders(newToken);
   })().finally(() => { socketRefreshPromise = null; });
 
   return socketRefreshPromise;
@@ -74,6 +76,7 @@ export class LobbySocketManager {
       timeout: SOCKET_TIMEOUT_MS,
       auth: { token },
       query: { token },
+      extraHeaders: socketIoExtraHeaders(token),
     });
 
     this.socket.on('connect', () => {

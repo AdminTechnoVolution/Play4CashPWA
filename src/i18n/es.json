@@ -483,6 +483,7 @@
   "chat_greeting_opponent_fallback": "Oponente",
   "chat_greeting_you_sent": "Enviaste",
   "chess_castling_banner_title": "Puedes enrocar — elige el lado: el rey salta junto a la torre",
+  "chess_castling_suggest_desc": "Una vez por partida: el rey salta dos casillas hacia una torre y esa torre cruza al otro lado — solo si el camino está libre y ninguna pieza se ha movido.",
   "chess_castling_cd_dismiss": "Cerrar sugerencia de enroque",
   "chess_castling_kingside": "Enroque corto — rey hacia la torre del lado del rey",
   "chess_castling_queenside": "Enroque largo — rey hacia la torre del lado de la dama",

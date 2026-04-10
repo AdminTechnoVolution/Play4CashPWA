@@ -26,6 +26,8 @@ interface DominoStoreState {
   spectatorCurrentPlayer: string;
   turnTimeLeft: number;
   turnTimerTotal: number;
+  statusMessage: string;
+  spectatorsCount: number;
 }
 
 interface DominoStoreActions {
@@ -71,29 +73,35 @@ export const useDominoStore = create<DominoStoreState & DominoStoreActions>((set
   spectatorCurrentPlayer: '',
   turnTimeLeft: 0,
   turnTimerTotal: 0,
-
+  statusMessage: '',
+  spectatorsCount: 0,
+ 
   initGame(roomId, myUsername, isSpectator = false) {
     if (!roomId) return;
+    set({ statusMessage: isSpectator ? 'spectator_waiting_next_move' : 'domino_status_waiting_opponent' });
     const socket = new DominoSocketManager();
     socket.connect(roomId);
     socket.onGameUpdate((state: DominoState) => {
       // ── Spectator refresh: extract player names + turn holder from every event ──
-      // Mirrors Android update (Battleship parity)
+      const { p1: ep1, p2: ep2, turnHolder } = SpectatorPayload.extractStandardTurnAndNames(state);
       if (get().isSpectator) {
-        const { p1: ep1, p2: ep2, turnHolder } = SpectatorPayload.extractStandardTurnAndNames(state);
         const nameUpdates: any = {};
         if (ep1) nameUpdates.p1Name = ep1;
         if (ep2) nameUpdates.p2Name = ep2;
         if (turnHolder) nameUpdates.spectatorCurrentPlayer = turnHolder;
         if (Object.keys(nameUpdates).length > 0) set(nameUpdates);
       }
-
+ 
       const valid = computeValidMoves(
         state?.myHand || [], 
         state?.leftEnd ?? -1, 
         state?.rightEnd ?? -1, 
         (state?.board || []).length === 0
       );
+ 
+      const currentPlayer = state.currentPlayer || '';
+      const isMyTurn = currentPlayer === myUsername;
+ 
       set({
         myHand: state.myHand || [],
         opponents: state.opponents || [],
@@ -101,18 +109,19 @@ export const useDominoStore = create<DominoStoreState & DominoStoreActions>((set
         leftEnd: state.leftEnd ?? -1,
         rightEnd: state.rightEnd ?? -1,
         boneyardCount: state.boneyardCount ?? 0,
-        currentPlayer: state.currentPlayer || '',
+        currentPlayer,
         myUsername: state.myUsername || myUsername,
         turnTimeLeft: (state as any).turnTimerSeconds ?? (state as any).turn_timer_seconds ?? (state as any).turn_timer ?? (state as any).turnTimeLeft ?? (state as any).turn_time_left ?? 0,
         turnTimerTotal: (state as any).turnTimerSeconds ?? (state as any).turn_timer_seconds ?? 60,
         validMoves: valid,
-        ...(isSpectator ? (() => {
-          const { p1, p2, turnHolder } = SpectatorPayload.extractStandardTurnAndNames(state);
-          // Although the refresh block above handles current player name, 
-          // we keep this standard sync structure for full data consistency.
-          return { p1Name: p1, p2Name: p2, turnHolder };
-        })() : {}),
-        gameOver: SpectatorPayload.resolveStandardGameOver(state, myUsername, isSpectator, 'DOMINO'),
+        spectatorsCount: (state as any).spectatorsCount ?? (state as any).spectators_count ?? get().spectatorsCount,
+        p1Name: ep1,
+        p2Name: ep2,
+        turnHolder,
+        statusMessage: get().isSpectator 
+          ? `spectator_turn_of_x|${turnHolder}`
+          : (isMyTurn ? 'domino_your_turn' : `domino_opponent_turn|${turnHolder}`),
+        gameOver: SpectatorPayload.resolveStandardGameOver(state, myUsername, get().isSpectator, 'DOMINO'),
         selectedTile: null,
         sidePickTile: null,
       });

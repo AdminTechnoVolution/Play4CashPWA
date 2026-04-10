@@ -26,6 +26,8 @@ const englishApiLiteralToKey: Record<string, string> = {
   [normalizeEnglishApiLiteral("Opponent joined! Game starting…")]: "halma_status_place_pieces",
   [normalizeEnglishApiLiteral("It is not your turn")]: "ws.games.notYourTurn",
   [normalizeEnglishApiLiteral("Invalid move")]: "ws.games.invalidMove",
+  [normalizeEnglishApiLiteral("Illegal move")]: "ws.chess.illegalMove",
+  [normalizeEnglishApiLiteral("Illegal move. You are in check!")]: "ws.chess.illegalMoveInCheck",
   [normalizeEnglishApiLiteral("Room is full")]: "room_full",
   [normalizeEnglishApiLiteral("The room is full")]: "room_full",
   [normalizeEnglishApiLiteral("This room is full")]: "room_full",
@@ -41,6 +43,42 @@ const resolveApiMessageLine = (trimmedLine: string): string => {
   if (key && hasKey(key)) return t(key);
   return trimmedLine;
 };
+
+/** Resolves a single API line to a catalog key when possible (mirrors Android `rawLineToMessageKey`). */
+function rawLineToMessageKey(trimmedLine: string): string | null {
+  if (!trimmedLine) return null;
+  if (hasKey(trimmedLine)) return trimmedLine;
+  return englishApiLiteralToKey[normalizeEnglishApiLiteral(trimmedLine)] ?? null;
+}
+
+/** Android: `NON_BLOCKING_SOCKET_MESSAGE_KEYS` in ApiMessageDisplay.kt */
+const NON_BLOCKING_SOCKET_MESSAGE_KEYS = new Set([
+  'ws.games.opponentJoined',
+  'ws.games.matchFound',
+  'ws.games.startedRoom',
+  'ws.games.waitingOpponent',
+  'ws.games.roomReconnected',
+]);
+
+/**
+ * When the server sends `success: false` with no `data`, some envelopes only carry informational keys.
+ * Those must not open a blocking error modal during live play (Android parity).
+ */
+export function isInformationalNonBlockingSocketRaw(raw: string | null | undefined): boolean {
+  if (raw == null || !String(raw).trim()) return true;
+  const lines = String(raw)
+    .trim()
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return true;
+  for (const line of lines) {
+    const key = rawLineToMessageKey(line);
+    if (key == null) return false;
+    if (!NON_BLOCKING_SOCKET_MESSAGE_KEYS.has(key)) return false;
+  }
+  return true;
+}
 
 /**
  * Replaces `{{key}}` placeholders using string fields from [data] (WebSocket contract).
@@ -110,6 +148,23 @@ export function formatApiMessagesBlockForDisplay(raw: string | null | undefined,
     .filter(Boolean)
     .join('\n');
   return mapped || fallbackIfEmpty;
+}
+
+/**
+ * Standard status message resolver for game stores/pages.
+ * Handles the "key|variable" pattern and resolves placeholders.
+ */
+export function tStatus(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+
+  const [key, val] = trimmed.split('|');
+  const translated = t(key);
+  
+  // If translated text is just the key, it means translation was missing or it's a literal.
+  // We apply placeholders regardless.
+  return applyWsMessagePlaceholders(translated, { username: val, count: val, amount: val });
 }
 
 // ── Game End Reasoning (Mirroring GameEndReason.kt logic) ───────────────────

@@ -469,6 +469,7 @@
   "chat_greeting_opponent_fallback": "Adversaire",
   "chat_greeting_you_sent": "Vous avez envoyé",
   "chess_castling_banner_title": "Roque possible — choisissez le côté : le roi saute près de la tour",
+  "chess_castling_suggest_desc": "Une fois par partie : le roi avance de deux cases vers une tour, et la tour va de l’autre côté — seulement si la voie est libre et qu’aucune pièce n’a bougé.",
   "chess_castling_cd_dismiss": "Fermer le roque",
   "chess_castling_kingside": "Petit roque — roi vers la tour du côté roi",
   "chess_castling_queenside": "Grand roque — roi vers la tour du côté dame",

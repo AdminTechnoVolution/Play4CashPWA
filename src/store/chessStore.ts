@@ -2,16 +2,17 @@ import { create } from 'zustand';
 import { ChessSocketManager } from '../data/network/ChessSocketManager';
 import { apiRepository } from '../data/network/ApiRepository';
 import { 
-  applyWsMessagePlaceholders, 
   apiMessagesJoinedOrNull, 
   gameEndMessageForDisplay,
   normalizedGameEndReason, 
   playerGameEndReasonFallback, 
-  PlayerGameEndReasonProfile 
+  PlayerGameEndReasonProfile,
+  isInformationalNonBlockingSocketRaw,
 } from '../i18n/ApiMessageDisplay';
-import { GameOverPayload } from '../data/models/ApiModels';
+import { t, hasKey } from '../i18n/translations';
+import { GameOverPayload, GreetingResponse } from '../data/models/ApiModels';
 import { SpectatorPayload } from '../util/SpectatorPayload';
-import { parseChatEnvelope, ChatGreetingOverlay } from '../util/ChatGreetingModels';
+import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
 
 export enum ChessPhase { WAITING = 'WAITING', PLAY = 'PLAY', GAME_OVER = 'GAME_OVER' }
 export enum ChessPieceType { KING = 'KING', QUEEN = 'QUEEN', ROOK = 'ROOK', BISHOP = 'BISHOP', KNIGHT = 'KNIGHT', PAWN = 'PAWN' }
@@ -89,6 +90,8 @@ interface ChessState {
   myUsername: string;
   chatGreetingOverlay: ChatGreetingOverlay | null;
   chatErrorToast: string | null;
+  /** Android ChessUiState.greetings — from GET /api/greetings while in PLAY */
+  greetings: GreetingResponse[];
 
   // Actions
   initGame: (roomId: string, myUsername: string, betAmount: number, hasOpponent: boolean, initialOpponentName: string, isSpectator: boolean) => void;
@@ -103,6 +106,10 @@ interface ChessState {
   clearIllegalMoveToast: () => void;
   leaveRoom: (roomId: string) => Promise<void>;
   sendGreeting: (roomId: string, greetingId: string) => void;
+  loadGreetings: () => void;
+  handleChatEnvelope: (json: any) => void;
+  clearChatErrorToast: () => void;
+  clearMatchCancelledToast: () => void;
 }
 
 const createInitialBoard = (): ChessCell[][] => 
@@ -111,6 +118,9 @@ const createInitialBoard = (): ChessCell[][] =>
 let countdownInterval: any = null;
 let statusPollingInterval: any = null;
 let chatOverlayTimeout: any = null;
+/** Android ChessViewModel lastGreetingSentAtMs — 5s throttle on sendGreeting */
+let lastGreetingSentAtMs = 0;
+let disconnectChessSocketTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export const useChessStore = create<ChessState>((set, get) => ({
   phase: ChessPhase.WAITING,
@@ -162,6 +172,7 @@ export const useChessStore = create<ChessState>((set, get) => ({
   myUsername: '',
   chatGreetingOverlay: null,
   chatErrorToast: null,
+  greetings: [],
 
   initGame: (roomId, myUsername, betAmount, hasOpponent, initialOpponentName, isSpectator) => {
     set({
@@ -170,16 +181,20 @@ export const useChessStore = create<ChessState>((set, get) => ({
       opponentConfirmed: hasOpponent || isSpectator,
       opponentName: initialOpponentName,
       isSpectator,
-      statusMessage: isSpectator ? 'spectator_waiting_next_move' : (hasOpponent ? 'chess_status_place_pieces' : 'chess_status_waiting_opponent'),
+      // ── Matches Android ChessViewModel.kt init (line 140-144) ──
+      statusMessage: isSpectator ? t('spectator_watching_status') : (hasOpponent ? t('chess_status_place_pieces') : t('chess_status_waiting_opponent')),
       navigateBack: false,
       phase: ChessPhase.WAITING,
       board: createInitialBoard(),
     });
 
     const socketManager = new ChessSocketManager();
-    socketManager.onChessMessage((json) => handleChessMessage(json, set, get));
+    socketManager.onChessMessage = (json) => handleChessMessage(json, set, get);
     socketManager.onConnected = () => {
       if (hasOpponent && !isSpectator) apiRepository.roomReady(roomId).catch(() => {});
+    };
+    socketManager.onConnectionError = () => {
+      set({ apiErrorRawMessage: 'bs_connection_error' });
     };
     socketManager.connect(roomId);
 
@@ -194,9 +209,17 @@ export const useChessStore = create<ChessState>((set, get) => ({
     if (countdownInterval) clearInterval(countdownInterval);
     if (statusPollingInterval) clearInterval(statusPollingInterval);
     if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
+    if (disconnectChessSocketTimeout) {
+      clearTimeout(disconnectChessSocketTimeout);
+      disconnectChessSocketTimeout = null;
+    }
     if ((window as any).chessSocket) {
       (window as any).chessSocket.disconnect();
       (window as any).chessSocket = null;
+    }
+    if ((window as any).chessChatSocket) {
+      (window as any).chessChatSocket.disconnect();
+      (window as any).chessChatSocket = null;
     }
     set({
       phase: ChessPhase.WAITING,
@@ -233,6 +256,12 @@ export const useChessStore = create<ChessState>((set, get) => ({
         return;
       }
 
+      // Android ChessViewModel.onCellTap: validMoves.isEmpty() → submit move to destination
+      if (s.validMoves.length === 0) {
+        submitPlayerMove(selR, selC, row, col, set, get);
+        return;
+      }
+
       const destCell = s.board[row][col];
       const isDestMyPiece = destCell.piece && (destCell.piece.isWhite === s.isPlayerWhite);
       if (isDestMyPiece) {
@@ -251,7 +280,8 @@ export const useChessStore = create<ChessState>((set, get) => ({
 
   playCastling: (roomId, kingSide) => {
     const s = get();
-    if (s.isSpectator || s.phase !== ChessPhase.PLAY || s.isMovePending) return;
+    if (s.isSpectator) return;
+    if (!shouldShowCastlingBanner(s)) return;
     if (kingSide && !s.castlingAvailable.kingSide) return;
     if (!kingSide && !s.castlingAvailable.queenSide) return;
 
@@ -265,7 +295,7 @@ export const useChessStore = create<ChessState>((set, get) => ({
     const kingMove = { fromRow: kingRow, fromCol: kingFromCol, toRow: kingRow, toCol: kingToCol };
     const rookSlide = { fromRow: kingRow, fromCol: rookFromCol, toRow: kingRow, toCol: rookToCol };
 
-    (window as any).chessSocket?.move(roomId, kingRow, kingFromCol, kingRow, kingToCol, null);
+    (window as any).chessSocket?.move(roomId, kingRow, kingFromCol, kingRow, kingToCol);
     set({
       board: newBoard,
       lastMove: kingMove,
@@ -298,27 +328,97 @@ export const useChessStore = create<ChessState>((set, get) => ({
     try {
       await apiRepository.leaveRoom(roomId);
     } catch (e) {}
+    (window as any).chessChatSocket?.disconnect();
     get().cleanup();
     set({ navigateBack: true, isLeaving: false });
   },
 
+  loadGreetings: () => {
+    if (get().isSpectator) return;
+    apiRepository.getGreetings().then((list) => set({ greetings: list })).catch(() => {});
+  },
+
+  handleChatEnvelope: (json) => {
+    const ev = parseChatEnvelope(json);
+    if (ev.type === 'Incoming') {
+      scheduleChatOverlay(set, { type: 'FromOpponent', from: ev.from, text: ev.text });
+      return;
+    }
+    if (ev.type === 'Sent') {
+      scheduleChatOverlay(set, { type: 'YouSent', text: ev.text });
+      return;
+    }
+    if (ev.type === 'Failure') {
+      const raw = ev.message;
+      const msg = hasKey(raw) ? t(raw) : raw;
+      set({ chatErrorToast: msg });
+      if (ev.refreshGreetings) get().loadGreetings();
+    }
+  },
+
+  clearChatErrorToast: () => set({ chatErrorToast: null }),
+
+  clearMatchCancelledToast: () => set({ matchCancelledMessage: null }),
+
+  /** Android ChessViewModel.sendGreeting — ChatSocketManager.sendGreeting(roomId, item.id) */
   sendGreeting: (roomId, greetingId) => {
-    (window as any).chessSocket?.sendGreeting(roomId, greetingId);
+    const st = get();
+    if (st.isSpectator || !greetingId?.trim()) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (now - lastGreetingSentAtMs < 5000) return;
+    lastGreetingSentAtMs = now;
+    (window as any).chessChatSocket?.sendGreeting(roomId, greetingId);
   },
 }));
+
+function scheduleChatOverlay(set: (fn: any) => void, overlay: ChatGreetingOverlay) {
+  if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
+  set({ chatGreetingOverlay: overlay });
+  chatOverlayTimeout = setTimeout(() => {
+    set({ chatGreetingOverlay: null });
+    chatOverlayTimeout = null;
+  }, 3000);
+}
+
+/** Android ChessUiState.shouldShowCastlingBanner() */
+function shouldShowCastlingBanner(s: {
+  phase: ChessPhase;
+  isPlayerTurn: boolean;
+  isMovePending: boolean;
+  promotionPending: ChessMove | null;
+  castlingAvailable: CastlingAvailable;
+  castlingBannerDismissed: boolean;
+  castlingSuppressedForTurn: boolean;
+}): boolean {
+  return (
+    s.phase === ChessPhase.PLAY &&
+    s.isPlayerTurn &&
+    !s.isMovePending &&
+    s.promotionPending == null &&
+    (s.castlingAvailable.kingSide || s.castlingAvailable.queenSide) &&
+    !s.castlingBannerDismissed &&
+    !s.castlingSuppressedForTurn
+  );
+}
 
 // --- Pure Port of ChessViewModel.kt Internal Logic ---
 
 function handleChessMessage(json: any, set: any, get: any) {
   const state = get();
   const hadMoveInFlight = state.isMovePending;
-  const data = json.data || json;
+  // Android: val data = json.optJSONObject("data") ?: json
+  const rawData = json?.data;
+  const hasDataObject =
+    rawData !== undefined &&
+    rawData !== null &&
+    typeof rawData === 'object' &&
+    !Array.isArray(rawData);
+  const data = hasDataObject ? rawData : json;
 
   applySpectatorBroadcast(data, set);
   mergeSpectatorChessLabels(data, state, set);
 
   // ── Spectator refresh: extract player names + turn holder from every event ──
-  // Mirrors Android update (Battleship/Chess parity)
   if (state.isSpectator) {
     const { p1: ep1, p2: ep2, turnHolder } = SpectatorPayload.extractStandardTurnAndNames(data);
     const nameUpdates: any = {};
@@ -328,18 +428,18 @@ function handleChessMessage(json: any, set: any, get: any) {
     if (Object.keys(nameUpdates).length > 0) set(nameUpdates);
   }
 
-  const success = json.success !== false;
-  if (!success && json.data === undefined) {
-    const raw = apiMessagesJoinedOrNull(json) || "";
+  const success = json?.success !== false;
+  if (!success && !hasDataObject) {
+    const raw = apiMessagesJoinedOrNull(json) || '';
     const revert = state.boardBeforePendingCastle;
-    const moveToast = hadMoveInFlight ? (
-      localizedToastForChessMoveRejection(json) || 
-      (apiMessagesJoinedOrNull(json) || "").trim() || 
-      "ws.games.invalidMove"
-    ) : null;
+    const moveToast = hadMoveInFlight
+      ? localizedToastForChessMoveRejection(json) ||
+        (apiMessagesJoinedOrNull(json) || '').trim() ||
+        t('chess_invalid_move_toast')
+      : null;
 
     set({
-      apiErrorRawMessage: raw,
+      apiErrorRawMessage: isInformationalNonBlockingSocketRaw(raw) ? null : raw,
       isMovePending: false,
       board: revert || state.board,
       boardBeforePendingCastle: null,
@@ -355,7 +455,7 @@ function handleChessMessage(json: any, set: any, get: any) {
   const revertBoard = showIllegalMoveToast ? state.boardBeforePendingCastle : null;
   const serverMoveFailureMsg = (apiMessagesJoinedOrNull(json) || "").trim();
   const illegalOrInvalidToast = (!success && hadMoveInFlight && !isChessTerminalOrCancelledPayload(data)) ? (
-    localizedToastForChessMoveRejection(json) || serverMoveFailureMsg || "ws.games.invalidMove"
+    localizedToastForChessMoveRejection(json) || serverMoveFailureMsg || t('chess_invalid_move_toast')
   ) : null;
 
   set({
@@ -385,11 +485,11 @@ function handleChessMessage(json: any, set: any, get: any) {
   const gameEnded = !!data.gameEnded;
 
   if (matchCancelled) {
-    set({ matchCancelledMessage: "bs_match_cancelled", navigateBack: true });
+    set({ matchCancelledMessage: t('bs_match_cancelled'), navigateBack: true });
     return;
   }
   if (opponentLeft && state.phase === ChessPhase.WAITING) {
-    set({ opponentLeftMessage: "bs_opponent_left", opponentConfirmed: false });
+    set({ opponentLeftMessage: t('bs_opponent_left'), opponentConfirmed: false });
     return;
   }
 
@@ -414,11 +514,40 @@ function handleChessMessage(json: any, set: any, get: any) {
   if (gameEnded || terminalOutcomes.has(outcome)) {
     if (countdownInterval) clearInterval(countdownInterval);
     const spectating = state.isSpectator;
-    const gameOver = SpectatorPayload.resolveStandardGameOver(data, get().myUsername, spectating, 'CHESS');
+    // ── Exact port of Android ChessViewModel.kt lines 473-511 ──
+    const reasonNorm = normalizedGameEndReason(data);
+    const isDraw = outcome === 'draw' || outcome === 'stalemate' || outcome === 'insufficient_material' ||
+      reasonNorm === 'draw' || reasonNorm === 'stalemate' || reasonNorm === 'insufficient_material' ||
+      (!outcome && gameEnded && !!(data.isDraw || data.draw));
+    const isWin = !isDraw && resolveYouWon(data, outcome);
+    const resolvedOutcome = outcome || (isDraw ? 'draw' : isWin ? 'win' : 'lose');
+    const seats = SpectatorPayload.seatsForSpectatorSummary(data);
+    const wid = (data.winner || "").toString().trim() || null;
+    const reasonFallback = playerGameEndReasonFallback(
+      data, resolvedOutcome, isWin, isDraw, 'CHESS' as PlayerGameEndReasonProfile, spectating,
+    );
+    const statusMsg = spectating
+      ? SpectatorPayload.spectatorGameEndReasonStatusMessage(json, data, resolvedOutcome)
+      : gameEndMessageForDisplay(data, json, reasonFallback);
+    const winnerDisplay = (spectating && !isDraw)
+      ? SpectatorPayload.gameEndWinnerDisplayName(wid, seats)
+      : null;
+
+    if (disconnectChessSocketTimeout) clearTimeout(disconnectChessSocketTimeout);
+    disconnectChessSocketTimeout = setTimeout(() => {
+      (window as any).chessSocket?.disconnect();
+      disconnectChessSocketTimeout = null;
+    }, 3000);
 
     set({
       phase: ChessPhase.GAME_OVER,
-      gameOver,
+      winner: (spectating || isDraw) ? null : (isWin ? 'You' : 'Opponent'),
+      gameEndYouWon: (spectating || isDraw) ? null : isWin,
+      prize: (spectating || !isWin || isDraw) ? null : prize,
+      gameOverIsDraw: isDraw,
+      gameOverWinnerDisplayName: winnerDisplay,
+      statusMessage: statusMsg,
+      gameOver: SpectatorPayload.resolveStandardGameOver(data, get().myUsername, spectating, 'CHESS'),
     });
     return;
   }
@@ -458,6 +587,7 @@ function handleChessMessage(json: any, set: any, get: any) {
 
     set({
       phase: ChessPhase.PLAY,
+      apiErrorRawMessage: null,
       gameEndYouWon: null,
       board: newBoard,
       isPlayerTurn: yourTurn && !spect,
@@ -474,15 +604,17 @@ function handleChessMessage(json: any, set: any, get: any) {
       promotionPending: spect ? null : promotionPending,
       turnTimeLeft: nextLeft,
       turnTimerTotal: nextTotal,
+      // ── Exact port of Android ChessViewModel.kt lines 567-578 ──
       statusMessage: spect ? (
         chessSpectatorPlayStatus(data, isCheckmate, isCheck, isDraw, lastMove)
       ) : (
-        promotionPending ? "chess_promotion_title" :
-        isCheckmate ? (yourTurn ? "chess_checkmate_you" : "chess_checkmate_opponent") :
-        isCheck ? (yourTurn ? "chess_check_you" : "chess_check_opponent") :
-        isDraw ? "chess_draw" :
-        yourTurn ? "chess_your_turn" :
-        `bs_named_opponent_turn|${syncTurnHolder || prev.opponentName}`
+        promotionPending ? t('chess_promotion_title') :
+        isCheckmate ? (yourTurn ? t('chess_checkmate_you') : t('chess_checkmate_opponent')) :
+        isCheck ? (yourTurn ? t('chess_check_you') : t('chess_check_opponent')) :
+        isDraw ? t('chess_draw') :
+        yourTurn ? t('chess_your_turn') :
+        prev.opponentName ? t('bs_named_opponent_turn').replace('%s', prev.opponentName) :
+        t('chess_opponent_turn')
       ),
       castlingAvailable: castling,
       castlingBannerDismissed: turnBecameOurs ? false : prev.castlingBannerDismissed,
@@ -496,7 +628,7 @@ function handleChessMessage(json: any, set: any, get: any) {
     set({
       phase: ChessPhase.WAITING,
       gameEndYouWon: null,
-      statusMessage: opponentJoined ? "chess_status_place_pieces" : "chess_status_waiting_opponent",
+      statusMessage: opponentJoined ? t('chess_status_place_pieces') : t('chess_status_waiting_opponent'),
       castlingAvailable: { kingSide: false, queenSide: false },
       castlingBannerDismissed: false,
       castlingSuppressedForTurn: false,
@@ -562,22 +694,26 @@ function formatChessSquareForSpectator(row: number, col: number): string {
   return `${file}${rank}`;
 }
 
+// ── Exact port of Android ChessViewModel.kt chessSpectatorPlayStatus (lines 348-367) ──
 function chessSpectatorPlayStatus(data: any, isCheckmate: boolean, isCheck: boolean, isDraw: boolean, lastMove: ChessMove | null): string {
   const turnName = SpectatorPayload.spectatorTurnHolderUsername(data);
-  const mover = turnName || SpectatorPayload.fallbackPlayerName(1);
-  const base = isCheckmate ? `spectator_chess_checkmate_x|${mover}` :
-               isCheck ? `spectator_chess_check_x|${mover}` :
-               isDraw ? "chess_draw" :
-               turnName ? `spectator_turn_of_x|${turnName}` : "spectator_waiting_next_move";
+  const mover = turnName || t('spectator_player_n').replace('%d', '1');
+  const base = isCheckmate ? t('spectator_chess_checkmate_x').replace('%s', mover) :
+               isCheck ? t('spectator_chess_check_x').replace('%s', mover) :
+               isDraw ? t('chess_draw') :
+               turnName ? t('spectator_turn_of_x').replace('%s', turnName) : t('spectator_waiting_next_move');
 
-  if (isCheckmate || isDraw || !lastMove) return base;
+  if (isCheckmate || isDraw) return base;
+  if (!lastMove) return base;
   const lm = `${formatChessSquareForSpectator(lastMove.fromRow, lastMove.fromCol)}→${formatChessSquareForSpectator(lastMove.toRow, lastMove.toCol)}`;
   return `${base} · ${lm}`;
 }
 
+// ── Exact port of Android ChessViewModel.kt jsonMessagesContainIllegalMove (lines 825-836) ──
 function jsonMessagesContainIllegalMove(json: any): boolean {
-  const msgs = json.messages || [];
-  return msgs.some((m: any) => m?.toLowerCase().includes("illegal"));
+  const arr = json.messages || [];
+  const illegalKeys = ['ws.chess.illegalMoveInCheck', 'ws.chess.illegalMove', 'ws.games.illegalMove'];
+  return arr.some((m: any) => illegalKeys.includes(m));
 }
 
 function localizedToastForChessMoveRejection(json: any): string | null {
@@ -588,26 +724,78 @@ function localizedToastForChessMoveRejection(json: any): string | null {
   return null;
 }
 
+// ── Exact port of Android ChessViewModel.kt parseRemainingSecondsFromServer (lines 860-871) ──
 function parseRemainingSecondsFromServer(data: any): number | null {
-  const v = data.turnTimerSeconds ?? data.turn_timer_seconds ?? data.turn_timer ?? data.turnTimeLeft ?? data.turn_time_left ?? data.timeLeft ?? data.secondsLeft ?? data.seconds_left;
-  return (v !== undefined) ? v : null;
+  const keys = ['turnTimeLeft', 'turn_time_left', 'timeLeft', 'secondsLeft', 'timer_remaining', 'remainingSeconds'];
+  for (const key of keys) {
+    if (data[key] !== undefined) {
+      const v = parseInt(data[key]);
+      if (v >= 0) return v;
+    }
+  }
+  return null;
 }
 
+// ── Exact port of Android ChessViewModel.kt computeTurnTimersFromPayload (lines 889-910) ──
 function computeTurnTimersFromPayload(data: any, prev: any, yourTurn: boolean, remaining: number | null): [number, number] {
-  const cap = data.turnTimerSeconds ?? data.turn_timer_seconds ?? 60;
-  let nextLeft = (remaining !== null) ? remaining : (yourTurn ? (cap || prev.turnTimeLeft) : (cap || prev.turnTimeLeft));
-  return [nextLeft, cap];
+  const cap = parseTurnTimerCapSeconds(data);
+  const nextTotal = cap ?? prev.turnTimerTotal;
+  const liveLeft = prev.turnTimeLeft;
+
+  let nextLeft: number;
+  if (remaining !== null) {
+    nextLeft = remaining;
+  } else if (yourTurn && prev.isPlayerTurn) {
+    // Still our turn — keep ticking locally
+    nextLeft = liveLeft;
+  } else if (!yourTurn && !prev.isPlayerTurn && cap !== null && prev.turnTimerTotal > 0 && cap === prev.turnTimerTotal) {
+    // Still opponent's turn with same cap — keep the local tick
+    nextLeft = liveLeft;
+  } else if (!yourTurn && prev.isPlayerTurn) {
+    // Opponent just gained the turn
+    nextLeft = cap ?? 0;
+  } else if (yourTurn && !prev.isPlayerTurn) {
+    // We just gained the turn
+    nextLeft = cap ?? prev.turnTimeLeft;
+  } else if (cap !== null) {
+    nextLeft = cap;
+  } else {
+    nextLeft = prev.turnTimeLeft;
+  }
+
+  return [Math.max(0, nextLeft), nextTotal];
 }
 
-function syncCountdownAfterTimerUpdate(prev: any, nextLeft: number, yourTurn: boolean, forceReset: boolean, set: any) {
+function parseTurnTimerCapSeconds(data: any): number | null {
+  const v = data.turnTimerSeconds ?? data.turn_timer_seconds ?? 0;
+  return v > 0 ? v : null;
+}
+
+// ── Exact port of Android ChessViewModel.kt syncCountdownAfterTimerUpdate (lines 917-933) ──
+function syncCountdownAfterTimerUpdate(prev: any, nextLeft: number, yourTurn: boolean, hadExplicitRemainingFromServer: boolean, set: any) {
+  if (nextLeft <= 0) {
+    if (countdownInterval) clearInterval(countdownInterval);
+    return;
+  }
+  // While it is still our turn, don't restart unless the server pushed an explicit remaining-seconds field.
+  if (yourTurn && prev.isPlayerTurn && !hadExplicitRemainingFromServer) {
+    return;
+  }
+  // Start a new countdown only if the displayed seconds actually changed (resync).
+  if (nextLeft !== prev.turnTimeLeft) {
+    startCountdown(nextLeft, set);
+  }
+}
+
+function startCountdown(seconds: number, set: any) {
   if (countdownInterval) clearInterval(countdownInterval);
-  if (nextLeft <= 0) return;
-  set({ turnTimeLeft: nextLeft });
+  if (seconds <= 0) return;
+  set({ turnTimeLeft: seconds });
   countdownInterval = setInterval(() => {
     set((s: any) => {
-      const current = Math.max(0, s.turnTimeLeft - 1);
-      if (current === 0) clearInterval(countdownInterval);
-      return { turnTimeLeft: current };
+      const next = Math.max(0, s.turnTimeLeft - 1);
+      if (next === 0 && countdownInterval) clearInterval(countdownInterval);
+      return { turnTimeLeft: next };
     });
   }, 1000);
 }

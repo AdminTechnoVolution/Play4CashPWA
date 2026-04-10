@@ -469,6 +469,7 @@
   "chat_greeting_opponent_fallback": "Gegner",
   "chat_greeting_you_sent": "Du hast gesendet",
   "chess_castling_banner_title": "Rochade möglich — Seite wählen: König springt zum Turm",
+  "chess_castling_suggest_desc": "Einmal pro Partie: Der König zieht zwei Felder auf einen Turm zu, der Turm springt nach hinten — nur wenn der Weg frei ist und keine Figur gezogen wurde.",
   "chess_castling_cd_dismiss": "Rochade-Hinweis schließen",
   "chess_castling_kingside": "Kurze Rochade — König zum Turm auf der Königsseite",
   "chess_castling_queenside": "Lange Rochade — König zum Turm auf der Damenseite",

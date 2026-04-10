@@ -481,6 +481,7 @@
   "chat_greeting_opponent_fallback": "Opponent",
   "chat_greeting_you_sent": "You sent",
   "chess_castling_banner_title": "You can castle — tap a side to move the king with the rook",
+  "chess_castling_suggest_desc": "Once per game: your king jumps two squares toward a rook, and that rook slides to the far side — only if the path is clear and neither piece has moved.",
   "chess_castling_cd_dismiss": "Dismiss castling hint",
   "chess_castling_kingside": "Kingside — king toward the rook on the king’s wing",
   "chess_castling_queenside": "Queenside — king toward the rook on the queen’s wing",

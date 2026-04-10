@@ -1,8 +1,9 @@
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
-import { getAccessToken, getRefreshToken, saveTokens, getLanguage } from '../auth/AuthSessionStore';
+import { getAccessToken, getRefreshToken, saveTokens } from '../auth/AuthSessionStore';
 import { bareClient } from './ApiClient';
+import { socketIoExtraHeaders } from './socketExtraHeaders';
 import type { ApiResponse, LoginResponse, DominoState } from '../models/ApiModels';
 
 let socketRefreshPromise: Promise<void> | null = null;
@@ -26,10 +27,7 @@ async function refreshSocketToken(socket: Socket): Promise<void> {
 
     const newToken = data.token;
     (socket.io.opts as Record<string, unknown>).query = { token: newToken };
-    (socket.io.opts as Record<string, unknown>).extraHeaders = { 
-      Authorization: `Bearer ${newToken}`,
-      'accept-language': getLanguage()
-    };
+    (socket.io.opts as Record<string, unknown>).extraHeaders = socketIoExtraHeaders(newToken);
   })().finally(() => {
     socketRefreshPromise = null;
   });
@@ -56,10 +54,7 @@ export class DominoSocketManager {
       reconnectionDelayMax: 5000,
       timeout: SOCKET_TIMEOUT_MS,
       query: { token },
-      extraHeaders: { 
-        Authorization: `Bearer ${token}`,
-        'accept-language': getLanguage()
-      },
+      extraHeaders: socketIoExtraHeaders(token),
     });
 
     this.socket.on('connect', () => {

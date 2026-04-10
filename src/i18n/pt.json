@@ -469,6 +469,7 @@
   "chat_greeting_opponent_fallback": "Oponente",
   "chat_greeting_you_sent": "Você enviou",
   "chess_castling_banner_title": "Pode rocar — escolha o lado: o rei salta junto à torre",
+  "chess_castling_suggest_desc": "Uma vez por partida: o rei avança duas casas em direção a uma torre e a torre passa para o outro lado — só se o caminho estiver livre e nenhuma peça tiver sido movida.",
   "chess_castling_cd_dismiss": "Fechar dica de roque",
   "chess_castling_kingside": "Roque pequeno — rei em direção à torre do lado do rei",
   "chess_castling_queenside": "Roque grande — rei em direção à torre do lado da dama",
