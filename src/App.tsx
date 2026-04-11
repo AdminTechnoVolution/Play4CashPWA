@@ -3,6 +3,8 @@ import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom';
 
 import { useAuthStore } from './store/authStore';
+import { usePWAInstallStore } from './store/pwaInstallStore';
+import PWAInstallBanner from './ui/components/PWAInstallBanner';
 
 import LoginPage from './pages/login/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -21,10 +23,25 @@ setupIonicReact({ mode: 'md' });
 
 export default function App() {
   const { user, loadSession } = useAuthStore();
+  const setDeferredPrompt = usePWAInstallStore((s) => s.setDeferredPrompt);
 
   useEffect(() => {
     loadSession();
   }, [loadSession]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as any);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+
+    window.addEventListener('appinstalled', () => {
+      setDeferredPrompt(null);
+    });
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, [setDeferredPrompt]);
 
   return (
     <IonApp>
@@ -52,6 +69,7 @@ export default function App() {
           <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
         </Routes>
       </BrowserRouter>
+      <PWAInstallBanner />
     </IonApp>
   );
 }

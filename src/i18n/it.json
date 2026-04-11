@@ -835,5 +835,9 @@
   "ws.games.winsTimeout": "{{username}} ha vinto al tempo!",
   "ws.games.yourTurn": "Tocca a te!",
   "ws.invalidMessageFormat": "Formato del messaggio non valido.",
-  "ws.unknownAction": "Azione sconosciuta."
+  "ws.unknownAction": "Azione sconosciuta.",
+  "pwa_install_title": "Installa Play4Cash",
+  "pwa_install_subtitle": "Aggiungi alla schermata principale per la migliore esperienza",
+  "pwa_install_button": "Installa",
+  "pwa_install_dismiss": "Più tardi"
 }

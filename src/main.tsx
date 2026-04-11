@@ -1,6 +1,9 @@
 import ReactDOM from 'react-dom/client';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { registerSW } from 'virtual:pwa-register';
 import App from './App';
+
+registerSW({ immediate: true });
 
 // Ionic CSS
 import '@ionic/react/css/core.css';

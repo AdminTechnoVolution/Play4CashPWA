@@ -862,5 +862,9 @@
   "ws.games.yourTurn": "¡Tu turno!",
   "ws.invalidMessageFormat": "Formato de mensaje no válido.",
   "ws.unknownAction": "Acción desconocida.",
-  "your_balance": "Tu saldo"
+  "your_balance": "Tu saldo",
+  "pwa_install_title": "Instalar Play4Cash",
+  "pwa_install_subtitle": "Agrega a tu pantalla de inicio para la mejor experiencia",
+  "pwa_install_button": "Instalar",
+  "pwa_install_dismiss": "Después"
 }
