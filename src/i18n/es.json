@@ -866,5 +866,8 @@
   "pwa_install_title": "Instalar Play4Cash",
   "pwa_install_subtitle": "Agrega a tu pantalla de inicio para la mejor experiencia",
   "pwa_install_button": "Instalar",
-  "pwa_install_dismiss": "Después"
+  "pwa_install_dismiss": "Después",
+  "pwa_ios_subtitle": "Instala esta app en tu iPhone en dos sencillos pasos",
+  "pwa_ios_step1": "Toca el botón Compartir en la barra de Safari",
+  "pwa_ios_step2": "Baja y toca \"Agregar a inicio\""
 }
