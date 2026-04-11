@@ -5,6 +5,7 @@ import { getAccessToken, getRefreshToken, saveTokens } from '../auth/AuthSession
 import { bareClient } from './ApiClient';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import type { ApiResponse, LoginResponse, ChatMessage } from '../models/ApiModels';
+import { parseChatEnvelope } from '../../util/ChatGreetingModels';
 
 let socketRefreshPromise: Promise<void> | null = null;
 
@@ -99,13 +100,25 @@ export class ChatSocketManager {
         }
       }
       this.onChatEnvelope?.(payload);
+      // Only surface greeting lines in the chips preview — ignore system/room events (no `from` → was shown as "System:").
       if (this.legacyMessageCb) {
+        const ev = parseChatEnvelope(payload);
         const data = payload?.data ?? payload;
-        if (data && typeof data === 'object') {
+        const ts =
+          data && typeof data === 'object' && (data as { timestamp?: number }).timestamp
+            ? Number((data as { timestamp?: number }).timestamp)
+            : Date.now();
+        if (ev.type === 'Incoming') {
           this.legacyMessageCb({
-            from: data.from || data.userName || data.user_name || 'System',
-            text: data.text || data.message || '',
-            timestamp: data.timestamp || Date.now(),
+            from: ev.from || (data as { userName?: string }).userName || (data as { user_name?: string }).user_name || '',
+            text: ev.text,
+            timestamp: ts,
+          });
+        } else if (ev.type === 'Sent') {
+          this.legacyMessageCb({
+            from: '',
+            text: ev.text,
+            timestamp: ts,
           });
         }
       }

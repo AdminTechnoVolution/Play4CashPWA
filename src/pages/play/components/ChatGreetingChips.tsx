@@ -29,12 +29,20 @@ export default function ChatGreetingChips({ greetings, onSend, lastReceivedMessa
           marginBottom: 8,
           animation: 'fadeIn 0.3s ease',
         }}>
-          <IonText style={{ color: '#c9a84c', fontSize: 12, fontWeight: 600 }}>
-            {lastReceivedMessage.from}:
-          </IonText>
-          <IonText style={{ color: '#fff', fontSize: 13, marginLeft: 6 }}>
-            {lastReceivedMessage.text}
-          </IonText>
+          {(lastReceivedMessage.from ?? '').trim() ? (
+            <>
+              <IonText style={{ color: '#c9a84c', fontSize: 12, fontWeight: 600 }}>
+                {lastReceivedMessage.from}:
+              </IonText>
+              <IonText style={{ color: '#fff', fontSize: 13, marginLeft: 6 }}>
+                {lastReceivedMessage.text}
+              </IonText>
+            </>
+          ) : (
+            <IonText style={{ color: '#fff', fontSize: 13 }}>
+              {lastReceivedMessage.text}
+            </IonText>
+          )}
         </div>
       )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

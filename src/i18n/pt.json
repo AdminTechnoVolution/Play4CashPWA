@@ -555,6 +555,7 @@
   "domino_player_eliminated_timeout": "%s ficou sem tempo e foi eliminado. A partida continua.",
   "domino_prize_usdt": "Pagamento: %s USDT",
   "domino_screen_title": "Dominó",
+  "domino_player_count_short": "%d jogadores",
   "domino_select_side_hint": "Escolha onde colocar a pedra",
   "domino_status_place_pieces": "Oponente encontrado! Iniciando…",
   "domino_status_waiting_opponent": "Aguardando um oponente…",

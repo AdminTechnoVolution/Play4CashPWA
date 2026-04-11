@@ -4,7 +4,7 @@ import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken, getRefreshToken, saveTokens } from '../auth/AuthSessionStore';
 import { bareClient } from './ApiClient';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
-import type { ApiResponse, LoginResponse, DominoState } from '../models/ApiModels';
+import type { ApiResponse, LoginResponse } from '../models/ApiModels';
 
 let socketRefreshPromise: Promise<void> | null = null;
 
@@ -37,6 +37,16 @@ async function refreshSocketToken(socket: Socket): Promise<void> {
 
 export class DominoSocketManager {
   private socket: Socket | null = null;
+  private onPayload?: (raw: unknown) => void;
+  private onConnectedCb?: () => void;
+
+  setOnGamePayload(cb: (raw: unknown) => void): void {
+    this.onPayload = cb;
+  }
+
+  setOnConnected(cb: () => void): void {
+    this.onConnectedCb = cb;
+  }
 
   connect(roomId: string): void {
     const token = getAccessToken();
@@ -58,8 +68,12 @@ export class DominoSocketManager {
     });
 
     this.socket.on('connect', () => {
-      // Android: emits "join" on connect to subscribe to room events
+      this.onConnectedCb?.();
       this.socket?.emit('join', { room_id: roomId });
+    });
+
+    this.socket.on('domino', (payload: unknown) => {
+      this.onPayload?.(payload);
     });
 
     this.socket.on('connect_error', async (err: Error & { data?: { status?: number } }) => {
@@ -82,6 +96,11 @@ export class DominoSocketManager {
     this.socket = null;
   }
 
+  /** Re-emit join to resync state after room becomes started (Android requestSync). */
+  requestSync(roomId: string): void {
+    this.socket?.emit('join', { room_id: roomId });
+  }
+
   playTile(roomId: string, tile: [number, number], side: 'left' | 'right'): void {
     this.socket?.emit('move', { room_id: roomId, tile, side });
   }
@@ -94,11 +113,8 @@ export class DominoSocketManager {
     this.socket?.emit('pass', { room_id: roomId });
   }
 
-  onGameUpdate(cb: (state: DominoState) => void): void {
-    this.socket?.on('domino', cb);
-  }
-
-  offAll(): void {
-    this.socket?.removeAllListeners();
+  /** @deprecated use setOnGamePayload */
+  onGameUpdate(cb: (state: unknown) => void): void {
+    this.setOnGamePayload(cb);
   }
 }

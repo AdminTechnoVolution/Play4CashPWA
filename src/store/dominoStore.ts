@@ -1,12 +1,122 @@
 import { create } from 'zustand';
 import { DominoSocketManager } from '../data/network/DominoSocketManager';
-import type { DominoTile, DominoBoardTile, DominoState, GameOverPayload } from '../data/models/ApiModels';
+import { apiRepository } from '../data/network/ApiRepository';
+import type { DominoTile, GameOverPayload, GreetingResponse } from '../data/models/ApiModels';
 import { SpectatorPayload } from '../util/SpectatorPayload';
+import {
+  apiMessagesJoinedOrNull,
+  applyWsMessagePlaceholders,
+  formatApiMessagesBlockForDisplay,
+  gameEndMessageForDisplay,
+  isInformationalNonBlockingSocketRaw,
+} from '../i18n/ApiMessageDisplay';
+import { hasKey, t } from '../i18n/translations';
+import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
+import {
+  buildDominoGameOverPayload,
+  computeBoneyardInvariant,
+  computeValidMovesClient,
+  dominoLastTileFromHistory,
+  opponentsFromHandCount,
+  parseBoardArray,
+  parseHandArray,
+  parseLobbyJoinedCount,
+  parseLobbyRequiredCount,
+  sumOpponentHandCounts,
+} from '../pages/play/domino/dominoGameLogic';
+
+export enum DominoPhase {
+  WAITING = 'WAITING',
+  PLAY = 'PLAY',
+  GAME_OVER = 'GAME_OVER',
+}
+
+let chatOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
+let statusPollTimer: ReturnType<typeof setInterval> | null = null;
+let lastGreetingSentAtMs = 0;
+
+function scheduleChatOverlay(set: (partial: any) => void, overlay: ChatGreetingOverlay) {
+  if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
+  set({ chatGreetingOverlay: overlay });
+  chatOverlayTimeout = setTimeout(() => {
+    set({ chatGreetingOverlay: null });
+    chatOverlayTimeout = null;
+  }, 3000);
+}
+
+function formatThreePlaceholders(msg: string, a: number, b: number, c: number): string {
+  return msg.replace('%1$d', String(a)).replace('%2$d', String(b)).replace('%3$d', String(c));
+}
+
+function formatPlayerLeftCounts(msg: string, player: string, rem: number, req: number): string {
+  return msg.replace('%1$s', player).replace('%2$d', String(rem)).replace('%3$d', String(req));
+}
+
+function dominoWaitingMainMessage(data: any): string {
+  const required = parseLobbyRequiredCount(data);
+  const joined = parseLobbyJoinedCount(data);
+  if (required != null && required > 2) return 'domino_status_waiting_table';
+  if (joined != null && joined > 1) return 'domino_status_waiting_table';
+  return 'domino_status_waiting_opponent';
+}
+
+function buildDominoWaitingLobbySubtitle(json: any, data: any): string {
+  const joined = parseLobbyJoinedCount(data);
+  const required = parseLobbyRequiredCount(data);
+  const countPart =
+    joined != null && required != null
+      ? formatThreePlaceholders(t('domino_waiting_lobby_players'), joined, required, Math.max(0, required - joined))
+      : null;
+  const rawApi = apiMessagesJoinedOrNull(json)?.trim() || '';
+  // Server often sends English in messages[]; map literals → keys (ApiMessageDisplay) so UI matches app language
+  const apiPart = rawApi ? formatApiMessagesBlockForDisplay(rawApi, '') : '';
+  const onlyGenericWait =
+    !!apiPart &&
+    (apiPart.trim() === t('domino_status_waiting_opponent').trim() ||
+      apiPart.trim() === t('ws.games.waitingOpponent').trim() ||
+      apiPart.trim() === t('domino_status_waiting_table').trim());
+  if (countPart && apiPart && !onlyGenericWait && countPart !== apiPart) return `${countPart}\n${apiPart}`;
+  if (countPart) return countPart;
+  if (apiPart) return apiPart;
+  return '';
+}
+
+function tilesEqual(t: DominoTile, u: DominoTile): boolean {
+  return (t.a === u.a && t.b === u.b) || (t.a === u.b && t.b === u.a);
+}
+
+function stopStatusPolling() {
+  if (statusPollTimer) {
+    clearInterval(statusPollTimer);
+    statusPollTimer = null;
+  }
+}
+
+function startStatusPolling(roomId: string, get: () => DominoStore) {
+  stopStatusPolling();
+  statusPollTimer = setInterval(async () => {
+    const st = get();
+    if (st.phase !== DominoPhase.WAITING || st.isSpectator) {
+      stopStatusPolling();
+      return;
+    }
+    try {
+      const status = await apiRepository.getRoomStatus(roomId);
+      if (status.status?.toLowerCase() === 'started') {
+        st.socket?.requestSync(roomId);
+        stopStatusPolling();
+      }
+    } catch {
+      /* ignore */
+    }
+  }, 5000);
+}
 
 interface DominoStoreState {
+  phase: DominoPhase;
   myHand: DominoTile[];
   opponents: { username: string; tileCount: number }[];
-  board: DominoBoardTile[];
+  board: DominoTile[];
   leftEnd: number;
   rightEnd: number;
   boneyardCount: number;
@@ -24,33 +134,74 @@ interface DominoStoreState {
   p2Name: string;
   turnHolder: string;
   spectatorCurrentPlayer: string;
+  spectatorPlayerOneName: string;
+  spectatorPlayerTwoName: string;
+  spectatorPlayerThreeName: string;
+  spectatorPlayerFourName: string;
   turnTimeLeft: number;
   turnTimerTotal: number;
+  isPlayerTurn: boolean;
   statusMessage: string;
+  waitingLobbySubtitle: string;
   spectatorsCount: number;
+  opponentConfirmed: boolean;
+  opponentName: string;
+  matchCancelledMessage: string | null;
+  opponentLeftMessage: string | null;
+  apiErrorRawMessage: string | null;
+  navigateBack: boolean;
+  eliminationNotice: string | null;
+  lastPlayedTile: DominoTile | null;
+  chatGreetingOverlay: ChatGreetingOverlay | null;
+  chatErrorToast: string | null;
+  greetings: GreetingResponse[];
+  isMovePending: boolean;
+  myUserId: string;
+  roomId: string;
+  betAmount: number;
+  initialOpponentName: string;
+  hasOpponent: boolean;
+  gameOverIsDraw: boolean;
+  gameOverWinnerDisplayName: string | null;
 }
 
+type DominoStore = DominoStoreState & DominoStoreActions;
+
 interface DominoStoreActions {
-  initGame: (roomId: string, myUsername: string, isSpectator?: boolean) => void;
+  initGame: (
+    roomId: string,
+    myUsername: string,
+    opts: { isSpectator?: boolean; hasOpponent?: boolean; initialOpponentName?: string; betAmount?: number },
+  ) => void;
   cleanup: () => void;
   selectTile: (tile: DominoTile | null) => void;
   playSide: (roomId: string, tile: DominoTile, side: 'left' | 'right') => void;
   draw: (roomId: string) => void;
   pass: (roomId: string) => void;
   clearError: () => void;
+  handleChatEnvelope: (json: any) => void;
+  clearChatErrorToast: () => void;
+  loadGreetings: () => void;
+  sendGreeting: (roomId: string, greetingId: string) => void;
+  clearOpponentLeft: () => void;
+  clearMatchCancelledToast: () => void;
+  clearGenericError: () => void;
+  clearEliminationNotice: () => void;
+  handleDominoPayload: (raw: any) => void;
 }
 
-function computeValidMoves(hand: DominoTile[], leftEnd: number, rightEnd: number, boardEmpty: boolean) {
-  return hand.map((tile) => {
-    if (boardEmpty) return { tile, sides: ['left' as const] };
-    const sides: ('left' | 'right')[] = [];
-    if (tile.a === leftEnd || tile.b === leftEnd) sides.push('left');
-    if (tile.a === rightEnd || tile.b === rightEnd) sides.push('right');
-    return { tile, sides };
-  }).filter((m) => m.sides.length > 0);
+function mergeSpectatorNames(data: any, set: (p: Partial<DominoStoreState>) => void) {
+  const names = SpectatorPayload.dominoSpectatorPlayerNames(data);
+  set({
+    spectatorPlayerOneName: names[0] || '',
+    spectatorPlayerTwoName: names[1] || '',
+    spectatorPlayerThreeName: names[2] || '',
+    spectatorPlayerFourName: names[3] || '',
+  });
 }
 
-export const useDominoStore = create<DominoStoreState & DominoStoreActions>((set, get) => ({
+export const useDominoStore = create<DominoStore>((set, get) => ({
+  phase: DominoPhase.WAITING,
   myHand: [],
   opponents: [],
   board: [],
@@ -61,8 +212,8 @@ export const useDominoStore = create<DominoStoreState & DominoStoreActions>((set
   myUsername: '',
   selectedTile: null,
   selectedSide: null,
-  sidePickTile: null,
   validMoves: [],
+  sidePickTile: null,
   gameOver: null,
   error: null,
   socket: null,
@@ -71,73 +222,463 @@ export const useDominoStore = create<DominoStoreState & DominoStoreActions>((set
   p2Name: '',
   turnHolder: '',
   spectatorCurrentPlayer: '',
+  spectatorPlayerOneName: '',
+  spectatorPlayerTwoName: '',
+  spectatorPlayerThreeName: '',
+  spectatorPlayerFourName: '',
   turnTimeLeft: 0,
-  turnTimerTotal: 0,
-  statusMessage: '',
+  turnTimerTotal: 60,
+  isPlayerTurn: false,
+  statusMessage: 'domino_status_waiting_opponent',
+  waitingLobbySubtitle: '',
   spectatorsCount: 0,
- 
-  initGame(roomId, myUsername, isSpectator = false) {
+  opponentConfirmed: false,
+  opponentName: '',
+  matchCancelledMessage: null,
+  opponentLeftMessage: null,
+  apiErrorRawMessage: null,
+  navigateBack: false,
+  eliminationNotice: null,
+  lastPlayedTile: null,
+  chatGreetingOverlay: null,
+  chatErrorToast: null,
+  greetings: [],
+  isMovePending: false,
+  myUserId: '',
+  roomId: '',
+  betAmount: 0,
+  initialOpponentName: '',
+  hasOpponent: false,
+  gameOverIsDraw: false,
+  gameOverWinnerDisplayName: null,
+
+  initGame(roomId, myUsername, opts = {}) {
     if (!roomId) return;
-    set({ statusMessage: isSpectator ? 'spectator_waiting_next_move' : 'domino_status_waiting_opponent' });
+    const isSpectator = !!opts.isSpectator;
+    const hasOpponent = !!opts.hasOpponent;
+    const initialOpponentName = opts.initialOpponentName ?? '';
+    const betAmount = opts.betAmount ?? 0;
+    const acc = apiRepository.getCachedUserAccount();
+    const myUserId = acc?.id ?? '';
+
+    const statusMessage = isSpectator
+      ? 'spectator_watching_status'
+      : hasOpponent
+        ? 'domino_status_place_pieces'
+        : 'domino_status_waiting_opponent';
+
+    stopStatusPolling();
+    get().socket?.disconnect();
+
     const socket = new DominoSocketManager();
-    socket.connect(roomId);
-    socket.onGameUpdate((state: DominoState) => {
-      // ── Spectator refresh: extract player names + turn holder from every event ──
-      const { p1: ep1, p2: ep2, turnHolder } = SpectatorPayload.extractStandardTurnAndNames(state);
-      if (get().isSpectator) {
-        const nameUpdates: any = {};
-        if (ep1) nameUpdates.p1Name = ep1;
-        if (ep2) nameUpdates.p2Name = ep2;
-        if (turnHolder) nameUpdates.spectatorCurrentPlayer = turnHolder;
-        if (Object.keys(nameUpdates).length > 0) set(nameUpdates);
+    socket.setOnConnected(() => {
+      if (hasOpponent && !get().isSpectator) {
+        apiRepository.roomReady(roomId).catch(() => {});
       }
- 
-      const valid = computeValidMoves(
-        state?.myHand || [], 
-        state?.leftEnd ?? -1, 
-        state?.rightEnd ?? -1, 
-        (state?.board || []).length === 0
-      );
- 
-      const currentPlayer = state.currentPlayer || '';
-      const isMyTurn = currentPlayer === myUsername;
- 
-      set({
-        myHand: state.myHand || [],
-        opponents: state.opponents || [],
-        board: state.board || [],
-        leftEnd: state.leftEnd ?? -1,
-        rightEnd: state.rightEnd ?? -1,
-        boneyardCount: state.boneyardCount ?? 0,
-        currentPlayer,
-        myUsername: state.myUsername || myUsername,
-        turnTimeLeft: (state as any).turnTimerSeconds ?? (state as any).turn_timer_seconds ?? (state as any).turn_timer ?? (state as any).turnTimeLeft ?? (state as any).turn_time_left ?? 0,
-        turnTimerTotal: (state as any).turnTimerSeconds ?? (state as any).turn_timer_seconds ?? 60,
-        validMoves: valid,
-        spectatorsCount: (state as any).spectatorsCount ?? (state as any).spectators_count ?? get().spectatorsCount,
-        p1Name: ep1,
-        p2Name: ep2,
-        turnHolder,
-        statusMessage: get().isSpectator 
-          ? `spectator_turn_of_x|${turnHolder}`
-          : (isMyTurn ? 'domino_your_turn' : `domino_opponent_turn|${turnHolder}`),
-        gameOver: SpectatorPayload.resolveStandardGameOver(state, myUsername, get().isSpectator, 'DOMINO'),
-        selectedTile: null,
-        sidePickTile: null,
-      });
     });
-    set({ socket, myUsername, isSpectator });
+
+    socket.connect(roomId);
+    socket.setOnGamePayload((raw) => get().handleDominoPayload(raw));
+
+    set({
+      socket,
+      roomId,
+      myUsername,
+      myUserId,
+      betAmount,
+      initialOpponentName,
+      hasOpponent,
+      isSpectator,
+      phase: DominoPhase.WAITING,
+      opponentConfirmed: hasOpponent || isSpectator,
+      opponentName: initialOpponentName,
+      statusMessage,
+      waitingLobbySubtitle: '',
+      gameOver: null,
+      navigateBack: false,
+      matchCancelledMessage: null,
+      opponentLeftMessage: null,
+      apiErrorRawMessage: null,
+      eliminationNotice: null,
+      lastPlayedTile: null,
+      sidePickTile: null,
+      validMoves: [],
+      myHand: [],
+      board: [],
+    });
+
+    if (!isSpectator) {
+      startStatusPolling(roomId, get);
+      get().loadGreetings();
+    }
   },
 
   cleanup() {
+    stopStatusPolling();
     get().socket?.disconnect();
-    set({ socket: null, myHand: [], board: [], gameOver: null, isSpectator: false, turnHolder: '', p1Name: '', p2Name: '' });
+    set({
+      socket: null,
+      myHand: [],
+      board: [],
+      gameOver: null,
+      isSpectator: false,
+      phase: DominoPhase.WAITING,
+      turnHolder: '',
+      p1Name: '',
+      p2Name: '',
+      validMoves: [],
+      sidePickTile: null,
+    });
+  },
+
+  handleDominoPayload(payload) {
+    const json = typeof payload === 'string' ? (JSON.parse(payload) as any) : payload;
+    const data =
+      json?.data && typeof json.data === 'object' && !Array.isArray(json.data) ? json.data : json;
+    const success = json?.success !== false;
+
+    const st = get();
+    const myUserId = st.myUserId;
+    const initialOpponentName = st.initialOpponentName;
+    const isSpectatorJoin = st.isSpectator;
+
+    // Spectator count
+    let sc = -1;
+    if (data?.spectatorsCount !== undefined) sc = Number(data.spectatorsCount);
+    else if (data?.spectators_count !== undefined) sc = Number(data.spectators_count);
+    if (sc >= 0) set({ spectatorsCount: sc });
+
+    if (isSpectatorJoin) mergeSpectatorNames(data, set);
+
+    if (!success && json?.data == null) {
+      const raw = apiMessagesJoinedOrNull(json) || '';
+      if (!isInformationalNonBlockingSocketRaw(raw)) {
+        set({ apiErrorRawMessage: raw });
+      }
+      return;
+    }
+
+    set({ isMovePending: false });
+
+    const waitingForOpponent = !!data?.waitingForOpponent;
+    const opponentJoined = !!data?.opponentJoined;
+    const opponentLeft = !!data?.opponentLeft;
+    const opponentName = String(data?.opponentName || data?.userName || '').trim();
+    const matchCancelled = String(data?.outcome || '') === 'match_cancelled';
+
+    if (matchCancelled) {
+      set({ matchCancelledMessage: t('bs_match_cancelled'), navigateBack: true });
+      return;
+    }
+
+    if (opponentLeft && waitingForOpponent) {
+      const player = String(data?.playerLeft || data?.player_left || '').trim();
+      const hasRem = data?.playersRemaining !== undefined || data?.players_remaining !== undefined;
+      const hasReq = data?.playersRequired !== undefined || data?.players_required !== undefined;
+      const remaining =
+        data?.playersRemaining ?? data?.players_remaining ?? -1;
+      const required = data?.playersRequired ?? data?.players_required ?? -1;
+      if (player && hasRem && hasReq) {
+        const msgKey = formatPlayerLeftCounts(
+          t('domino_wait_player_left_counts'),
+          player,
+          Number(remaining),
+          Number(required),
+        );
+        set({
+          phase: DominoPhase.WAITING,
+          statusMessage: msgKey,
+          waitingLobbySubtitle: '',
+        });
+        return;
+      }
+      if (player) {
+        set({
+          phase: DominoPhase.WAITING,
+          statusMessage: t('domino_wait_player_left_name').replace('%s', player),
+          waitingLobbySubtitle: '',
+        });
+        return;
+      }
+      const ws = applyWsMessagePlaceholders(t('ws.domino.playerLeftWaiting'), data);
+      set({
+        phase: DominoPhase.WAITING,
+        statusMessage: ws,
+        waitingLobbySubtitle: '',
+      });
+      return;
+    }
+
+    if (opponentLeft && get().phase === DominoPhase.WAITING) {
+      set({
+        opponentLeftMessage: t('bs_opponent_left'),
+        opponentConfirmed: false,
+        waitingLobbySubtitle: '',
+      });
+      return;
+    }
+
+    if (opponentJoined && opponentName) {
+      if (waitingForOpponent) {
+        set({ opponentConfirmed: true, opponentName });
+      } else {
+        set({ opponentConfirmed: true, opponentName, waitingLobbySubtitle: '' });
+        if (!isSpectatorJoin) {
+          apiRepository.roomReady(get().roomId).catch(() => {});
+        }
+      }
+    }
+
+    if (waitingForOpponent) {
+      const sub = buildDominoWaitingLobbySubtitle(json, data);
+      if (isSpectatorJoin) {
+        set({
+          phase: DominoPhase.WAITING,
+          statusMessage: 'spectator_watching_status',
+          waitingLobbySubtitle: sub,
+        });
+      } else {
+        set({
+          phase: DominoPhase.WAITING,
+          statusMessage: dominoWaitingMainMessage(data),
+          waitingLobbySubtitle: sub,
+        });
+        // All seats filled but server still says waiting → call roomReady and
+        // poll room status; when status is "started" the poll calls requestSync.
+        const joined = parseLobbyJoinedCount(data);
+        const required = parseLobbyRequiredCount(data);
+        if (joined != null && required != null && joined >= required) {
+          apiRepository.roomReady(get().roomId).catch(() => {});
+          startStatusPolling(get().roomId, get);
+        }
+      }
+      return;
+    }
+
+    const gameEnded = !!data?.gameEnded;
+    if (gameEnded) {
+      const winnerId = String(data?.winner || '').trim();
+      const reasonNorm = String(data?.reason || data?.winnerReason || data?.winner_reason || '')
+        .trim()
+        .toLowerCase();
+      const outcome = String(data?.outcome || '').trim();
+      const outcomeNorm = outcome.toLowerCase();
+      const isForfeitEnd = reasonNorm === 'forfeit' || outcomeNorm === 'forfeit';
+      const opponentForfeit =
+        outcome === 'opponent_disconnected' ||
+        reasonNorm === 'opponent_disconnect' ||
+        reasonNorm === 'opponent_disconnected';
+      let youWon = false;
+      if (opponentForfeit) youWon = true;
+      else if (winnerId && myUserId) youWon = winnerId === myUserId;
+      else youWon = !!data?.youWon || !!data?.you_won;
+
+      const isDraw =
+        outcomeNorm === 'draw' ||
+        reasonNorm === 'draw' ||
+        !!data?.isDraw ||
+        !!data?.draw ||
+        (!winnerId && reasonNorm !== 'timeout' && !opponentForfeit);
+
+      const resolvedOutcome = opponentForfeit
+        ? 'opponent_disconnected'
+        : outcome || (isForfeitEnd ? 'forfeit' : youWon ? 'win' : 'lose');
+
+      const spectating = isSpectatorJoin;
+      const seats = SpectatorPayload.seatsForSpectatorSummary(data);
+
+      if (spectating) {
+        const reasonKey = SpectatorPayload.spectatorEndReasonFallback(data, resolvedOutcome);
+        const winnerDisplay =
+          !isDraw && winnerId
+            ? SpectatorPayload.gameEndWinnerDisplayName(winnerId, seats)
+            : null;
+        const statusMsg = SpectatorPayload.spectatorGameEndReasonStatusMessage(json, data, resolvedOutcome);
+        set({
+          phase: DominoPhase.GAME_OVER,
+          gameOverIsDraw: isDraw,
+          gameOverWinnerDisplayName: winnerDisplay,
+          statusMessage: statusMsg,
+          gameOver: {
+            outcome: isDraw ? 'draw' : 'lose',
+            youWon: false,
+            isDraw,
+            winner: winnerDisplay || winnerId || undefined,
+            reason: reasonKey,
+          },
+        });
+        return;
+      }
+
+      const goPayload = buildDominoGameOverPayload(data, json, myUserId);
+      const reasonOnlyKey = goPayload.reason || 'spectator_end_decisive';
+      const body = gameEndMessageForDisplay(data, json, t(reasonOnlyKey));
+
+      const boardParsed = parseBoardArray(data);
+      const finalHand = parseHandArray(data);
+      const hand = finalHand.length > 0 ? finalHand : get().myHand;
+
+      set({
+        phase: DominoPhase.GAME_OVER,
+        gameOver: { ...goPayload, reason: reasonOnlyKey },
+        gameOverIsDraw: isDraw,
+        gameOverWinnerDisplayName: null,
+        statusMessage: body,
+        myHand: hand,
+        board: boardParsed.tiles,
+        leftEnd: boardParsed.leftEnd,
+        rightEnd: boardParsed.rightEnd,
+        validMoves: [],
+        eliminationNotice: null,
+        lastPlayedTile: null,
+      });
+      return;
+    }
+
+    const yourTurn = data?.hasOwnProperty('yourTurn')
+      ? !!data.yourTurn
+      : data?.hasOwnProperty('your_turn')
+        ? !!data.your_turn
+        : get().isPlayerTurn;
+
+    const timerSeconds =
+      data?.turnTimerSeconds ?? data?.turn_timer_seconds ?? data?.turnTimer ?? null;
+    const gameStarted = !!data?.gameStarted;
+
+    const lastTileArr = data?.lastTile;
+    let lastPlayedTileFromPacket: DominoTile | null = null;
+    if (Array.isArray(lastTileArr) && lastTileArr.length >= 2) {
+      lastPlayedTileFromPacket = { a: Number(lastTileArr[0]), b: Number(lastTileArr[1]) };
+    }
+    const lastPlayedTile =
+      lastPlayedTileFromPacket ||
+      (isSpectatorJoin ? dominoLastTileFromHistory(data?.history) : null);
+    const lastPlayerId = String(data?.lastPlayer || '').trim();
+
+    let hand = get().myHand;
+    if (Array.isArray(data?.hand)) {
+      const parsed = parseHandArray(data);
+      hand = parsed.length > 0 ? parsed : hand;
+    } else if (data?.newTile && Array.isArray(data.newTile) && data.newTile.length >= 2) {
+      hand = [...get().myHand, { a: Number(data.newTile[0]), b: Number(data.newTile[1]) }];
+    } else if (lastPlayedTile && lastPlayerId && myUserId && lastPlayerId === myUserId) {
+      const lp = lastPlayedTile;
+      hand = get().myHand.filter((x) => !tilesEqual(x, lp));
+    } else {
+      hand = get().myHand;
+    }
+
+    const boardData = parseBoardArray(data);
+    const hasBoard = data?.hasOwnProperty('board') && Array.isArray(data.board);
+    const boardTiles = hasBoard ? boardData.tiles : get().board;
+    const leftEnd = hasBoard ? boardData.leftEnd : get().leftEnd;
+    const rightEnd = hasBoard ? boardData.rightEnd : get().rightEnd;
+
+    const handCountObj =
+      data?.handCount && typeof data.handCount === 'object' ? (data.handCount as Record<string, number>) : null;
+
+    let boneyardCount: number;
+    if (data?.hasOwnProperty('boneyardCount')) {
+      boneyardCount = Number(data.boneyardCount) || 0;
+    } else {
+      const oppSum = handCountObj
+        ? sumOpponentHandCounts(handCountObj, myUserId)
+        : get().opponents.reduce((s, o) => s + o.tileCount, 0);
+      boneyardCount = computeBoneyardInvariant(boardTiles.length, hand.length, oppSum);
+    }
+
+    const opponents =
+      handCountObj && Object.keys(handCountObj).length > 0
+        ? opponentsFromHandCount(data, handCountObj, myUserId, initialOpponentName)
+        : get().opponents;
+
+    const rawTurnUsername = String(data?.currentTurnUsername || data?.current_turn_username || '').trim();
+    const resolvedTurnUsername = rawTurnUsername || get().turnHolder;
+
+    const nextTimer = timerSeconds != null ? Number(timerSeconds) : get().turnTimeLeft;
+    const nextTotal = timerSeconds != null ? Number(timerSeconds) : get().turnTimerTotal;
+
+    let effectiveYourTurn = false;
+    let validMovesResolved: { tile: DominoTile; sides: ('left' | 'right')[] }[] = [];
+    let canDrawResolved = false;
+    let canPassResolved = false;
+    let nextStatus: string;
+
+    if (isSpectatorJoin) {
+      const turnNamed = SpectatorPayload.spectatorTurnHolderUsername(data) || rawTurnUsername;
+      nextStatus = turnNamed
+        ? t('spectator_turn_of_x').replace('%s', turnNamed)
+        : t('spectator_waiting_next_move');
+    } else {
+      effectiveYourTurn = yourTurn;
+      validMovesResolved = effectiveYourTurn
+        ? computeValidMovesClient(hand, leftEnd, rightEnd)
+        : [];
+      canDrawResolved = effectiveYourTurn && validMovesResolved.length === 0 && boneyardCount > 0;
+      canPassResolved = effectiveYourTurn && validMovesResolved.length === 0 && boneyardCount === 0;
+      if (effectiveYourTurn && validMovesResolved.length === 0 && canDrawResolved) {
+        nextStatus = 'domino_draw_needed';
+      } else if (effectiveYourTurn && validMovesResolved.length === 0 && canPassResolved) {
+        nextStatus = 'domino_pass_needed';
+      } else if (effectiveYourTurn) {
+        nextStatus = 'domino_your_turn';
+      } else if (resolvedTurnUsername) {
+        nextStatus = `bs_named_opponent_turn|${resolvedTurnUsername}`;
+      } else {
+        nextStatus = 'domino_opponent_turn';
+      }
+    }
+
+    const eliminationNotice = buildEliminationNotice(data);
+    const extNames = SpectatorPayload.extractStandardTurnAndNames(data);
+
+    const metaOnlyPlayUpdate =
+      !data?.hasOwnProperty('yourTurn') &&
+      !data?.hasOwnProperty('your_turn') &&
+      lastPlayedTileFromPacket == null &&
+      !data?.hand &&
+      !data?.newTile &&
+      !data?.board &&
+      !data?.history;
+
+    const preservePick = isSpectatorJoin || !metaOnlyPlayUpdate;
+
+    set({
+      phase: DominoPhase.PLAY,
+      apiErrorRawMessage: null,
+      waitingLobbySubtitle: '',
+      opponentConfirmed: get().opponentConfirmed || gameStarted || opponentJoined,
+      myHand: hand,
+      board: boardTiles,
+      leftEnd,
+      rightEnd,
+      boneyardCount,
+      opponents,
+      validMoves: validMovesResolved,
+      currentPlayer: resolvedTurnUsername || get().currentPlayer,
+      turnHolder: resolvedTurnUsername,
+      isPlayerTurn: isSpectatorJoin ? false : effectiveYourTurn,
+      turnTimeLeft: nextTimer,
+      turnTimerTotal: nextTotal,
+      statusMessage: nextStatus,
+      lastPlayedTile: lastPlayedTile ?? get().lastPlayedTile,
+      eliminationNotice,
+      sidePickTile: preservePick ? get().sidePickTile : null,
+      p1Name: extNames.p1 || get().p1Name,
+      p2Name: extNames.p2 || get().p2Name,
+      spectatorCurrentPlayer: isSpectatorJoin
+        ? SpectatorPayload.spectatorTurnHolderUsername(data) || extNames.turnHolder || get().spectatorCurrentPlayer
+        : get().spectatorCurrentPlayer,
+    });
   },
 
   selectTile(tile) {
-    if (!tile) { set({ selectedTile: null, sidePickTile: null }); return; }
-    const { validMoves, currentPlayer, myUsername } = get();
-    if (currentPlayer !== myUsername) return;
+    if (!tile) {
+      set({ selectedTile: null, sidePickTile: null });
+      return;
+    }
+    const { validMoves, currentPlayer, myUsername, isSpectator } = get();
+    if (isSpectator || currentPlayer !== myUsername) return;
     const vm = validMoves.find((m) => m.tile.a === tile.a && m.tile.b === tile.b);
     if (!vm || vm.sides.length === 0) return;
     if (vm.sides.length === 1) {
@@ -148,18 +689,74 @@ export const useDominoStore = create<DominoStoreState & DominoStoreActions>((set
   },
 
   playSide(roomId, tile, side) {
-    const { socket } = get();
-    socket?.playTile(roomId, [tile.a, tile.b], side);
-    set({ selectedTile: null, selectedSide: null, sidePickTile: null });
+    if (get().isMovePending) return;
+    set({ isMovePending: true, selectedTile: null, selectedSide: null, sidePickTile: null });
+    get().socket?.playTile(roomId, [tile.a, tile.b], side);
   },
 
   draw(roomId) {
+    if (get().isMovePending) return;
+    set({ isMovePending: true });
     get().socket?.draw(roomId);
   },
 
   pass(roomId) {
+    if (get().isMovePending) return;
+    set({ isMovePending: true });
     get().socket?.pass(roomId);
   },
 
-  clearError() { set({ error: null }); },
+  clearError() {
+    set({ error: null });
+  },
+
+  handleChatEnvelope(json) {
+    const ev = parseChatEnvelope(json);
+    if (ev.type === 'Incoming') {
+      scheduleChatOverlay(set, { type: 'FromOpponent', from: ev.from, text: ev.text });
+      return;
+    }
+    if (ev.type === 'Sent') {
+      scheduleChatOverlay(set, { type: 'YouSent', text: ev.text });
+      return;
+    }
+    if (ev.type === 'Failure') {
+      const raw = ev.message;
+      const msg = hasKey(raw) ? t(raw) : raw;
+      set({ chatErrorToast: msg });
+      if (ev.refreshGreetings) get().loadGreetings();
+    }
+  },
+
+  clearChatErrorToast: () => set({ chatErrorToast: null }),
+
+  loadGreetings: () => {
+    if (get().isSpectator) return;
+    apiRepository.getGreetings().then((list) => set({ greetings: list })).catch(() => {});
+  },
+
+  sendGreeting: (roomId, greetingId) => {
+    const st = get();
+    if (st.isSpectator || !greetingId?.trim()) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (now - lastGreetingSentAtMs < 5000) return;
+    lastGreetingSentAtMs = now;
+    (window as any).dominoChatSocket?.sendGreeting(roomId, greetingId);
+  },
+
+  clearOpponentLeft: () => set({ opponentLeftMessage: null }),
+  clearMatchCancelledToast: () => set({ matchCancelledMessage: null }),
+  clearGenericError: () => set({ apiErrorRawMessage: null }),
+  clearEliminationNotice: () => set({ eliminationNotice: null }),
 }));
+
+function buildEliminationNotice(data: any): string | null {
+  const player = String(data?.playerEliminated || data?.player_eliminated || '').trim();
+  if (!player) return null;
+  const reason = String(data?.eliminationReason || data?.elimination_reason || '')
+    .trim()
+    .toLowerCase();
+  if (reason === 'timeout') return t('domino_player_eliminated_timeout').replace('%s', player);
+  if (!reason) return t('domino_player_eliminated_generic').replace('%s', player);
+  return t('domino_player_eliminated_reason').replace('%1$s', player).replace('%2$s', reason);
+}

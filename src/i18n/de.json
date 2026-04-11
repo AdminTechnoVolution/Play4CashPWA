@@ -555,6 +555,7 @@
   "domino_player_eliminated_timeout": "%s hat keine Zeit mehr und ist ausgeschieden. Das Spiel geht weiter.",
   "domino_prize_usdt": "Auszahlung: %s USDT",
   "domino_screen_title": "Domino",
+  "domino_player_count_short": "%d Spieler",
   "domino_select_side_hint": "Wähle, wo du den Stein platzierts",
   "domino_status_place_pieces": "Gegner gefunden! Spiel startet…",
   "domino_status_waiting_opponent": "Warte auf einen Gegner…",

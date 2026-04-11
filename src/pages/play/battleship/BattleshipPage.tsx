@@ -38,6 +38,9 @@ function cellBg(cell: string, animating: boolean): string {
 
 // ── Ship image overlay (absolutely positioned on top of grid) ─────────────────
 function ShipOverlay({ ships }: { ships: PlacedShip[] }) {
+  const beamPad = CELL * 0.28;
+  const bowPad  = CELL * 0.10;
+
   return (
     <>
       {ships.map((s) => {
@@ -54,8 +57,8 @@ function ShipOverlay({ ships }: { ships: PlacedShip[] }) {
               draggable={false}
               style={{
                 position: 'absolute',
-                left: x, top: y,
-                width: longSide, height: CELL,
+                left: x - bowPad, top: y - beamPad,
+                width: longSide + bowPad * 2, height: CELL + beamPad * 2,
                 objectFit: 'fill',
                 pointerEvents: 'none',
                 zIndex: 3,
@@ -66,9 +69,8 @@ function ShipOverlay({ ships }: { ships: PlacedShip[] }) {
           );
         }
 
-        // Vertical: rotate(90deg) with transformOrigin '0 0' uses matrix [[0,-1],[1,0]]
-        // which visually places the image at [left-CELL, left] × [top, top+longSide].
-        // Add CELL to left so the visual left edge aligns with column x.
+        // Vertical: rotate(90deg) with transformOrigin '0 0'. The overflow adjustments
+        // apply to the pre-rotation coordinate space (width = length, height = beam).
         return (
           <img
             key={s.type}
@@ -77,8 +79,8 @@ function ShipOverlay({ ships }: { ships: PlacedShip[] }) {
             draggable={false}
             style={{
               position: 'absolute',
-              left: x + CELL, top: y,
-              width: longSide, height: CELL,
+              left: x + CELL + beamPad, top: y - bowPad,
+              width: longSide + bowPad * 2, height: CELL + beamPad * 2,
               objectFit: 'fill',
               transform: 'rotate(90deg)',
               transformOrigin: '0 0',
@@ -112,6 +114,77 @@ function OceanPanel({
       <div style={{ position: 'relative', zIndex: 2 }}>
         {children}
       </div>
+    </div>
+  );
+}
+
+// ── Fleet status panel (mirrors Android FleetStatusPanel) ─────────────────────
+function FleetStatusPanel({
+  label, ships, board,
+}: { label: string; ships: PlacedShip[]; board: string[][] }) {
+  const t = useT();
+  if (ships.length === 0) return null;
+  return (
+    <div style={{
+      width: GRID_PX + 16,
+      background: 'rgba(13,31,52,0.7)',
+      border: '1px solid rgba(255,255,255,0.10)',
+      borderRadius: 10,
+      padding: 12,
+    }}>
+      <p style={{
+        color: 'rgba(255,255,255,0.45)',
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+        margin: '0 0 8px',
+      }}>
+        {label}
+      </p>
+      {ships.map((ship) => {
+        const cells: [number, number][] = [];
+        for (let i = 0; i < ship.size; i++) {
+          cells.push(ship.horizontal ? [ship.row, ship.col + i] : [ship.row + i, ship.col]);
+        }
+        const hits = cells.filter(([r, c]) => board[r]?.[c] === 'hit' || board[r]?.[c] === 'sunk').length;
+        const isSunk = hits === ship.size;
+        return (
+          <div key={ship.type} style={{ display: 'flex', alignItems: 'center', padding: '3px 0' }}>
+            <span style={{
+              width: 82,
+              color: isSunk ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.55)',
+              fontSize: 11,
+              flexShrink: 0,
+              textDecoration: isSunk ? 'line-through' : 'none',
+            }}>
+              {ship.type}
+            </span>
+            <div style={{ display: 'flex', gap: 2, marginLeft: 6 }}>
+              {cells.map(([r, c], i) => {
+                const isHit = board[r]?.[c] === 'hit' || board[r]?.[c] === 'sunk';
+                return (
+                  <div key={i} style={{
+                    width: 11, height: 11,
+                    borderRadius: 2,
+                    background: isHit ? '#cc3333' : '#2e6ea6',
+                  }} />
+                );
+              })}
+            </div>
+            {isSunk && (
+              <span style={{
+                marginLeft: 6,
+                color: '#cc3333',
+                fontSize: 10,
+                fontWeight: 700,
+              }}>
+                {t('bs_sunk')}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -512,6 +585,17 @@ export default function BattleshipPage({
             onFire={() => {}}
           />
         </div>
+
+        {/* Fleet status detail */}
+        {store.placedShips.length > 0 && (
+          <FleetStatusPanel
+            label={isSpectator
+              ? `⚓ ${store.spectatorFleetOwnerName || store.spectatorBoardOwner || t('bs_your_fleet')}`
+              : t('bs_fleet_status')}
+            ships={store.placedShips}
+            board={store.playerBoard}
+          />
+        )}
 
       </div>
     </IonContent>

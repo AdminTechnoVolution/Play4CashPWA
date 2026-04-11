@@ -1,11 +1,16 @@
 import { t, hasKey } from './translations';
 
 /** Matches server English prose to the same entries as `ws.*` keys in our catalog. */
-const normalizeEnglishApiLiteral = (s: string): string =>
-  s.trim()
+const normalizeEnglishApiLiteral = (s: string): string => {
+  let x = s
+    .trim()
     .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[\.\!\?]+$/, '');
+    .replace(/\s+/g, ' ');
+  // Strip trailing ellipsis (ASCII …, U+2026, or ...) then standard sentence punctuation
+  x = x.replace(/(\u2026|…)+$/g, '').replace(/\.{3,}$/g, '');
+  x = x.replace(/[\.\!\?]+$/, '');
+  return x;
+};
 
 /**
  * When REST/socket returns the English `en` string instead of the key, still show the user
@@ -19,6 +24,8 @@ const englishApiLiteralToKey: Record<string, string> = {
   [normalizeEnglishApiLiteral("Insufficient balance")]: "ws.games.insufficientBalance",
   [normalizeEnglishApiLiteral("Reconnected to room")]: "ws.games.roomReconnected",
   [normalizeEnglishApiLiteral("Waiting for opponent")]: "ws.games.waitingOpponent",
+  [normalizeEnglishApiLiteral("Waiting for an opponent")]: "domino_status_waiting_opponent",
+  [normalizeEnglishApiLiteral("Waiting for more players")]: "domino_status_waiting_table",
   [normalizeEnglishApiLiteral("Game started! Good luck")]: "ws.games.startedRoom",
   [normalizeEnglishApiLiteral("Game started! Good luck.")]: "ws.games.startedRoom",
   [normalizeEnglishApiLiteral("Game started!")]: "ws.games.startedRoom",
@@ -37,18 +44,58 @@ const englishApiLiteralToKey: Record<string, string> = {
   [normalizeEnglishApiLiteral("bet_amount must not be less than 1")]: "room_bet_min_error",
 };
 
-const resolveApiMessageLine = (trimmedLine: string): string => {
+/** Parses minimum bet from API English e.g. `bet_amount must not be less than 5`. */
+function parseMinBetFromBetAmountLiteral(raw: string): number | null {
+  const m = raw.match(/less than (\d+)/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+function isRoomBetMinMessageKey(trimmedLine: string): boolean {
+  if (trimmedLine === 'room_bet_min_error') return true;
+  if (englishApiLiteralToKey[normalizeEnglishApiLiteral(trimmedLine)] === 'room_bet_min_error') return true;
+  const low = trimmedLine.trim().toLowerCase();
+  return /^bet_amount must not be less than \d+$/.test(low);
+}
+
+/** Android `String.format(getString("room_bet_min_error"), minBet)` — all locales use `%s` for the amount. */
+export function formatRoomBetMinMessage(minBet: number): string {
+  return t('room_bet_min_error').replace(/%s/g, String(minBet));
+}
+
+/** Server English: `{name} has joined the room!` (lobby / 4-player) → `ws.games.opponentJoined`. */
+function tryResolveOpponentJoinedEnglishProse(trimmedLine: string): string | null {
+  const m = trimmedLine.match(/^(.+?)\s+has joined the room!?$/i);
+  if (!m) return null;
+  const username = m[1].trim();
+  if (!username || username.length > 80) return null;
+  return applyWsMessagePlaceholders(t('ws.games.opponentJoined'), { username });
+}
+
+function resolveApiMessageLine(trimmedLine: string, opts?: { minBet?: number }): string {
+  if (isRoomBetMinMessageKey(trimmedLine)) {
+    const min = opts?.minBet ?? parseMinBetFromBetAmountLiteral(trimmedLine) ?? 1;
+    return formatRoomBetMinMessage(min);
+  }
+  const joined = tryResolveOpponentJoinedEnglishProse(trimmedLine);
+  if (joined != null) return joined;
   if (hasKey(trimmedLine)) return t(trimmedLine);
   const key = englishApiLiteralToKey[normalizeEnglishApiLiteral(trimmedLine)];
   if (key && hasKey(key)) return t(key);
   return trimmedLine;
-};
+}
 
 /** Resolves a single API line to a catalog key when possible (mirrors Android `rawLineToMessageKey`). */
 function rawLineToMessageKey(trimmedLine: string): string | null {
   if (!trimmedLine) return null;
   if (hasKey(trimmedLine)) return trimmedLine;
-  return englishApiLiteralToKey[normalizeEnglishApiLiteral(trimmedLine)] ?? null;
+  const fromMap = englishApiLiteralToKey[normalizeEnglishApiLiteral(trimmedLine)];
+  if (fromMap) return fromMap;
+  const low = trimmedLine.trim().toLowerCase();
+  if (/^bet_amount must not be less than \d+$/.test(low)) return 'room_bet_min_error';
+  if (/^.+\s+has joined the room!?$/i.test(trimmedLine.trim())) return 'ws.games.opponentJoined';
+  return null;
 }
 
 /** Android: `NON_BLOCKING_SOCKET_MESSAGE_KEYS` in ApiMessageDisplay.kt */
@@ -81,6 +128,17 @@ export function isInformationalNonBlockingSocketRaw(raw: string | null | undefin
 }
 
 /**
+ * Android `String.format(getString(key), n)` for catalog lines that only use `%d`
+ * (e.g. `domino_boneyard_count`). Does not use username fields.
+ */
+export function formatCatalogInteger(template: string, value: unknown): string {
+  if (!template) return '';
+  const raw = Number(value);
+  const n = Number.isFinite(raw) ? Math.max(0, Math.trunc(raw)) : 0;
+  return template.replace(/%d/g, String(n));
+}
+
+/**
  * Replaces `{{key}}` placeholders using string fields from [data] (WebSocket contract).
  * Unknown or empty values leave the placeholder as-is.
  */
@@ -107,14 +165,35 @@ export const applyWsMessagePlaceholders = (template: string, data: any): string 
     return value ?? match;
   });
 
-  // 2. Handle %s and %d (fallback to first available replacement or username)
-  if (res.includes('%s') || res.includes('%d')) {
-    const val = ['username', 'userName', 'displayName', 'playerName', 'player_name', 'winner', 'winnerName', 'count', 'amount']
-      .map(k => String(data[k] ?? '').trim())
-      .find(v => v.length > 0) || '';
-    
-    // Replace all occurrences for simplicity (usually there is only one in these game strings)
-    res = res.replace(/%s/g, val).replace(/%d/g, val);
+  // 2. %d — must use numeric count/amount first (Android String.format); never substitute a name for %d
+  if (res.includes('%d')) {
+    let dv: string | null = null;
+    if (data != null && data.count !== undefined && data.count !== null && data.count !== '') {
+      const num = Number(data.count);
+      if (Number.isFinite(num)) dv = String(Math.trunc(num));
+    }
+    if (dv == null && data != null && data.amount !== undefined && data.amount !== null && data.amount !== '') {
+      const num = Number(data.amount);
+      if (Number.isFinite(num)) dv = String(Math.trunc(num));
+    }
+    if (dv != null) {
+      res = res.replace(/%d/g, dv);
+    } else {
+      const fallback =
+        ['count', 'amount', 'username', 'userName', 'displayName', 'playerName', 'player_name', 'winner', 'winnerName']
+          .map((k) => String(data[k] ?? '').trim())
+          .find((v) => v.length > 0) || '';
+      res = res.replace(/%d/g, fallback);
+    }
+  }
+
+  // 3. %s — names / text (not used for integer-only domino stock labels)
+  if (res.includes('%s')) {
+    const val =
+      ['username', 'userName', 'displayName', 'playerName', 'player_name', 'winner', 'winnerName', 'count', 'amount']
+        .map((k) => String(data[k] ?? '').trim())
+        .find((v) => v.length > 0) || '';
+    res = res.replace(/%s/g, val);
   }
 
   return res;
@@ -126,11 +205,16 @@ export const applyWsMessagePlaceholders = (template: string, data: any): string 
  * - If the API sent a catalog key → localized string.
  * - If the API sent the English prose that matches a known `ws.games.*` line → same localization as that key.
  * - Otherwise → the API text as-is.
+ * @param opts.minBet Optional game minimum when the API sends only `room_bet_min_error` or an unparseable line.
  */
-export function formatApiMessageForDisplay(raw: string | null | undefined, emptyFallbackKey: string = 'error_try_later_message'): string {
+export function formatApiMessageForDisplay(
+  raw: string | null | undefined,
+  emptyFallbackKey: string = 'error_try_later_message',
+  opts?: { minBet?: number },
+): string {
   const trimmed = (raw || '').trim();
   if (!trimmed) return t(emptyFallbackKey);
-  return resolveApiMessageLine(trimmed);
+  return resolveApiMessageLine(trimmed, opts);
 }
 
 /**
@@ -169,7 +253,16 @@ export function tStatus(raw: string | null | undefined): string {
 
 // ── Game End Reasoning (Mirroring GameEndReason.kt logic) ───────────────────
 
-export const GAME_END_OPPONENT_TIMEOUT_REASONS = new Set(["timeout", "opponent_timeout", "opponent_timer", "timer", "turn_timeout", "timeout_loss"]);
+export const GAME_END_OPPONENT_TIMEOUT_REASONS = new Set([
+  'timeout',
+  'opponent_timeout',
+  'opponent_timer',
+  'timer',
+  'turn_timeout',
+  'timeout_loss',
+  'timeout_win',
+  'win_by_timeout',
+]);
 export const GAME_END_OWN_TIMEOUT_REASONS = new Set(["timeout", "player_timeout", "timer", "turn_timeout", "timeout_loss"]);
 export const GAME_END_OPPONENT_DISCONNECT_REASONS = new Set(["opponent_disconnect", "opponent_disconnected", "player_disconnected", "disconnect", "offline", "left", "abandoned", "forfeit"]);
 export const GAME_END_CHECKMATE_REASONS = new Set(["checkmate", "check_mate", "check-mate"]);

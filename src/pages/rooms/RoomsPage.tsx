@@ -45,10 +45,11 @@ import { LobbySocketManager } from '../../data/network/LobbySocketManager';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { useT, hasKey } from '../../i18n/translations';
-import { 
-  formatApiMessageForDisplay, 
+import {
+  formatApiMessageForDisplay,
+  formatRoomBetMinMessage,
   classifyRoomLobbyStatus,
-  RoomLobbyKind 
+  RoomLobbyKind,
 } from '../../i18n/ApiMessageDisplay';
 import { getGameContext, savePlayContext } from '../../util/routingStorage';
 import '../../ui/theme/variables.css';
@@ -209,7 +210,7 @@ const RoomsPage: React.FC = () => {
       return;
     }
     if (createBet < minBetNum) {
-      setCreateError(t('room_bet_min_error').replace('%s', String(minBetNum)));
+      setCreateError(formatRoomBetMinMessage(minBetNum));
       return;
     }
     if (createBet > userBalanceNum) {
@@ -244,7 +245,11 @@ const RoomsPage: React.FC = () => {
       setCreateLimit(2);
       navigate(`/play/${gameSocketCode}`);
     } catch (err) {
-      setCreateError(formatApiMessageForDisplay(err instanceof Error ? err.message : null, 'error_create_room_failed'));
+      setCreateError(
+        formatApiMessageForDisplay(err instanceof Error ? err.message : null, 'error_create_room_failed', {
+          minBet: minBetNum,
+        }),
+      );
     } finally {
       setCreateLoading(false);
     }

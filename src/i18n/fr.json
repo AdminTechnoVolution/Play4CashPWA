@@ -555,6 +555,7 @@
   "domino_player_eliminated_timeout": "%s a épuisé son temps et est éliminé(e). La partie continue.",
   "domino_prize_usdt": "Gain : %s USDT",
   "domino_screen_title": "Domino",
+  "domino_player_count_short": "%d joueurs",
   "domino_select_side_hint": "Choisissez où poser la tuile",
   "domino_status_place_pieces": "Adversaire trouvé ! Démarrage…",
   "domino_status_waiting_opponent": "En attente d'un adversaire…",
