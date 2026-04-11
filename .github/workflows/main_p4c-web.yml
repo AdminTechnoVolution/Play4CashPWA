@@ -60,5 +60,5 @@ jobs:
         with:
           app-name: 'p4c-web'
           slot-name: 'Production'
-          package: .
+          package: /dist
           
