@@ -13,6 +13,7 @@ import { t, hasKey } from '../i18n/translations';
 import { GameOverPayload, GreetingResponse } from '../data/models/ApiModels';
 import { SpectatorPayload } from '../util/SpectatorPayload';
 import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
+import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 
 export enum ChessPhase { WAITING = 'WAITING', PLAY = 'PLAY', GAME_OVER = 'GAME_OVER' }
 export enum ChessPieceType { KING = 'KING', QUEEN = 'QUEEN', ROOK = 'ROOK', BISHOP = 'BISHOP', KNIGHT = 'KNIGHT', PAWN = 'PAWN' }
@@ -628,7 +629,7 @@ function handleChessMessage(json: any, set: any, get: any) {
       boardBeforePendingCastle: null,
     });
 
-    syncCountdownAfterTimerUpdate(prev, nextLeft, yourTurn, remainingFromServer !== null, set);
+    syncCountdownAfterTimerUpdate(prev, nextLeft, yourTurn, remainingFromServer !== null, set, get);
   } else if (waitingForOpponent || opponentJoined) {
     set({
       phase: ChessPhase.WAITING,
@@ -777,7 +778,7 @@ function parseTurnTimerCapSeconds(data: any): number | null {
 }
 
 // ── Exact port of Android ChessViewModel.kt syncCountdownAfterTimerUpdate (lines 917-933) ──
-function syncCountdownAfterTimerUpdate(prev: any, nextLeft: number, yourTurn: boolean, hadExplicitRemainingFromServer: boolean, set: any) {
+function syncCountdownAfterTimerUpdate(prev: any, nextLeft: number, yourTurn: boolean, hadExplicitRemainingFromServer: boolean, set: any, get: any) {
   if (nextLeft <= 0) {
     if (countdownInterval) clearInterval(countdownInterval);
     return;
@@ -788,17 +789,45 @@ function syncCountdownAfterTimerUpdate(prev: any, nextLeft: number, yourTurn: bo
   }
   // Start a new countdown only if the displayed seconds actually changed (resync).
   if (nextLeft !== prev.turnTimeLeft) {
-    startCountdown(nextLeft, set);
+    startCountdown(nextLeft, set, get);
   }
 }
 
-function startCountdown(seconds: number, set: any) {
+let chessCountdownTimeoutWarned = false;
+
+function startCountdown(seconds: number, set: any, get: any) {
   if (countdownInterval) clearInterval(countdownInterval);
   if (seconds <= 0) return;
+  chessCountdownTimeoutWarned = false;
+
+  const cap = (() => {
+    const st = get();
+    return st.turnTimerTotal > 0 ? st.turnTimerTotal : seconds;
+  })();
+
   set({ turnTimeLeft: seconds });
+
+  queueMicrotask(() => {
+    const s = get();
+    if (!s.isPlayerTurn || s.isSpectator) return;
+    const th = thresholdSeconds(cap);
+    if (cap > 0 && cap <= th && !chessCountdownTimeoutWarned) {
+      triggerTimeoutWarning();
+      chessCountdownTimeoutWarned = true;
+    }
+  });
+
   countdownInterval = setInterval(() => {
     set((s: any) => {
-      const next = Math.max(0, s.turnTimeLeft - 1);
+      const prev = s.turnTimeLeft;
+      const next = Math.max(0, prev - 1);
+      if (s.isPlayerTurn && !s.isSpectator && !chessCountdownTimeoutWarned) {
+        const th = thresholdSeconds(cap);
+        if (cap > th && prev > th && next <= th) {
+          triggerTimeoutWarning();
+          chessCountdownTimeoutWarned = true;
+        }
+      }
       if (next === 0 && countdownInterval) clearInterval(countdownInterval);
       return { turnTimeLeft: next };
     });

@@ -82,18 +82,24 @@ export const apiService = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any[]>>('/api/games');
     const raw = unwrap(res.data);
-    return raw.map((g) => ({
-      id: g._id ?? g.id ?? '',
-      name: g.name ?? '',
-      minBet: g.min_bet ?? 0,
-      socketCode: g.socket_code ?? '',
-      turnTimerSeconds: g.turn_timer_seconds ?? 0,
-      defaultBets: g.default_bets ?? [],
-      description: g.description ?? '',
-      minPlayers: g.min_players ?? g.minPlayers ?? 2,
-      maxPlayers: g.max_players ?? g.maxPlayers ?? 2,
-      activeRooms: g.activeRooms ?? g.active_rooms ?? 0,
-    }));
+    return raw.map((g) => {
+      const he = g.house_edge ?? g.houseEdge;
+      const houseEdge =
+        typeof he === 'number' && Number.isFinite(he) ? he : undefined;
+      return {
+        id: g._id ?? g.id ?? '',
+        name: g.name ?? '',
+        minBet: g.min_bet ?? 0,
+        socketCode: g.socket_code ?? '',
+        turnTimerSeconds: g.turn_timer_seconds ?? 0,
+        defaultBets: g.default_bets ?? [],
+        description: g.description ?? '',
+        minPlayers: g.min_players ?? g.minPlayers ?? 2,
+        maxPlayers: g.max_players ?? g.maxPlayers ?? 2,
+        activeRooms: g.activeRooms ?? g.active_rooms ?? 0,
+        houseEdge,
+      };
+    });
   },
 
   // ─── Greetings ─────────────────────────────────────────────────────────────

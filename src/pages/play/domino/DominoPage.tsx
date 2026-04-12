@@ -247,6 +247,11 @@ export default function DominoPage({
               isMyTurn={isMyTurn}
               onTimeout={() => {}}
               turnPlayerName={isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
+              otherPlayerName={
+                store.turnHolder || store.currentPlayer || opponentName
+              }
+              disableLocalTick={!isSpectator}
+              timeoutAlarm={false}
             />
 
             {store.phase === DominoPhase.PLAY && store.greetings.length > 0 && (

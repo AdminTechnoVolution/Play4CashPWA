@@ -24,6 +24,7 @@ import {
   parseLobbyRequiredCount,
   sumOpponentHandCounts,
 } from '../pages/play/domino/dominoGameLogic';
+import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 
 export enum DominoPhase {
   WAITING = 'WAITING',
@@ -33,7 +34,58 @@ export enum DominoPhase {
 
 let chatOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
 let statusPollTimer: ReturnType<typeof setInterval> | null = null;
+let dominoTurnTimer: ReturnType<typeof setInterval> | null = null;
+let dominoTimeoutWarned = false;
 let lastGreetingSentAtMs = 0;
+
+function stopDominoTurnTimer() {
+  if (dominoTurnTimer) {
+    clearInterval(dominoTurnTimer);
+    dominoTurnTimer = null;
+  }
+}
+
+/** Local 1s countdown + TurnTimeoutAlarm (Android DominoViewModel) for non-spectators */
+function syncDominoTurnCountdownAfterSocket(set: (partial: any) => void, get: () => DominoStore) {
+  stopDominoTurnTimer();
+  const st = get();
+  if (st.phase !== DominoPhase.PLAY || st.turnTimeLeft <= 0 || st.isSpectator) return;
+
+  dominoTimeoutWarned = false;
+  const cap = st.turnTimerTotal > 0 ? st.turnTimerTotal : st.turnTimeLeft;
+
+  queueMicrotask(() => {
+    const s = get();
+    if (!s.isPlayerTurn || s.isSpectator) return;
+    const th = thresholdSeconds(cap);
+    if (cap > 0 && cap <= th && !dominoTimeoutWarned) {
+      triggerTimeoutWarning();
+      dominoTimeoutWarned = true;
+    }
+  });
+
+  dominoTurnTimer = setInterval(() => {
+    set((s: DominoStoreState) => {
+      if (s.phase !== DominoPhase.PLAY) return s;
+      const prev = s.turnTimeLeft;
+      if (prev <= 0) {
+        stopDominoTurnTimer();
+        return s;
+      }
+      const next = Math.max(0, prev - 1);
+      const capUse = s.turnTimerTotal > 0 ? s.turnTimerTotal : prev;
+      if (s.isPlayerTurn && !s.isSpectator && !dominoTimeoutWarned) {
+        const th = thresholdSeconds(capUse);
+        if (capUse > th && prev > th && next <= th) {
+          triggerTimeoutWarning();
+          dominoTimeoutWarned = true;
+        }
+      }
+      if (next === 0) stopDominoTurnTimer();
+      return { turnTimeLeft: next };
+    });
+  }, 1000);
+}
 
 function scheduleChatOverlay(set: (partial: any) => void, overlay: ChatGreetingOverlay) {
   if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
@@ -319,6 +371,7 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
 
   cleanup() {
     stopStatusPolling();
+    stopDominoTurnTimer();
     get().socket?.disconnect();
     set({
       socket: null,
@@ -461,6 +514,7 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
 
     const gameEnded = !!data?.gameEnded;
     if (gameEnded) {
+      stopDominoTurnTimer();
       const winnerId = String(data?.winner || '').trim();
       const reasonNorm = String(data?.reason || data?.winnerReason || data?.winner_reason || '')
         .trim()
@@ -647,6 +701,7 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
 
     const preservePick = isSpectatorJoin || !metaOnlyPlayUpdate;
 
+    const beforePlay = get();
     set({
       phase: DominoPhase.PLAY,
       apiErrorRawMessage: null,
@@ -674,6 +729,23 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
         ? SpectatorPayload.spectatorTurnHolderUsername(data) || extNames.turnHolder || get().spectatorCurrentPlayer
         : get().spectatorCurrentPlayer,
     });
+
+    if (isSpectatorJoin) {
+      stopDominoTurnTimer();
+    } else {
+      const afterPlay = get();
+      if (afterPlay.phase === DominoPhase.PLAY && afterPlay.turnTimeLeft > 0) {
+        const turnChanged =
+          beforePlay.isPlayerTurn !== afterPlay.isPlayerTurn ||
+          (beforePlay.turnHolder || '') !== (afterPlay.turnHolder || '');
+        const timerJump = Math.abs(beforePlay.turnTimeLeft - afterPlay.turnTimeLeft) > 2;
+        if (turnChanged || timerJump || dominoTurnTimer == null) {
+          syncDominoTurnCountdownAfterSocket(set, get);
+        }
+      } else {
+        stopDominoTurnTimer();
+      }
+    }
   },
 
   selectTile(tile) {

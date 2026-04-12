@@ -4,6 +4,7 @@ import { apiService } from '../data/network/ApiService';
 import { apiRepository } from '../data/network/ApiRepository';
 import type { GameOverPayload } from '../data/models/ApiModels';
 import { SpectatorPayload } from '../util/SpectatorPayload';
+import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 import { playerGameEndReasonFallback } from '../i18n/ApiMessageDisplay';
 
 // Mirroring Android: HalmaViewModel.kt
@@ -67,6 +68,8 @@ export interface HalmaUiState {
   turnHolder: string;
   spectatorCurrentPlayer: string;
   myUsername: string;
+  /** True when on-screen light pieces map to server seat P1 (from socket isPlayerOne / is_player_one). */
+  boardViewAsPlayerOne: boolean;
 }
 
 interface HalmaStoreActions {
@@ -115,6 +118,7 @@ const INITIAL_STATE: HalmaUiState = {
   turnHolder: '',
   spectatorCurrentPlayer: '',
   myUsername: '',
+  boardViewAsPlayerOne: true,
 };
 
 export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get) => {
@@ -123,20 +127,45 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
   let turnTimerInterval: any = null;
   let isPlayerOne = true; // authoritative from socket
   let jumpTrailAccumulator: { row: number, col: number }[] = [];
+  let halmaCountdownTimeoutWarned = false;
 
   const startCountdown = (seconds: number) => {
     if (turnTimerInterval) clearInterval(turnTimerInterval);
+    halmaCountdownTimeoutWarned = false;
+    const cap = Math.max(0, seconds);
     set({ turnTimeLeft: Math.max(0, seconds) });
-    turnTimerInterval = setInterval(() => {
-      const current = get().turnTimeLeft;
-      if (current > 0) {
-        set({ turnTimeLeft: current - 1 });
-      } else {
-        if (turnTimerInterval) {
-          clearInterval(turnTimerInterval);
-          turnTimerInterval = null;
-        }
+
+    queueMicrotask(() => {
+      const s = get();
+      if (!s.isPlayerTurn || s.isSpectator) return;
+      const th = thresholdSeconds(cap);
+      if (cap > 0 && cap <= th && !halmaCountdownTimeoutWarned) {
+        triggerTimeoutWarning();
+        halmaCountdownTimeoutWarned = true;
       }
+    });
+
+    turnTimerInterval = setInterval(() => {
+      set((state) => {
+        const current = state.turnTimeLeft;
+        if (current <= 0) {
+          if (turnTimerInterval) {
+            clearInterval(turnTimerInterval);
+            turnTimerInterval = null;
+          }
+          return state;
+        }
+        const prev = current;
+        const next = current - 1;
+        if (state.isPlayerTurn && !state.isSpectator && !halmaCountdownTimeoutWarned) {
+          const th = thresholdSeconds(cap);
+          if (cap > th && prev > th && next <= th) {
+            triggerTimeoutWarning();
+            halmaCountdownTimeoutWarned = true;
+          }
+        }
+        return { turnTimeLeft: next };
+      });
     }, 1000);
   };
 
@@ -279,6 +308,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
     ...INITIAL_STATE,
 
     initGame(roomId, myUsername, bet, hasOpponent, initialOpponentName, isSpectator) {
+      isPlayerOne = true;
       set({ 
         ...INITIAL_STATE, 
         betAmount: bet, 
@@ -286,6 +316,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
         opponentName: initialOpponentName, 
         isSpectator,
         myUsername,
+        boardViewAsPlayerOne: true,
         statusMessage: isSpectator ? 'spectator_watching_status' : (hasOpponent ? 'halma_opponent_joined' : 'status_waiting_opponent')
       });
 
@@ -336,8 +367,13 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
         const outcome = data.outcome || '';
         const isDraw = data.isDraw || data.draw || false;
         
-        if (data.isPlayerOne !== undefined) isPlayerOne = data.isPlayerOne;
-        else if (data.is_player_one !== undefined) isPlayerOne = data.is_player_one;
+        if (data.isPlayerOne !== undefined) {
+          isPlayerOne = data.isPlayerOne;
+          set({ boardViewAsPlayerOne: data.isPlayerOne });
+        } else if (data.is_player_one !== undefined) {
+          isPlayerOne = data.is_player_one;
+          set({ boardViewAsPlayerOne: data.is_player_one });
+        }
 
         if (opponentJoined && opponentName) {
           set({ opponentConfirmed: true, opponentName });
@@ -529,6 +565,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
       stopCountdown();
       socketManager?.disconnect();
       socketManager = null;
+      isPlayerOne = true;
       set(INITIAL_STATE);
     },
 

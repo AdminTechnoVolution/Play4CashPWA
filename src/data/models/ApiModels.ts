@@ -38,6 +38,8 @@ export interface GameResponse {
   minPlayers: number;
   maxPlayers: number;
   activeRooms: number;
+  /** Commission (%) in UI. Percentage points (e.g. 5 = 5%). From API `house_edge`. */
+  houseEdge?: number;
 }
 
 // ─── Rooms ─────────────────────────────────────────────────────────────────────

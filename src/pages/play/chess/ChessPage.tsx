@@ -294,6 +294,9 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
               isMyTurn={store.isPlayerTurn} 
               onTimeout={() => {}} 
               turnPlayerName={store.isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
+              otherPlayerName={store.opponentName || opponentName}
+              disableLocalTick
+              timeoutAlarm={false}
             />
 
             {/* Board frame — matches Android ChessBoard outer Box */}

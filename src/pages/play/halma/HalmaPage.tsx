@@ -31,6 +31,12 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
   const { user } = useAuthStore();
   const store = useHalmaStore();
   const t = useT();
+  const lightSideName = isSpectator
+    ? (store.boardViewAsPlayerOne ? store.p1Name : store.p2Name) || '—'
+    : (user?.username || 'Tú');
+  const darkSideName = isSpectator
+    ? (store.boardViewAsPlayerOne ? store.p2Name : store.p1Name) || '—'
+    : (store.opponentName || 'Oponente');
   const chatRef = useRef(new ChatSocketManager());
   const [greetings, setGreetings] = useState<GreetingResponse[]>([]);
   const [lastMsg, setLastMsg] = useState<ChatMessage | null>(null);
@@ -114,7 +120,10 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
           isMyTurn={store.isPlayerTurn}
           onTimeout={() => {}}
           turnPlayerName={store.isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
+          otherPlayerName={store.opponentName || initialOpponentName}
           resetKey={store.isSpectator ? store.moveCount : undefined}
+          disableLocalTick
+          timeoutAlarm={false}
         />
       </div>
     );
@@ -230,10 +239,10 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 0', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #fff, #F0E8D0, #D4C090)', border: '1px solid #D4C090' }} />
-              <IonText style={{ color: '#8a9bbf', fontSize: 13, fontWeight: 'bold' }}>{user?.username || 'Tú'}</IonText>
+              <IonText style={{ color: '#8a9bbf', fontSize: 13, fontWeight: 'bold' }}>{lightSideName}</IonText>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <IonText style={{ color: '#8a9bbf', fontSize: 13, fontWeight: 'bold' }}>{store.opponentName || 'Oponente'}</IonText>
+              <IonText style={{ color: '#8a9bbf', fontSize: 13, fontWeight: 'bold' }}>{darkSideName}</IonText>
               <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #606060, #282828, #111111)', border: '1px solid #111' }} />
             </div>
           </div>

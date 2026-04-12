@@ -47,6 +47,7 @@ import {
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAuthStore } from '../../store/authStore';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
+import ConnectionStrengthIndicator from '../../ui/components/ConnectionStrengthIndicator';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import { useT } from '../../i18n/translations';
 import { saveGameContext } from '../../util/routingStorage';
@@ -98,6 +99,15 @@ const DashboardPage: React.FC = () => {
     { icon: timeOutline, label: t('game_history_title'), path: '/history' },
     { icon: settingsOutline, label: t('settings_title'), path: '/settings' },
   ];
+
+  const formatHouseEdgePercent = (edge: number | undefined): string | null => {
+    if (edge == null || typeof edge !== 'number' || !Number.isFinite(edge)) return null;
+    const rounded =
+      Math.abs(edge - Math.round(edge)) < 1e-9
+        ? Math.round(edge)
+        : Math.round(edge * 100) / 100;
+    return `${rounded}%`;
+  };
 
   const SkeletonCard = () => (
     <IonCard style={{ background: 'var(--sovereign-surface)', border: '1px solid var(--sovereign-border)', borderRadius: '16px' }}>
@@ -227,6 +237,14 @@ const DashboardPage: React.FC = () => {
               <IonIcon icon={timeOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px' }} />
               <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>{game.turnTimerSeconds}s</span>
             </div>
+            {formatHouseEdgePercent(game.houseEdge) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>{t('game_commission')}</span>
+                <span style={{ color: 'var(--sovereign-text)', fontSize: '12px', fontWeight: '600' }}>
+                  {formatHouseEdgePercent(game.houseEdge)}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Action Button */}
@@ -350,20 +368,42 @@ const DashboardPage: React.FC = () => {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '10px',
                     marginRight: '12px',
-                    background: 'rgba(201,168,76,0.12)',
-                    border: '1px solid var(--sovereign-border)',
-                    borderRadius: '8px',
-                    padding: '4px 10px',
                   }}
                 >
-                  <IonIcon icon={cashOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '16px' }} />
-                  <IonText>
-                    <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '14px' }}>
-                      ${formatUSD(account.balance)}
-                    </span>
-                  </IonText>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: 30,
+                      padding: '0 6px',
+                      background: 'rgba(201,168,76,0.08)',
+                      border: '1px solid var(--sovereign-border)',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <ConnectionStrengthIndicator />
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'rgba(201,168,76,0.12)',
+                      border: '1px solid var(--sovereign-border)',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                    }}
+                  >
+                    <IonIcon icon={cashOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '16px' }} />
+                    <IonText>
+                      <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '14px' }}>
+                        ${formatUSD(account.balance)}
+                      </span>
+                    </IonText>
+                  </div>
                 </div>
               </IonButtons>
             )}
@@ -632,6 +672,17 @@ const DashboardPage: React.FC = () => {
             </h2>
             <div style={{ lineHeight: '1.6', fontSize: '15px' }}>
               {selectedGame?.description || t('dashboard_no_games_subtitle')}
+
+              {formatHouseEdgePercent(selectedGame?.houseEdge) && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--sovereign-gold)', marginBottom: '8px' }}>
+                    {t('game_commission')}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'var(--sovereign-text)' }}>
+                    {formatHouseEdgePercent(selectedGame?.houseEdge)}
+                  </p>
+                </div>
+              )}
 
               {selectedGame?.defaultBets?.length > 0 && (
                 <div style={{ marginTop: '20px' }}>

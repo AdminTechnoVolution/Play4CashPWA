@@ -43,6 +43,7 @@ import { useRoomsStore } from '../../store/roomsStore';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { LobbySocketManager } from '../../data/network/LobbySocketManager';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
+import ConnectionStrengthIndicator from '../../ui/components/ConnectionStrengthIndicator';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { useT, hasKey } from '../../i18n/translations';
 import {
@@ -310,20 +311,42 @@ const RoomsPage: React.FC = () => {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '10px',
                 marginRight: '12px',
-                background: 'rgba(201,168,76,0.12)',
-                border: '1px solid var(--sovereign-border)',
-                borderRadius: '8px',
-                padding: '4px 10px',
               }}
             >
-              <IonIcon icon={cashOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '14px' }} />
-              <IonText>
-                <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '13px' }}>
-                  ${formatUSD(userBalanceNum)}
-                </span>
-              </IonText>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 28,
+                  padding: '0 6px',
+                  background: 'rgba(201,168,76,0.08)',
+                  border: '1px solid var(--sovereign-border)',
+                  borderRadius: '8px',
+                }}
+              >
+                <ConnectionStrengthIndicator />
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: 'rgba(201,168,76,0.12)',
+                  border: '1px solid var(--sovereign-border)',
+                  borderRadius: '8px',
+                  padding: '4px 10px',
+                }}
+              >
+                <IonIcon icon={cashOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '14px' }} />
+                <IonText>
+                  <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '13px' }}>
+                    ${formatUSD(userBalanceNum)}
+                  </span>
+                </IonText>
+              </div>
             </div>
           </IonButtons>
         </IonToolbar>

@@ -864,6 +864,51 @@ export default function BattleshipPage({
           </div>
         )}
 
+        {/* Ready / reset — above grid so the send action stays visible */}
+        {store.opponentConfirmed && (
+          <div style={{ width: GRID_PX + 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button
+              onClick={() => store.placedShips.length >= SHIP_CATALOG.length && setShowReadyConfirm(true)}
+              disabled={store.placedShips.length < SHIP_CATALOG.length}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: 12,
+                background: store.placedShips.length < SHIP_CATALOG.length
+                  ? 'rgba(201,168,76,0.25)'
+                  : 'linear-gradient(135deg, #b8922a, #e8c96b)',
+                border: 'none',
+                color: store.placedShips.length < SHIP_CATALOG.length ? 'rgba(255,255,255,0.4)' : '#0a1628',
+                fontWeight: 700,
+                fontSize: 15,
+                cursor: store.placedShips.length < SHIP_CATALOG.length ? 'not-allowed' : 'pointer',
+                letterSpacing: '0.5px',
+                transition: 'opacity 0.2s',
+              }}
+            >
+              {t('bs_ready_button')} ({store.placedShips.length}/{SHIP_CATALOG.length})
+            </button>
+
+            <button
+              onClick={() => store.resetFleet()}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: 'rgba(255,255,255,0.7)',
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              <IonIcon icon={refreshOutline} style={{ marginRight: '6px', fontSize: '16px', verticalAlign: 'middle' }} />
+              {t('bs_reset_button')}
+            </button>
+          </div>
+        )}
+
         {/* Placement grid with ocean background */}
         <OceanPanel width={GRID_PX + 16} height={GRID_PX + 16}>
           <div style={{ padding: 8 }}>
@@ -974,53 +1019,6 @@ export default function BattleshipPage({
             );
           })}
         </div>
-
-        {/* Action Buttons — only shown when opponent is confirmed */}
-        {store.opponentConfirmed && (
-          <div style={{ width: GRID_PX + 16, display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 20 }}>
-            {/* Reset Fleet Button */}
-            <button
-              onClick={() => store.resetFleet()}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: 12,
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                color: 'rgba(255,255,255,0.7)',
-                fontWeight: 600,
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
-            >
-              <IonIcon icon={refreshOutline} style={{ marginRight: '6px', fontSize: '16px', verticalAlign: 'middle' }} />
-              {t('bs_reset_button')}
-            </button>
-
-            {/* Ready button */}
-            <button
-              onClick={() => store.placedShips.length >= SHIP_CATALOG.length && setShowReadyConfirm(true)}
-              disabled={store.placedShips.length < SHIP_CATALOG.length}
-              style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: 12,
-                background: store.placedShips.length < SHIP_CATALOG.length
-                  ? 'rgba(201,168,76,0.25)'
-                  : 'linear-gradient(135deg, #b8922a, #e8c96b)',
-                border: 'none',
-                color: store.placedShips.length < SHIP_CATALOG.length ? 'rgba(255,255,255,0.4)' : '#0a1628',
-                fontWeight: 700,
-                fontSize: 15,
-                cursor: store.placedShips.length < SHIP_CATALOG.length ? 'not-allowed' : 'pointer',
-                letterSpacing: '0.5px',
-                transition: 'opacity 0.2s',
-              }}
-            >
-              {t('bs_ready_button')} ({store.placedShips.length}/{SHIP_CATALOG.length})
-            </button>
-          </div>
-        )}
       </div>
 
       <IonToast
@@ -1082,7 +1080,8 @@ export default function BattleshipPage({
           isMyTurn={store.isMyTurn}
           onTimeout={() => {}}
           turnPlayerName={isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
-          resetKey={isSpectator ? store.shotCount : undefined}
+          otherPlayerName={store.opponentName || opponentName}
+          resetKey={store.shotCount}
         />
 
         {/* ── Opponent board ── */}

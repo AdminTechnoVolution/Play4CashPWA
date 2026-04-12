@@ -6,9 +6,10 @@ import { SovereignPrimaryButton, SovereignDangerButton } from '../../ui/componen
 import { apiRepository } from '../../data/network/ApiRepository';
 import { useBattleshipStore } from '../../store/battleshipStore';
 import { useChessStore, ChessPhase } from '../../store/chessStore';
-import { useDominoStore } from '../../store/dominoStore';
+import { useDominoStore, DominoPhase } from '../../store/dominoStore';
 import { useHalmaStore, HalmaPhase } from '../../store/halmaStore';
 import type { RoomStatusResponse } from '../../data/models/ApiModels';
+import { buildFinishedLeaveDialogText, isRoomTerminalWithWinner } from '../../util/roomLeavePrecheck';
 import BattleshipPage from './battleship/BattleshipPage';
 import ChessPage from './chess/ChessPage';
 import DominoPage from './domino/DominoPage';
@@ -16,16 +17,6 @@ import HalmaPage from './halma/HalmaPage';
 import { getPlayContext, clearPlayContext } from '../../util/routingStorage';
 import { formatUSD } from '../../util/formatCurrency';
 import { useAuthStore } from '../../store/authStore';
-import type { UserAccountResponse } from '../../data/models/ApiModels';
-
-/** Room status `winner` is an id or username — compare to the logged-in account, not to `opponentName` (may be a placeholder). */
-function isWinnerCurrentUser(winner: string | undefined, me: UserAccountResponse | null): boolean | null {
-  const w = winner?.trim();
-  if (!w || !me) return null;
-  const wl = w.toLowerCase();
-  return wl === me.id.trim().toLowerCase() || wl === me.username.trim().toLowerCase();
-}
-
 // ── Leave-context snapshot (called at the moment the user requests to leave) ──
 function getLeaveContext(gameSocketCode: string): {
   gameIsOver: boolean;
@@ -37,34 +28,39 @@ function getLeaveContext(gameSocketCode: string): {
       const s = useChessStore.getState();
       // Android ChessScreen: warn when opponentConfirmed && (WAITING || PLAY), not only after first move
       return {
-        gameIsOver: !!s.gameOver,
+        gameIsOver: !!s.gameOver || s.phase === ChessPhase.GAME_OVER,
         isPastPlacement: s.phase === ChessPhase.WAITING || s.phase === ChessPhase.PLAY,
         opponentConfirmed: s.opponentConfirmed,
       };
     }
     case 'domino': {
       const s = useDominoStore.getState();
-      // Android DominoScreen: same — WAITING or PLAY with opponent (board may still be empty)
       return {
-        gameIsOver: !!s.gameOver,
-        isPastPlacement: s.opponents.length > 0,
-        opponentConfirmed: s.opponents.length > 0,
+        gameIsOver: !!s.gameOver || s.phase === DominoPhase.GAME_OVER,
+        isPastPlacement:
+          s.phase === DominoPhase.WAITING || s.phase === DominoPhase.PLAY,
+        opponentConfirmed: s.opponentConfirmed,
       };
     }
     case 'halma': {
       const s = useHalmaStore.getState();
-      return { 
-        gameIsOver: s.phase === HalmaPhase.GAME_OVER, 
-        isPastPlacement: true, 
-        opponentConfirmed: s.opponentConfirmed 
+      return {
+        gameIsOver: s.phase === HalmaPhase.GAME_OVER || !!s.gameOver,
+        isPastPlacement:
+          s.phase === HalmaPhase.WAITING || s.phase === HalmaPhase.PLAY,
+        opponentConfirmed: s.opponentConfirmed,
       };
     }
-    default: { // battleship (and any unknown code)
+    default: { // battleship / naval-battle (and any unknown code)
       const s = useBattleshipStore.getState();
+      // Same idea as Android: warn once the match is "live" — placement with both players,
+      // waiting after ships submitted, or battle. Alone in placement (no opponent) stays Rule 3 via opponentConfirmed.
+      const inStakedSession =
+        s.phase === 'placement' || s.phase === 'waiting' || s.phase === 'battle';
       return {
         gameIsOver: s.phase === 'finished' || !!s.gameOver,
-        isPastPlacement: s.phase === 'waiting' || s.phase === 'battle',
-        opponentConfirmed: s.opponentConfirmed
+        isPastPlacement: inStakedSession,
+        opponentConfirmed: s.opponentConfirmed,
       };
     }
   }
@@ -110,9 +106,9 @@ export default function PlayPage() {
   const doLeave = async (silent = false) => {
     try {
       const status = await apiRepository.leaveRoom(roomId);
-      const serverFinished = !!status.winner || ['finished', 'completed', 'game_over'].includes(status.status?.toLowerCase() ?? '');
+      const serverSettled = isRoomTerminalWithWinner(status);
 
-      if (serverFinished && !isSpectator && !silent) {
+      if (serverSettled && !isSpectator && !silent) {
         // If the game ended because we left (or just now), show the result alert
         setFinishedStatus(status);
         setShowFinished(true);
@@ -147,12 +143,10 @@ export default function PlayPage() {
       setCheckingLeave(true);
       try {
         const status = await apiRepository.getRoomStatus(roomId);
-        const serverFinished =
-          !!status.winner ||
-          ['finished', 'completed', 'game_over'].includes(status.status?.toLowerCase() ?? '');
+        const serverSettled = isRoomTerminalWithWinner(status);
 
         setCheckingLeave(false);
-        if (serverFinished) {
+        if (serverSettled) {
           // Game already ended on server — show result, no forfeit penalty
           setFinishedStatus(status);
           setShowFinished(true);
@@ -173,20 +167,7 @@ export default function PlayPage() {
     navigate(-1);
   };
 
-  // ── Determine won/lost for the finished dialog (only when opened from server status / pre-check) ──
-  const iWon = isWinnerCurrentUser(finishedStatus?.winner, me);
-
-  const finishedHeader =
-    iWon === true  ? '🏆 You Won!'  :
-    iWon === false ? '💀 You Lost'  :
-    'Game Over';
-
-  const finishedMessage =
-    finishedStatus?.winnerReason
-      ? finishedStatus.winnerReason
-      : iWon === true
-        ? `${opponent} has forfeited.`
-        : 'The game has already ended.';
+  const finishedDialogCopy = finishedStatus ? buildFinishedLeaveDialogText(finishedStatus, me, t) : null;
 
   // ── Shared game page props ──────────────────────────────────────────────────
   const gameProps = {
@@ -256,11 +237,11 @@ export default function PlayPage() {
       <IonAlert
         isOpen={showFinished}
         backdropDismiss={false}
-        header={finishedHeader}
-        message={finishedMessage}
+        header={finishedDialogCopy?.title ?? ''}
+        message={finishedDialogCopy?.message ?? ''}
         buttons={[
           {
-            text: 'OK',
+            text: t('ok'),
             handler: () => {
               setShowFinished(false);
               void doLeave(true);
