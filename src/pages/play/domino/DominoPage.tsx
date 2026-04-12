@@ -16,6 +16,7 @@ import TurnTimer from '../components/TurnTimer';
 import { useT, hasKey } from '../../../i18n/translations';
 import { applyWsMessagePlaceholders, formatApiMessageForDisplay, formatCatalogInteger, tStatus } from '../../../i18n/ApiMessageDisplay';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
+import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import { BoardTileViz, EndIndicatorViz, HandTileViz, END_LEFT, END_RIGHT } from './DominoTileViews';
 import GameSound from '../../../ui/game/GameSound';
 
@@ -160,7 +161,23 @@ export default function DominoPage({
           </IonButtons>
           <IonTitle style={{ color: '#fff', fontSize: 16 }}>{t('domino_screen_title')} · {roomName}</IonTitle>
           <IonButtons slot="end">
-            <IonText style={{ color: '#c9a84c', fontSize: 14, paddingRight: 12 }}>${betAmount}</IonText>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 28,
+                  padding: '0 6px',
+                  background: 'rgba(201,168,76,0.08)',
+                  border: '1px solid var(--sovereign-border)',
+                  borderRadius: '8px',
+                }}
+              >
+                <ConnectionStrengthIndicator />
+              </div>
+              <IonText style={{ color: '#c9a84c', fontSize: 14 }}>${betAmount}</IonText>
+            </div>
           </IonButtons>
         </IonToolbar>
         {store.chatGreetingOverlay && (

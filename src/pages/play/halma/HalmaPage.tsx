@@ -15,6 +15,7 @@ import GameOverModal from '../components/GameOverModal';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
+import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import GameSound from '../../../ui/game/GameSound';
 
 interface Props {
@@ -163,7 +164,23 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
           </IonButtons>
           <IonTitle style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>{t('halma_screen_title')}</IonTitle>
           <IonButtons slot="end">
-            <IonText style={{ color: '#c9a84c', fontSize: 14, paddingRight: 12, fontWeight: '800' }}>${betAmount}</IonText>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 28,
+                  padding: '0 6px',
+                  background: 'rgba(201,168,76,0.08)',
+                  border: '1px solid var(--sovereign-border)',
+                  borderRadius: '8px',
+                }}
+              >
+                <ConnectionStrengthIndicator />
+              </div>
+              <IonText style={{ color: '#c9a84c', fontSize: 14, fontWeight: '800' }}>${betAmount}</IonText>
+            </div>
           </IonButtons>
         </IonToolbar>
       </IonHeader>

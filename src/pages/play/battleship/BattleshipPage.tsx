@@ -11,6 +11,7 @@ import GameOverModal from '../components/GameOverModal';
 import TurnTimer from '../components/TurnTimer';
 import SpectatorBadge from '../components/SpectatorBadge';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
+import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import { useT } from '../../../i18n/translations';
 import { formatApiMessageForDisplay, applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
 import { formatUSD } from '../../../util/formatCurrency';
@@ -1069,21 +1070,46 @@ export default function BattleshipPage({
   // ── Battle phase ────────────────────────────────────────────────────────────
   const renderBattle = () => (
     <IonContent style={{ '--background': '#060e1e' }}>
-      <div style={{
-        padding: '8px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-      }}>
-        {isSpectator && <SpectatorBadge count={store.spectatorsCount} />}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', width: '100%' }}>
+        {/* Sticky: turn + timer stay visible while scrolling boards */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+            alignSelf: 'stretch',
+            width: '100%',
+            background: '#060e1e',
+            padding: '8px 8px 10px',
+            boxSizing: 'border-box',
+            boxShadow: '0 6px 18px rgba(0,0,0,0.45)',
+            borderBottom: '1px solid rgba(201,168,76,0.12)',
+          }}
+        >
+          {isSpectator && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <SpectatorBadge count={store.spectatorsCount} />
+            </div>
+          )}
+          <TurnTimer
+            seconds={store.turnTimerSeconds}
+            isMyTurn={store.isMyTurn}
+            onTimeout={() => {}}
+            turnPlayerName={isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
+            otherPlayerName={store.opponentName || opponentName}
+            resetKey={store.shotCount}
+          />
+        </div>
 
-        <TurnTimer
-          seconds={store.turnTimerSeconds}
-          isMyTurn={store.isMyTurn}
-          onTimeout={() => {}}
-          turnPlayerName={isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
-          otherPlayerName={store.opponentName || opponentName}
-          resetKey={store.shotCount}
-        />
-
+        <div
+          style={{
+            padding: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
         {/* ── Opponent board ── */}
         <div style={{ width: GRID_PX + 16 }}>
           <div style={{
@@ -1154,6 +1180,7 @@ export default function BattleshipPage({
           />
         )}
 
+        </div>
       </div>
     </IonContent>
   );
@@ -1170,9 +1197,23 @@ export default function BattleshipPage({
           </IonButtons>
           <IonTitle style={{ color: '#fff', fontSize: 16 }}>{roomName}</IonTitle>
           <IonButtons slot="end">
-            <IonText style={{ color: '#c9a84c', fontSize: 14, paddingRight: 12 }}>
-              ${betAmount}
-            </IonText>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 30,
+                  padding: '0 6px',
+                  background: 'rgba(201,168,76,0.08)',
+                  border: '1px solid rgba(201,168,76,0.2)',
+                  borderRadius: '8px',
+                }}
+              >
+                <ConnectionStrengthIndicator />
+              </div>
+              <IonText style={{ color: '#c9a84c', fontSize: 14 }}>${betAmount}</IonText>
+            </div>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
