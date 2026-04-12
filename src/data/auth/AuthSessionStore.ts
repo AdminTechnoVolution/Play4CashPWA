@@ -1,5 +1,6 @@
 import { jwtDecode } from 'jwt-decode';
 import { TOKEN_LEEWAY_S } from '../../config/api.config';
+import { normaliseLang, detectBrowserLang } from '../../i18n/languageUtils';
 import type { UserAccountResponse } from '../models/ApiModels';
 
 const KEYS = {
@@ -70,5 +71,6 @@ export function saveLanguage(lang: string): void {
 }
 
 export function getLanguage(): string {
-  return localStorage.getItem(KEYS.LANGUAGE) ?? 'es';
+  const saved = localStorage.getItem(KEYS.LANGUAGE);
+  return saved ? normaliseLang(saved) : detectBrowserLang();
 }

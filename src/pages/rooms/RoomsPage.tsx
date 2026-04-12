@@ -52,6 +52,7 @@ import {
   RoomLobbyKind,
 } from '../../i18n/ApiMessageDisplay';
 import { getGameContext, savePlayContext } from '../../util/routingStorage';
+import { formatUSD } from '../../util/formatCurrency';
 import '../../ui/theme/variables.css';
 type RoomStatus = 'waiting' | 'started' | 'finished';
 
@@ -214,7 +215,7 @@ const RoomsPage: React.FC = () => {
       return;
     }
     if (createBet > userBalanceNum) {
-      setCreateError(t('room_bet_exceeds_balance_error').replace('%s', `$${userBalanceNum.toFixed(2)}`));
+      setCreateError(t('room_bet_exceeds_balance_error').replace('%s', `$${formatUSD(userBalanceNum)}`));
       return;
     }
     setCreateLoading(true);
@@ -309,7 +310,7 @@ const RoomsPage: React.FC = () => {
               <IonIcon icon={cashOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '14px' }} />
               <IonText>
                 <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '13px' }}>
-                  ${userBalanceNum.toFixed(2)}
+                  ${formatUSD(userBalanceNum)}
                 </span>
               </IonText>
             </div>
@@ -617,7 +618,7 @@ const RoomsPage: React.FC = () => {
                 />
                 <IonText>
                   <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: '6px 0 0 2px' }}>
-                    {t('your_balance')}: ${userBalanceNum.toFixed(2)}
+                    {t('your_balance')}: ${formatUSD(userBalanceNum)}
                   </p>
                 </IonText>
               </div>

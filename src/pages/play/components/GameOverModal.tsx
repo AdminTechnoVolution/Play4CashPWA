@@ -10,6 +10,7 @@ import {
   GameEndMessageKeys,
   applyWsMessagePlaceholders
 } from '../../../i18n/ApiMessageDisplay';
+import { formatUSD } from '../../../util/formatCurrency';
 
 interface GameOverModalProps {
   isOpen: boolean;
@@ -137,7 +138,7 @@ const GameOverModal: React.FC<GameOverModalProps> = ({
               alignSelf: 'center',
             }}>
               <p style={{ color: 'var(--sovereign-gold)', fontSize: 18, fontWeight: 800, margin: 0, textAlign: 'center' }}>
-                + {gameOver.prize.toFixed(2)} USDT
+                + {formatUSD(gameOver.prize)} USDT
               </p>
             </div>
           )}

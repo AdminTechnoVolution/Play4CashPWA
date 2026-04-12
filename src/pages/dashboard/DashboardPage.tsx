@@ -50,6 +50,7 @@ import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import { useT } from '../../i18n/translations';
 import { saveGameContext } from '../../util/routingStorage';
+import { formatUSD } from '../../util/formatCurrency';
 import '../../ui/theme/variables.css';
 
 const MENU_ID = 'dashboard-menu';
@@ -280,7 +281,7 @@ const DashboardPage: React.FC = () => {
                 >
                   <IonText>
                     <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '16px' }}>
-                      ${account.balance.toFixed(2)}
+                      ${formatUSD(account.balance)}
                     </span>
                   </IonText>
                 </div>
@@ -349,7 +350,7 @@ const DashboardPage: React.FC = () => {
                   <IonIcon icon={cashOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '16px' }} />
                   <IonText>
                     <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '14px' }}>
-                      ${account.balance.toFixed(2)}
+                      ${formatUSD(account.balance)}
                     </span>
                   </IonText>
                 </div>
@@ -449,7 +450,7 @@ const DashboardPage: React.FC = () => {
                     <IonIcon icon={trophyOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '22px', display: 'block', margin: '0 auto 4px' }} />
                     <IonText>
                       <p style={{ color: 'var(--sovereign-gold)', fontWeight: '800', fontSize: '18px', margin: '0 0 2px 0' }}>
-                        ${(roomStats?.totalBetAmount ?? 0).toFixed(0)}
+                        ${formatUSD(roomStats?.totalBetAmount ?? 0, 0)}
                       </p>
                     </IonText>
                     <IonText>

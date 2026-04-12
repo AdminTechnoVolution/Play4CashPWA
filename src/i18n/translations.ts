@@ -5,8 +5,10 @@ import deJson from './de.json';
 import itJson from './it.json';
 import ptJson from './pt.json';
 import { useLanguageStore } from './languageStore';
+import type { SupportedLang } from './languageUtils';
+import { normaliseLang } from './languageUtils';
 
-export type SupportedLang = 'es' | 'en' | 'fr' | 'de' | 'it' | 'pt';
+export type { SupportedLang };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ALL: Record<SupportedLang, any> = { es: esJson, en: enJson, fr: frJson, de: deJson, it: itJson, pt: ptJson };
@@ -37,21 +39,21 @@ function resolve(dict: any, fallback: any, key: string): string {
 
 /** Reactive hook — re-renders whenever language changes */
 export function useT() {
-  const lang = useLanguageStore((s) => s.lang) as SupportedLang;
+  const lang = normaliseLang(useLanguageStore((s) => s.lang));
   const dict = ALL[lang] ?? ALL['en'];
   return (key: string) => resolve(dict, ALL['en'], key);
 }
 
 /** Non-reactive helper for use outside components (e.g. legal layout titles) */
 export function t(key: string): string {
-  const lang = useLanguageStore.getState().lang as SupportedLang;
+  const lang = normaliseLang(useLanguageStore.getState().lang);
   const dict = ALL[lang] ?? ALL['en'];
   return resolve(dict, ALL['en'], key);
 }
 
 /** Returns true if the key exists in the current or fallback dictionary */
 export function hasKey(key: string): boolean {
-  const lang = useLanguageStore.getState().lang as SupportedLang;
+  const lang = normaliseLang(useLanguageStore.getState().lang);
   const dict = ALL[lang] ?? ALL['en'];
   const fallback = ALL['en'];
 

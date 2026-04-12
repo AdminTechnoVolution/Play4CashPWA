@@ -13,6 +13,7 @@ import SpectatorBadge from '../components/SpectatorBadge';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import { useT } from '../../../i18n/translations';
 import { formatApiMessageForDisplay, applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
+import { formatUSD } from '../../../util/formatCurrency';
 import OceanCanvas from './OceanCanvas';
 import GameSound from '../../../ui/game/GameSound';
 
@@ -1228,7 +1229,7 @@ export default function BattleshipPage({
             }}>
               <span style={{ fontSize: 18 }}>💰</span>
               <span style={{ color: '#e8d08a', fontSize: 13, lineHeight: 1.4 }}>
-                {t('bs_ready_confirm_bet_info').replace('%s', `$${betAmount.toFixed(2)}`)}
+                {t('bs_ready_confirm_bet_info').replace('%s', `$${formatUSD(betAmount)}`)}
               </span>
             </div>
           )}

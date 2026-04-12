@@ -2,10 +2,10 @@ import { getLanguage } from '../auth/AuthSessionStore';
 
 /**
  * Short language tag for `Accept-Language` on all game / lobby Socket.IO connections.
- * Aligns with `ChatSocketManager` (first two letters, default `en`).
+ * Already normalised by `getLanguage()` via `languageUtils.normaliseLang`.
  */
 export function acceptLanguageTag(): string {
-  return getLanguage().toLowerCase().slice(0, 2).trim() || 'en';
+  return getLanguage();
 }
 
 /** Standard handshake headers: JWT + locale (required by backend for translated socket messages). */

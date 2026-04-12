@@ -34,6 +34,7 @@ import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import '../../ui/theme/variables.css';
 import type { RechargeHistoryItem, WithdrawalHistoryItem, GameHistoryItem } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
+import { formatUSD } from '../../util/formatCurrency';
 
 type Tab = 'deposits' | 'withdrawals' | 'games';
 
@@ -257,7 +258,7 @@ const TransactionHistoryPage: React.FC = () => {
                           <div>
                             <IonText>
                               <p style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '15px', margin: 0 }}>
-                                +${item.amount.toFixed(2)}
+                                +${formatUSD(item.amount)}
                               </p>
                             </IonText>
                             <IonText>
@@ -340,7 +341,7 @@ const TransactionHistoryPage: React.FC = () => {
                           <div>
                             <IonText>
                               <p style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '15px', margin: '0 0 2px 0' }}>
-                                -${item.amount.toFixed(2)}
+                                -${formatUSD(item.amount)}
                               </p>
                             </IonText>
                             <IonText>
@@ -460,7 +461,7 @@ const TransactionHistoryPage: React.FC = () => {
                             {item.prize > 0 && (
                               <IonText>
                                 <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '13px' }}>
-                                  +${item.prize.toFixed(2)}
+                                  +${formatUSD(item.prize)}
                                 </span>
                               </IonText>
                             )}

@@ -14,6 +14,7 @@ import ChessPage from './chess/ChessPage';
 import DominoPage from './domino/DominoPage';
 import HalmaPage from './halma/HalmaPage';
 import { getPlayContext, clearPlayContext } from '../../util/routingStorage';
+import { formatUSD } from '../../util/formatCurrency';
 import { useAuthStore } from '../../store/authStore';
 import type { UserAccountResponse } from '../../data/models/ApiModels';
 
@@ -230,7 +231,7 @@ export default function PlayPage() {
           </IonText>
           <IonText>
             <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '15px', lineHeight: '1.4', margin: '0 0 24px 0' }}>
-              {t('bs_leave_confirm_message').replace('%s', `$${bet.toFixed(2)}`)}
+              {t('bs_leave_confirm_message').replace('%s', `$${formatUSD(bet)}`)}
             </p>
           </IonText>
           
