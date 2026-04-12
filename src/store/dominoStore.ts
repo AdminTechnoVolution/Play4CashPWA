@@ -310,6 +310,10 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
     if (!isSpectator) {
       startStatusPolling(roomId, get);
       get().loadGreetings();
+    } else {
+      setTimeout(() => {
+        if (get().phase === DominoPhase.WAITING) get().socket?.requestSync(roomId);
+      }, 1500);
     }
   },
 

@@ -38,6 +38,8 @@ async function refreshSocketToken(socket: Socket): Promise<void> {
 export class HalmaSocketManager {
   private socket: Socket | null = null;
 
+  private gameUpdateCb?: (data: HalmaState) => void;
+
   connect(roomId: string): void {
     const token = getAccessToken();
     if (!token) {
@@ -58,8 +60,11 @@ export class HalmaSocketManager {
     });
 
     this.socket.on('connect', () => {
-      // Android: emits "join" on connect to subscribe to room events
       this.socket?.emit('join', { room_id: roomId });
+    });
+
+    this.socket.on('halma', (payload: unknown) => {
+      this.gameUpdateCb?.(payload as HalmaState);
     });
 
     this.socket.on('connect_error', async (err: Error & { data?: { status?: number } }) => {
@@ -98,7 +103,7 @@ export class HalmaSocketManager {
   }
 
   onGameUpdate(cb: (state: HalmaState) => void): void {
-    this.socket?.on('halma', cb);
+    this.gameUpdateCb = cb;
   }
 
   requestSync(roomId: string): void {

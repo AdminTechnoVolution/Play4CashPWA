@@ -286,7 +286,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
         opponentName: initialOpponentName, 
         isSpectator,
         myUsername,
-        statusMessage: isSpectator ? 'Observando partida' : (hasOpponent ? '¡Oponente unido! Iniciando partida...' : 'Esperando oponente...')
+        statusMessage: isSpectator ? 'spectator_watching_status' : (hasOpponent ? 'halma_opponent_joined' : 'status_waiting_opponent')
       });
 
       // Polling mirrored from Android (HalmaViewModel.kt:150)
@@ -304,11 +304,15 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
 
       socketManager = new HalmaSocketManager();
       
-      // onConnected mirrored from Android (HalmaViewModel.kt:179)
       socketManager.connect(roomId);
       if (hasOpponent && !isSpectator) {
         apiRepository.readyRoom(roomId).catch(() => {});
         socketManager.requestSync(roomId);
+      }
+      if (isSpectator) {
+        setTimeout(() => {
+          if (get().phase === HalmaPhase.WAITING) socketManager?.requestSync(roomId);
+        }, 1500);
       }
       
       socketManager.onGameUpdate((json: any) => {

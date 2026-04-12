@@ -14,6 +14,68 @@ const GAME_OVER_OUTCOMES = new Set([
 
 export interface PlacedShip extends ShipPlacement { size: number }
 
+/**
+ * When a ship is sunk, find all adjacent hit/sunk cells from the sunk cell
+ * to reconstruct the full ship, then mark them all 'sunk'.
+ */
+function deriveSunkShip(
+  board: BattleshipCell[][],
+  sunkRow: number, sunkCol: number,
+  shipType: string | undefined,
+): PlacedShip | null {
+  const catalog = shipType
+    ? SHIP_CATALOG.find(s => s.type.toLowerCase() === shipType.toLowerCase())
+    : undefined;
+  const expectedSize = catalog?.size ?? 0;
+  const resolvedType = catalog?.type ?? shipType ?? 'Unknown';
+
+  const isPartOfShip = (r: number, c: number) =>
+    r >= 0 && r < 10 && c >= 0 && c < 10 &&
+    (board[r][c] === 'hit' || board[r][c] === 'sunk');
+
+  // Expand horizontally
+  let hCells: [number, number][] = [[sunkRow, sunkCol]];
+  for (let c = sunkCol - 1; isPartOfShip(sunkRow, c); c--) hCells.unshift([sunkRow, c]);
+  for (let c = sunkCol + 1; isPartOfShip(sunkRow, c); c++) hCells.push([sunkRow, c]);
+
+  // Expand vertically
+  let vCells: [number, number][] = [[sunkRow, sunkCol]];
+  for (let r = sunkRow - 1; isPartOfShip(r, sunkCol); r--) vCells.unshift([r, sunkCol]);
+  for (let r = sunkRow + 1; isPartOfShip(r, sunkCol); r++) vCells.push([r, sunkCol]);
+
+  // Pick the line that matches expected size, or the longer one
+  let shipCells: [number, number][];
+  if (expectedSize > 0) {
+    shipCells = hCells.length === expectedSize ? hCells : vCells.length === expectedSize ? vCells : (hCells.length >= vCells.length ? hCells : vCells);
+  } else {
+    shipCells = hCells.length >= vCells.length ? hCells : vCells;
+  }
+
+  if (shipCells.length < 2) {
+    // Fallback: could be a 1-cell scenario — still valid for submarines etc
+    if (expectedSize === 1 || shipCells.length === 1) {
+      // mark and return
+    } else {
+      return null;
+    }
+  }
+
+  // Mark all cells as 'sunk'
+  for (const [r, c] of shipCells) board[r][c] = 'sunk';
+
+  const startRow = shipCells[0][0];
+  const startCol = shipCells[0][1];
+  const horizontal = shipCells.length > 1 ? shipCells[0][0] === shipCells[1][0] : true;
+
+  return {
+    type: resolvedType,
+    row: startRow,
+    col: startCol,
+    horizontal,
+    size: shipCells.length,
+  };
+}
+
 export const SHIP_CATALOG: { type: string; size: number }[] = [
   { type: 'Carrier',    size: 5 },
   { type: 'Battleship', size: 4 },
@@ -68,6 +130,8 @@ interface BattleshipStoreState {
   turnTimerSeconds: number;
   /** Increments on each shot — used as TurnTimer resetKey for spectators */
   shotCount: number;
+  /** Enemy ships revealed when sunk — used to render sprite overlays on opponent board */
+  sunkEnemyShips: PlacedShip[];
 }
 
 interface BattleshipStoreActions {
@@ -120,6 +184,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
   spectatorsCount: 0,
   turnTimerSeconds: 30,
   shotCount: 0,
+  sunkEnemyShips: [],
 
   // ── initGame ────────────────────────────────────────────────────────────────
   initGame(roomId, myUsername, hasOpponent = false, initialOpponentName = '', isSpectator = false) {
@@ -127,12 +192,14 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
     const socket = new BattleshipSocketManager();
     socket.connect(roomId);
 
-    // Spectators join an active game — skip placement and treat opponent as confirmed
     if (isSpectator) {
-      console.log('[SPECTATOR][7] Spectator mode → setting phase=battle, opponentConfirmed=true');
       set({ isSpectator: true, phase: 'battle', opponentConfirmed: true, opponentName: initialOpponentName });
+      setTimeout(() => {
+        if (get().opponentBoard.every(row => row.every(c => c === 'empty'))) {
+          socket.requestSync(roomId);
+        }
+      }, 1500);
     } else if (hasOpponent) {
-      // Pre-seed opponent state when joining an existing room
       set({ opponentConfirmed: true, opponentName: initialOpponentName });
     }
 
@@ -169,9 +236,14 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       }
 
       // ── Full state sync (reconnection / spectator join) ─────────────────────
+      // Android: spectators enter sync when isSpectatorJoin && history.length > 0;
+      // participants enter when gameStarted && ships[].length > 0.
       const ships = data.ships;
-      if (data.gameStarted && (spectatorMode || (Array.isArray(ships) && (ships as unknown[]).length > 0))) {
-        console.log('[SPECTATOR][9] handleFullSync triggered → gameStarted:', data.gameStarted, '| isSpectator:', spectatorMode, '| player1:', data.player1, '| player2:', data.player2);
+      const gameStarted = !!(data.gameStarted || data.game_started);
+      const hasHistory  = Array.isArray(data.history) && (data.history as unknown[]).length > 0;
+      const hasShips    = Array.isArray(ships) && (ships as unknown[]).length > 0;
+      if ((gameStarted && (spectatorMode || hasShips)) || (spectatorMode && hasHistory)) {
+        console.log('[SPECTATOR][9] handleFullSync triggered → gameStarted:', gameStarted, '| hasHistory:', hasHistory, '| isSpectator:', spectatorMode, '| player1:', data.player1, '| player2:', data.player2);
         handleFullSync(data, get().myUsername, spectatorMode, set);
         return;
       }
@@ -246,14 +318,18 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
           const oBoard = get().opponentBoard.map(r => [...r]) as BattleshipCell[][];
 
           let finalBoard: 'player' | 'opponent' = 'player';
+          let finalSunkShips = get().sunkEnemyShips;
           if (row >= 0 && col >= 0) {
-            // Use same shot attribution logic as regular shots
             const finalShotFromPlayer1 = spec
               ? (shooter != null ? shooter === boardOwner : false)
               : hasPendingFire;
             finalBoard = finalShotFromPlayer1 ? 'opponent' : 'player';
             if (finalShotFromPlayer1) {
               oBoard[row][col] = 'sunk';
+              if (outcome === 'sunk' || outcome === 'win') {
+                const derived = deriveSunkShip(oBoard, row, col, shipType);
+                if (derived) finalSunkShips = [...finalSunkShips, derived];
+              }
             } else {
               pBoard[row][col] = 'hit';
             }
@@ -263,12 +339,16 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
             phase: 'finished',
             playerBoard: pBoard,
             opponentBoard: oBoard,
+            sunkEnemyShips: finalSunkShips,
             hasPendingFire: false,
             isMyTurn: false,
             animatingShot: row >= 0 ? { row, col, board: finalBoard } : null,
             gameOver,
           });
-          if (row >= 0) setTimeout(() => set({ animatingShot: null }), 2000);
+          if (row >= 0) {
+            const animDur = outcome === 'sunk' ? 4000 : 2000;
+            setTimeout(() => set({ animatingShot: null }), animDur);
+          }
           return;
         }
 
@@ -277,20 +357,22 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
         const pBoard  = get().playerBoard.map(r => [...r]) as BattleshipCell[][];
         const oBoard  = get().opponentBoard.map(r => [...r]) as BattleshipCell[][];
         let   shotMsg: string | null = null;
-        const { isSpectator, spectatorBoardOwner, hasPendingFire } = get();
+        const { isSpectator, spectatorBoardOwner, hasPendingFire, sunkEnemyShips } = get();
+        let   newSunkShips = sunkEnemyShips;
 
         let shotBoard: 'player' | 'opponent' = 'player';
         if (row >= 0 && col >= 0) {
-          // Determine if the shot came from the "playerBoard owner" or the "opponentBoard owner"
-          // Spectator mode: use server-provided shooter; player mode: use hasPendingFire
           const isShotFromPlayer1 = isSpectator
             ? (shooter != null ? shooter === spectatorBoardOwner : false)
             : hasPendingFire;
           shotBoard = isShotFromPlayer1 ? 'opponent' : 'player';
 
           if (isShotFromPlayer1) {
-            // Player1 shot → hit opponent board
             oBoard[row][col] = outcome === 'sunk' ? 'sunk' : isHit ? 'hit' : 'miss';
+            if (outcome === 'sunk') {
+              const derived = deriveSunkShip(oBoard, row, col, shipType);
+              if (derived) newSunkShips = [...sunkEnemyShips, derived];
+            }
             if (!isSpectator) {
               shotMsg = outcome === 'sunk' && shipType
                 ? `bs_outcome_you_sunk_${shipType.toLowerCase()}`
@@ -299,8 +381,10 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
                 : 'ws.games.shotMiss';
             }
           } else {
-            // Player2 shot → hit player board
             pBoard[row][col] = outcome === 'sunk' ? 'sunk' : isHit ? 'hit' : 'miss';
+            if (outcome === 'sunk') {
+              deriveSunkShip(pBoard, row, col, shipType);
+            }
             if (!isSpectator) {
               shotMsg = outcome === 'sunk' && shipType
                 ? `bs_outcome_opponent_sunk_${shipType.toLowerCase()}`
@@ -313,6 +397,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
         set({
           playerBoard: pBoard,
           opponentBoard: oBoard,
+          sunkEnemyShips: newSunkShips,
           hasPendingFire: false,
           isMyTurn: isSpectator ? false : (yourTurn ?? false),
           shotMessage: shotMsg,
@@ -322,7 +407,10 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
             : get().lastShot,
           shotCount: get().shotCount + 1,
         });
-        if (row >= 0) setTimeout(() => set({ animatingShot: null }), 2000);
+        if (row >= 0) {
+          const animDur = outcome === 'sunk' ? 4000 : 2000;
+          setTimeout(() => set({ animatingShot: null }), animDur);
+        }
         return;
       }
 
@@ -375,6 +463,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       spectatorsCount: 0,
       turnTimerSeconds: 30,
       shotCount: 0,
+      sunkEnemyShips: [],
       selectedShipType: 'Carrier',
       selectedHorizontal: true,
     });
@@ -498,6 +587,16 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
 }));
 
 // ── Full state sync (reconnection / spectator join) ───────────────────────────
+
+/** Resolve shooter username from a history entry — mirrors Android's multi-field fallback chain. */
+function resolveShooterFromHistoryEntry(entry: Record<string, unknown>): string {
+  for (const key of ['player', 'username', 'shooter', 'shooterUsername', 'firedBy']) {
+    const v = typeof entry[key] === 'string' ? (entry[key] as string).trim() : '';
+    if (v) return v;
+  }
+  return '';
+}
+
 function handleFullSync(
   data: Record<string, unknown>,
   myUsername: string,
@@ -510,42 +609,81 @@ function handleFullSync(
   const p1 = (data.player1 as string) ?? '';
   const p2 = (data.player2 as string) ?? '';
 
-  // For players: boardOwner = myUsername
-  // For spectators: boardOwner = player1 (arbitrary assignment; player1 owns playerBoard)
   const boardOwner = isSpectator ? p1 : myUsername;
 
+  // Reconstruct placed ships for participants (spectators have fog of war)
+  const placedShips: PlacedShip[] = [];
   if (!isSpectator) {
-    // Re-mark own ships from the ships array (spectators have no ships)
     const ships = (data.ships as Record<string, unknown>[]) ?? [];
     ships.forEach(ship => {
       const cells = ship.cells as number[][] | undefined;
+      const shipType = (ship.type as string) ?? '';
+      const catalog = SHIP_CATALOG.find(s => s.type.toLowerCase() === shipType.toLowerCase());
       cells?.forEach(([r, c]) => {
         if (r >= 0 && r < 10 && c >= 0 && c < 10) playerBoard[r][c] = 'ship';
       });
+      if (cells && cells.length > 0 && catalog) {
+        const horizontal = cells.length > 1 ? cells[0][0] === cells[1][0] : true;
+        placedShips.push({
+          type: catalog.type,
+          size: catalog.size,
+          row: cells[0][0],
+          col: cells[0][1],
+          horizontal,
+        });
+      }
     });
   }
 
-  // Replay shot history — boardOwner's shots hit the opponentBoard, the other player's shots hit playerBoard
+  // Replay shot history — boardOwner's shots → opponentBoard, other player's shots → playerBoard
   const history = (data.history as Record<string, unknown>[]) ?? [];
+  const sunkEnemyShips: PlacedShip[] = [];
+
   history.forEach(shot => {
-    const { player, row, col, outcome } = shot as Record<string, unknown>;
-    const r = row as number;
-    const c = col as number;
-    const o = outcome as string;
+    const entry = shot as Record<string, unknown>;
+    const shooter  = resolveShooterFromHistoryEntry(entry);
+    const r        = entry.row as number;
+    const c        = entry.col as number;
+    const o        = ((entry.outcome as string) ?? 'miss').trim().toLowerCase();
+    const shipType = typeof entry.shipType === 'string' ? (entry.shipType as string) : undefined;
     if (r < 0 || r >= 10 || c < 0 || c >= 10) return;
-    const isHit = o === 'hit' || o === 'sunk';
-    const cell: BattleshipCell = o === 'sunk' ? 'sunk' : isHit ? 'hit' : 'miss';
-    if (player === boardOwner) {
-      opponentBoard[r][c] = cell; // boardOwner shot at opponent
+
+    const isSunk = o === 'sunk';
+    const isHit  = o === 'hit' || isSunk;
+    const cell: BattleshipCell = isSunk ? 'sunk' : isHit ? 'hit' : 'miss';
+
+    // Determine which board was targeted using defender fields or shooter identity
+    const defender = (
+      (typeof entry.defenderUsername === 'string' ? (entry.defenderUsername as string).trim() : '') ||
+      (typeof entry.defender_username === 'string' ? (entry.defender_username as string).trim() : '') ||
+      (typeof entry.targetUsername === 'string' ? (entry.targetUsername as string).trim() : '') ||
+      (typeof entry.target_username === 'string' ? (entry.target_username as string).trim() : '')
+    );
+
+    let hitsPlayerBoard: boolean;
+    if (defender) {
+      hitsPlayerBoard = defender === boardOwner;
+    } else if (shooter) {
+      hitsPlayerBoard = shooter !== boardOwner;
     } else {
-      playerBoard[r][c] = cell;   // opponent shot at boardOwner
+      return;
+    }
+
+    if (hitsPlayerBoard) {
+      playerBoard[r][c] = cell;
+      if (isSunk) deriveSunkShip(playerBoard, r, c, shipType);
+    } else {
+      opponentBoard[r][c] = cell;
+      if (isSunk) {
+        const derived = deriveSunkShip(opponentBoard, r, c, shipType);
+        if (derived) sunkEnemyShips.push(derived);
+      }
     }
   });
 
   const opponentName = p1 === myUsername ? p2 : p1;
-  const spectatorOpponent = p1 === boardOwner ? p2 : p1; // for spectators: the other player
+  const spectatorOpponent = p1 === boardOwner ? p2 : p1;
 
-  // For spectators: extract display names from the sync payload
   const syncTurnHolder = isSpectator
     ? ((data.turnOf as string | undefined)?.trim() ||
        (data.turn_of as string | undefined)?.trim() ||
@@ -557,10 +695,12 @@ function handleFullSync(
     phase: 'battle',
     playerBoard,
     opponentBoard,
+    sunkEnemyShips,
     isMyTurn: isSpectator ? false : ((data.yourTurn as boolean) ?? false),
     opponentConfirmed: true,
     opponentName: isSpectator ? spectatorOpponent : opponentName,
     hasPendingFire: false,
+    ...(placedShips.length > 0 ? { placedShips } : {}),
     ...(isSpectator ? {
       spectatorBoardOwner: boardOwner,
       spectatorFleetOwnerName: p1,

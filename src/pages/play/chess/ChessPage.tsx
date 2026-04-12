@@ -16,6 +16,7 @@ import SpectatorBadge from '../components/SpectatorBadge';
 import { formatApiMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
 import { useT } from '../../../i18n/translations';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
+import GameSound from '../../../ui/game/GameSound';
 
 const PIECE_SYMBOL: Record<string, string> = {
   [`${ChessPieceType.KING}_true`]: '♔', [`${ChessPieceType.QUEEN}_true`]: '♕', [`${ChessPieceType.ROOK}_true`]: '♖',
@@ -106,8 +107,14 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
     }
   }, [store.matchCancelledMessage]);
 
-
-
+  // Sound: piece move (matches Android LaunchedEffect(state.lastMove))
+  const lastMoveRef = useRef(store.lastMove);
+  useEffect(() => {
+    if (store.lastMove && store.lastMove !== lastMoveRef.current) {
+      GameSound.pieceMove();
+    }
+    lastMoveRef.current = store.lastMove;
+  }, [store.lastMove]);
 
   // Orientation logic exactly like Android
   const playingWhite = store.isPlayerWhite;

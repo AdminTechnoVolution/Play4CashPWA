@@ -192,6 +192,11 @@ export const useChessStore = create<ChessState>((set, get) => ({
     socketManager.onChessMessage = (json) => handleChessMessage(json, set, get);
     socketManager.onConnected = () => {
       if (hasOpponent && !isSpectator) apiRepository.roomReady(roomId).catch(() => {});
+      if (isSpectator) {
+        setTimeout(() => {
+          if (get().phase === ChessPhase.WAITING) socketManager.requestSync(roomId);
+        }, 1500);
+      }
     };
     socketManager.onConnectionError = () => {
       set({ apiErrorRawMessage: 'bs_connection_error' });

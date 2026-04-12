@@ -37,17 +37,14 @@ async function refreshSocketToken(socket: Socket): Promise<void> {
 
 export class BattleshipSocketManager {
   private socket: Socket | null = null;
+  private gameUpdateCb?: (data: BattleshipState) => void;
 
   connect(roomId: string): void {
     const token = getAccessToken();
     if (!token) {
-      console.error('[SPECTATOR][5] BattleshipSocketManager.connect → no access token, dispatching auth-failure');
       window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
       return;
     }
-
-    console.log('[SPECTATOR][5] BattleshipSocketManager.connect → namespace:', BASE_URL + '/naval-battle', '| roomId:', roomId);
-    console.log('[SPECTATOR][5] Socket options → transports: polling | query: { token: ***' + token.slice(-6) + ' } | extraHeaders: Authorization Bearer');
 
     this.socket = io(`${BASE_URL}/naval-battle`, {
       transports: ['polling'],
@@ -62,18 +59,16 @@ export class BattleshipSocketManager {
     });
 
     this.socket.on('connect', () => {
-      console.log('[SPECTATOR][6] Socket connected → emitting "join" with { room_id:', roomId, '}');
-      // Android: emits "join" on connect to subscribe to room events
-      // room_id is sent ONLY here (not in query params) so the backend
-      // can resolve the user's role (player vs spectator) from the prior REST call
       this.socket?.emit('join', { room_id: roomId });
+    });
+
+    this.socket.on('naval-battle', (payload: unknown) => {
+      this.gameUpdateCb?.(payload as BattleshipState);
     });
 
     this.socket.on('connect_error', async (err: Error & { data?: { status?: number } }) => {
       const status = (err as unknown as { data?: { status?: number } }).data?.status;
-      console.error('[SPECTATOR] Socket connect_error → status:', status, '| message:', err.message);
       if (status === 401 && this.socket) {
-        console.log('[SPECTATOR] 401 → refreshing token and reconnecting');
         try {
           await refreshSocketToken(this.socket);
           this.socket.connect();
@@ -84,7 +79,6 @@ export class BattleshipSocketManager {
     });
 
     this.socket.connect();
-    console.log('[SPECTATOR][5] socket.connect() called');
   }
 
   disconnect(): void {
@@ -97,7 +91,11 @@ export class BattleshipSocketManager {
   }
 
   onGameUpdate(cb: (state: BattleshipState) => void): void {
-    this.socket?.on('naval-battle', cb);
+    this.gameUpdateCb = cb;
+  }
+
+  requestSync(roomId: string): void {
+    this.socket?.emit('join', { room_id: roomId });
   }
 
   offAll(): void {

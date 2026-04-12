@@ -15,6 +15,7 @@ import GameOverModal from '../components/GameOverModal';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
+import GameSound from '../../../ui/game/GameSound';
 
 interface Props {
   roomId: string;
@@ -48,6 +49,15 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
       chat.disconnect();
     };
   }, [roomId]);
+
+  // Sound: piece move (matches Android LaunchedEffect(state.moveCount))
+  const prevMoveCount = useRef(0);
+  useEffect(() => {
+    if (store.moveCount > 0 && store.moveCount !== prevMoveCount.current) {
+      GameSound.pieceMove();
+    }
+    prevMoveCount.current = store.moveCount;
+  }, [store.moveCount]);
 
   const cellSize = Math.min(Math.floor((window.innerWidth - 32) / 8), 44);
 

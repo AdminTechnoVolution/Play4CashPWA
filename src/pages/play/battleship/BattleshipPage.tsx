@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonIcon, IonText, IonToast, IonModal,
@@ -14,11 +14,14 @@ import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import { useT } from '../../../i18n/translations';
 import { formatApiMessageForDisplay, applyWsMessagePlaceholders } from '../../../i18n/ApiMessageDisplay';
 import OceanCanvas from './OceanCanvas';
+import GameSound from '../../../ui/game/GameSound';
 
 // ── Grid constants ─────────────────────────────────────────────────────────────
 const CELL = 32;
 const GAP  = 2;
 const GRID_PX = CELL * 10 + GAP * 9; // 338 px
+const MISSILE_FALL_MS = 820;
+const SUNK_BOMB_FALL_MS = 1800;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function shipImageSrc(type: string): string {
@@ -30,10 +33,47 @@ function cellBg(cell: string, animating: boolean): string {
   switch (cell) {
     case 'hit':  return 'rgba(200,50,55,0.85)';
     case 'miss': return 'rgba(160,200,220,0.30)';
-    case 'sunk': return 'rgba(110,18,28,0.90)';
+    case 'sunk': return 'rgba(80,10,15,0.90)';
     case 'ship': return 'rgba(10,42,72,0.45)';
     default:     return 'rgba(8,26,50,0.55)';
   }
+}
+
+// ── Animated fire overlay for hit/sunk cells ─────────────────────────────────
+const fireKeyframes = `
+@keyframes bsFire {
+  0%   { transform: scale(1)   translateY(0);    opacity: 0.9; }
+  25%  { transform: scale(1.1) translateY(-1px); opacity: 1;   }
+  50%  { transform: scale(0.9) translateY(1px);  opacity: 0.8; }
+  75%  { transform: scale(1.1) translateY(-2px); opacity: 1;   }
+  100% { transform: scale(1)   translateY(0);    opacity: 0.9; }
+}
+`;
+let fireStyleInjected = false;
+function ensureFireStyle() {
+  if (fireStyleInjected) return;
+  fireStyleInjected = true;
+  const style = document.createElement('style');
+  style.textContent = fireKeyframes;
+  document.head.appendChild(style);
+}
+
+function FireEmoji({ delay }: { delay: number }) {
+  ensureFireStyle();
+  return (
+    <span style={{
+      position: 'absolute',
+      top: -2, left: 0, right: 0, bottom: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: CELL * 0.65,
+      animation: `bsFire 0.6s ease-in-out infinite`,
+      animationDelay: `${delay}ms`,
+      pointerEvents: 'none',
+      filter: 'drop-shadow(0 0 3px rgba(255,100,0,0.8))',
+    }}>
+      🔥
+    </span>
+  );
 }
 
 // ── Ship image overlay (absolutely positioned on top of grid) ─────────────────
@@ -189,19 +229,476 @@ function FleetStatusPanel({
   );
 }
 
+// ── Missile overlay (matches Android MissileOverlay) ─────────────────────────
+function MissileOverlay({ targetRow, targetCol, shotCount }: {
+  targetRow: number; targetCol: number; shotCount: number;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const prevShot = useRef(0);
+
+  useEffect(() => {
+    if (shotCount <= 0 || shotCount === prevShot.current) return;
+    prevShot.current = shotCount;
+    setVisible(true);
+    setProgress(0);
+    const start = performance.now();
+    let raf: number;
+    const animate = (now: number) => {
+      const t = Math.min((now - start) / MISSILE_FALL_MS, 1);
+      setProgress(t);
+      if (t < 1) { raf = requestAnimationFrame(animate); }
+      else { setTimeout(() => setVisible(false), 80); }
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [shotCount]);
+
+  if (!visible || targetRow < 0 || targetCol < 0) return null;
+
+  const targetX = targetCol * (CELL + GAP) + CELL / 2;
+  const targetY = targetRow * (CELL + GAP) + CELL / 2;
+  const startY = targetY - CELL * 7;
+  const currentY = startY + (targetY - startY) * progress;
+  const rocketH = CELL * 0.7;
+  const rocketW = CELL * 0.3;
+  const plumeLen = CELL * 0.9 * (1 - progress * 0.3);
+
+  return (
+    <svg
+      style={{
+        position: 'absolute', top: 0, left: 0,
+        width: '100%', height: '100%',
+        overflow: 'visible', pointerEvents: 'none', zIndex: 20,
+      }}
+    >
+      <defs>
+        <linearGradient id="rocketBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#b8c0cc" />
+          <stop offset="50%" stopColor="#7a8694" />
+          <stop offset="100%" stopColor="#4a5460" />
+        </linearGradient>
+        <linearGradient id="plume" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor="#FFEE88" stopOpacity="0.9" />
+          <stop offset="40%" stopColor="#FFAA22" stopOpacity="0.7" />
+          <stop offset="70%" stopColor="#FF4400" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#FF6600" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {/* Flame/plume trail */}
+      <ellipse
+        cx={targetX} cy={currentY - rocketH}
+        rx={rocketW * 0.5} ry={plumeLen / 2}
+        fill="url(#plume)"
+        opacity={0.85}
+      />
+      {/* Rocket body */}
+      <rect
+        x={targetX - rocketW / 2} y={currentY - rocketH}
+        width={rocketW} height={rocketH * 0.65}
+        rx={rocketW * 0.15} fill="url(#rocketBody)"
+        stroke="#1a222c" strokeWidth={0.6}
+      />
+      {/* Nose cone */}
+      <polygon
+        points={`${targetX},${currentY} ${targetX - rocketW * 0.45},${currentY - rocketH * 0.25} ${targetX + rocketW * 0.45},${currentY - rocketH * 0.25}`}
+        fill="#1a222c"
+      />
+      {/* Fins */}
+      <polygon
+        points={`${targetX - rocketW / 2},${currentY - rocketH * 0.9} ${targetX - rocketW},${currentY - rocketH * 0.65} ${targetX - rocketW / 2},${currentY - rocketH * 0.65}`}
+        fill="#4a5460" stroke="#1a222c" strokeWidth={0.4}
+      />
+      <polygon
+        points={`${targetX + rocketW / 2},${currentY - rocketH * 0.9} ${targetX + rocketW},${currentY - rocketH * 0.65} ${targetX + rocketW / 2},${currentY - rocketH * 0.65}`}
+        fill="#4a5460" stroke="#1a222c" strokeWidth={0.4}
+      />
+      {/* Nozzle glow */}
+      <ellipse
+        cx={targetX} cy={currentY - rocketH + 2}
+        rx={rocketW * 0.25} ry={2}
+        fill="#FF6633" opacity={0.8}
+      />
+    </svg>
+  );
+}
+
+// ── Water splash overlay (matches Android WaterSplashOverlay) ────────────────
+function WaterSplashOverlay({ targetRow, targetCol, shotCount, outcome }: {
+  targetRow: number; targetCol: number; shotCount: number; outcome: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const prevShot = useRef(0);
+
+  useEffect(() => {
+    if (shotCount <= 0 || shotCount === prevShot.current || outcome !== 'miss') return;
+    prevShot.current = shotCount;
+    const delay = Math.max(0, MISSILE_FALL_MS - 30);
+    const timer = setTimeout(() => {
+      setVisible(true);
+      setProgress(0);
+      const start = performance.now();
+      let raf: number;
+      const animate = (now: number) => {
+        const t = Math.min((now - start) / 560, 1);
+        setProgress(t);
+        if (t < 1) { raf = requestAnimationFrame(animate); }
+        else { setVisible(false); }
+      };
+      raf = requestAnimationFrame(animate);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [shotCount, outcome]);
+
+  if (!visible || targetRow < 0 || targetCol < 0) return null;
+
+  const cx = targetCol * (CELL + GAP) + CELL / 2;
+  const cy = targetRow * (CELL + GAP) + CELL / 2;
+  const ease = 1 - (1 - progress) * (1 - progress);
+  const fade = 1 - progress * progress;
+  const r = CELL * (0.3 + 0.6 * ease);
+
+  return (
+    <svg
+      style={{
+        position: 'absolute', top: 0, left: 0,
+        width: '100%', height: '100%',
+        overflow: 'visible', pointerEvents: 'none', zIndex: 19,
+      }}
+    >
+      <circle cx={cx} cy={cy} r={r * 0.4} fill={`rgba(255,255,255,${0.8 * fade})`} />
+      <circle cx={cx} cy={cy} r={r * 0.7} fill="none"
+        stroke={`rgba(160,216,240,${0.5 * fade})`} strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke={`rgba(160,216,240,${0.3 * fade})`} strokeWidth={1} />
+      {Array.from({ length: 8 }).map((_, i) => {
+        const angle = (i / 8) * Math.PI * 2 + 0.4;
+        const dist = CELL * (0.15 + 0.5 * ease);
+        const dx = cx + Math.cos(angle) * dist;
+        const dy = cy + Math.sin(angle) * dist * 0.65 - CELL * 0.12 * ease;
+        return (
+          <circle key={i} cx={dx} cy={dy} r={CELL * 0.04 + CELL * 0.03 * (1 - progress)}
+            fill={`rgba(224,244,255,${0.7 * fade})`} />
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── Explosion overlay (hit/sunk) ─────────────────────────────────────────────
+function ExplosionOverlay({ targetRow, targetCol, shotCount, outcome }: {
+  targetRow: number; targetCol: number; shotCount: number; outcome: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const prevShot = useRef(0);
+
+  useEffect(() => {
+    if (shotCount <= 0 || shotCount === prevShot.current) return;
+    if (outcome !== 'hit' && outcome !== 'sunk') return;
+    prevShot.current = shotCount;
+    const delay = Math.max(0, MISSILE_FALL_MS - 20);
+    const timer = setTimeout(() => {
+      setVisible(true);
+      setProgress(0);
+      const start = performance.now();
+      let raf: number;
+      const animate = (now: number) => {
+        const t = Math.min((now - start) / 800, 1);
+        setProgress(t);
+        if (t < 1) { raf = requestAnimationFrame(animate); }
+        else { setTimeout(() => setVisible(false), 300); }
+      };
+      raf = requestAnimationFrame(animate);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [shotCount, outcome]);
+
+  if (!visible || targetRow < 0 || targetCol < 0) return null;
+
+  const cx = targetCol * (CELL + GAP) + CELL / 2;
+  const cy = targetRow * (CELL + GAP) + CELL / 2;
+  const ease = 1 - (1 - progress) * (1 - progress);
+  const fade = Math.max(0, 1 - progress * 1.2);
+  const r = CELL * (0.2 + 1.0 * ease);
+
+  return (
+    <svg
+      style={{
+        position: 'absolute', top: 0, left: 0,
+        width: '100%', height: '100%',
+        overflow: 'visible', pointerEvents: 'none', zIndex: 21,
+      }}
+    >
+      {/* Fireball core */}
+      <circle cx={cx} cy={cy} r={r * 0.5}
+        fill={`rgba(255,${Math.round(100 + 120 * (1 - progress))},30,${0.9 * fade})`} />
+      {/* Mid ring */}
+      <circle cx={cx} cy={cy} r={r * 0.75}
+        fill={`rgba(255,${Math.round(160 * (1 - progress))},0,${0.5 * fade})`} />
+      {/* Outer ring */}
+      <circle cx={cx} cy={cy} r={r}
+        fill={`rgba(255,80,0,${0.25 * fade})`} />
+      {/* Flash */}
+      {progress < 0.15 && (
+        <circle cx={cx} cy={cy} r={r * 0.3}
+          fill={`rgba(255,255,200,${0.95 * (1 - progress / 0.15)})`} />
+      )}
+      {/* Smoke particles */}
+      {Array.from({ length: 6 }).map((_, i) => {
+        const angle = (i / 6) * Math.PI * 2;
+        const dist = r * 0.8 * ease;
+        const dx = cx + Math.cos(angle) * dist;
+        const dy = cy + Math.sin(angle) * dist - CELL * 0.15 * ease;
+        return (
+          <circle key={i} cx={dx} cy={dy} r={CELL * 0.08 * (1 + ease)}
+            fill={`rgba(80,80,80,${0.4 * fade})`} />
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── Sunk bomb overlay (PWA exclusive — big bomb sweeping across the fleet) ────
+function cubicBezier(t: number, p0: number, p1: number, p2: number, p3: number) {
+  const mt = 1 - t;
+  return mt * mt * mt * p0 + 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t * p3;
+}
+function cubicBezierDeriv(t: number, p0: number, p1: number, p2: number, p3: number) {
+  const mt = 1 - t;
+  return 3 * mt * mt * (p1 - p0) + 6 * mt * t * (p2 - p1) + 3 * t * t * (p3 - p2);
+}
+
+function SunkBombOverlay({ targetRow, targetCol, shotCount, outcome }: {
+  targetRow: number; targetCol: number; shotCount: number; outcome: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const prevShot = useRef(0);
+
+  useEffect(() => {
+    if (shotCount <= 0 || shotCount === prevShot.current || outcome !== 'sunk') return;
+    prevShot.current = shotCount;
+    setVisible(true);
+    setProgress(0);
+    const start = performance.now();
+    let raf: number;
+    const animate = (now: number) => {
+      const t = Math.min((now - start) / SUNK_BOMB_FALL_MS, 1);
+      setProgress(t);
+      if (t < 1) { raf = requestAnimationFrame(animate); }
+      else { setTimeout(() => setVisible(false), 80); }
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [shotCount, outcome]);
+
+  if (!visible || targetRow < 0 || targetCol < 0) return null;
+
+  const targetX = targetCol * (CELL + GAP) + CELL / 2;
+  const targetY = targetRow * (CELL + GAP) + CELL / 2;
+
+  // Sweep from the opposite side of the grid for a dramatic cross-fleet path
+  const enterFromLeft = targetCol > 4;
+  const p0x = enterFromLeft ? -CELL * 4 : GRID_PX + CELL * 4;
+  const p0y = -CELL * 10;
+  const p1x = enterFromLeft ? GRID_PX * 0.35 : GRID_PX * 0.65;
+  const p1y = -CELL * 2;
+  const p2x = enterFromLeft ? GRID_PX * 0.75 : GRID_PX * 0.25;
+  const p2y = targetY * 0.4;
+  const p3x = targetX;
+  const p3y = targetY;
+
+  const t = progress;
+  const cx = cubicBezier(t, p0x, p1x, p2x, p3x);
+  const cy = cubicBezier(t, p0y, p1y, p2y, p3y);
+  const dx = cubicBezierDeriv(t, p0x, p1x, p2x, p3x);
+  const dy = cubicBezierDeriv(t, p0y, p1y, p2y, p3y);
+  const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+  const bombLen = CELL * 1.4;
+  const bombW = CELL * 0.65;
+  const plumeLen = CELL * 2.2 * (1 - progress * 0.25);
+  const plumeW = bombW * 0.55;
+
+  return (
+    <svg
+      style={{
+        position: 'absolute', top: 0, left: 0,
+        width: '100%', height: '100%',
+        overflow: 'visible', pointerEvents: 'none', zIndex: 22,
+      }}
+    >
+      <defs>
+        <radialGradient id="bombBody">
+          <stop offset="0%" stopColor="#555" />
+          <stop offset="60%" stopColor="#2a2a2a" />
+          <stop offset="100%" stopColor="#111" />
+        </radialGradient>
+        <linearGradient id="bombPlume" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor="#FFEE55" stopOpacity="1" />
+          <stop offset="30%" stopColor="#FF8800" stopOpacity="0.85" />
+          <stop offset="60%" stopColor="#FF3300" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#AA2200" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <g transform={`translate(${cx}, ${cy}) rotate(${angle + 90})`}>
+        {/* Flame trail — drawn behind the bomb (positive Y = behind when rotated) */}
+        <ellipse cx={0} cy={-bombLen * 0.5 - plumeLen * 0.45} rx={plumeW} ry={plumeLen * 0.5}
+          fill="url(#bombPlume)" opacity={0.9} />
+        {/* Outer glow */}
+        <ellipse cx={0} cy={-bombLen * 0.5 - plumeLen * 0.2} rx={plumeW * 0.7} ry={plumeLen * 0.25}
+          fill="rgba(255,200,50,0.4)" />
+
+        {/* Bomb body — fat oval */}
+        <ellipse cx={0} cy={0} rx={bombW * 0.5} ry={bombLen * 0.38}
+          fill="url(#bombBody)" stroke="#0a0a0a" strokeWidth={1} />
+        {/* Nose cone */}
+        <ellipse cx={0} cy={bombLen * 0.38} rx={bombW * 0.22} ry={bombLen * 0.14}
+          fill="#1a1a1a" />
+        {/* Nose tip glow */}
+        <circle cx={0} cy={bombLen * 0.48} r={bombW * 0.1}
+          fill="#FF4422" opacity={0.7 + 0.3 * Math.sin(progress * 20)} />
+        {/* Tail fin left */}
+        <polygon
+          points={`${-bombW * 0.25},${-bombLen * 0.32} ${-bombW * 0.6},${-bombLen * 0.5} ${-bombW * 0.2},${-bombLen * 0.5}`}
+          fill="#333" stroke="#111" strokeWidth={0.5} />
+        {/* Tail fin right */}
+        <polygon
+          points={`${bombW * 0.25},${-bombLen * 0.32} ${bombW * 0.6},${-bombLen * 0.5} ${bombW * 0.2},${-bombLen * 0.5}`}
+          fill="#333" stroke="#111" strokeWidth={0.5} />
+        {/* Center tail fin */}
+        <polygon
+          points={`0,${-bombLen * 0.3} ${-bombW * 0.12},${-bombLen * 0.52} ${bombW * 0.12},${-bombLen * 0.52}`}
+          fill="#444" stroke="#111" strokeWidth={0.4} />
+        {/* Warning band */}
+        <rect x={-bombW * 0.48} y={-bombLen * 0.06} width={bombW * 0.96} height={bombLen * 0.08}
+          rx={2} fill="#cc3300" opacity={0.8} />
+      </g>
+    </svg>
+  );
+}
+
+// ── Sunk explosion overlay (PWA exclusive — massive explosion for sunk ships) ─
+function SunkExplosionOverlay({ targetRow, targetCol, shotCount, outcome }: {
+  targetRow: number; targetCol: number; shotCount: number; outcome: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const prevShot = useRef(0);
+
+  useEffect(() => {
+    if (shotCount <= 0 || shotCount === prevShot.current || outcome !== 'sunk') return;
+    prevShot.current = shotCount;
+    const delay = SUNK_BOMB_FALL_MS - 30;
+    const timer = setTimeout(() => {
+      setVisible(true);
+      setProgress(0);
+      const start = performance.now();
+      let raf: number;
+      const animate = (now: number) => {
+        const p = Math.min((now - start) / 1400, 1);
+        setProgress(p);
+        if (p < 1) { raf = requestAnimationFrame(animate); }
+        else { setTimeout(() => setVisible(false), 200); }
+      };
+      raf = requestAnimationFrame(animate);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [shotCount, outcome]);
+
+  if (!visible || targetRow < 0 || targetCol < 0) return null;
+
+  const cx = targetCol * (CELL + GAP) + CELL / 2;
+  const cy = targetRow * (CELL + GAP) + CELL / 2;
+  const ease = 1 - (1 - progress) * (1 - progress);
+  const fade = Math.max(0, 1 - progress * 1.1);
+  const maxR = CELL * 2.8;
+  const r = maxR * ease;
+
+  const shockR = CELL * 4 * ease;
+  const shockFade = Math.max(0, 1 - progress * 1.5);
+
+  return (
+    <svg
+      style={{
+        position: 'absolute', top: 0, left: 0,
+        width: '100%', height: '100%',
+        overflow: 'visible', pointerEvents: 'none', zIndex: 23,
+      }}
+    >
+      {/* Shockwave ring */}
+      <circle cx={cx} cy={cy} r={shockR} fill="none"
+        stroke={`rgba(255,200,100,${0.35 * shockFade})`} strokeWidth={2.5} />
+      <circle cx={cx} cy={cy} r={shockR * 0.7} fill="none"
+        stroke={`rgba(255,150,50,${0.25 * shockFade})`} strokeWidth={1.5} />
+
+      {/* White flash (first 15%) */}
+      {progress < 0.15 && (
+        <circle cx={cx} cy={cy} r={maxR * 0.8}
+          fill={`rgba(255,255,220,${0.95 * (1 - progress / 0.15)})`} />
+      )}
+
+      {/* Outer fire ring */}
+      <circle cx={cx} cy={cy} r={r}
+        fill={`rgba(255,60,0,${0.2 * fade})`} />
+      {/* Mid fire ring */}
+      <circle cx={cx} cy={cy} r={r * 0.7}
+        fill={`rgba(255,${Math.round(120 * (1 - progress))},0,${0.45 * fade})`} />
+      {/* Inner fireball */}
+      <circle cx={cx} cy={cy} r={r * 0.45}
+        fill={`rgba(255,${Math.round(180 + 60 * (1 - progress))},${Math.round(40 * (1 - progress))},${0.85 * fade})`} />
+      {/* Bright core */}
+      <circle cx={cx} cy={cy} r={r * 0.2}
+        fill={`rgba(255,255,180,${0.7 * fade})`} />
+
+      {/* Debris particles — 12 flying outward */}
+      {Array.from({ length: 12 }).map((_, i) => {
+        const a = (i / 12) * Math.PI * 2 + 0.3;
+        const dist = maxR * 1.3 * ease * (0.6 + 0.4 * ((i % 3) / 2));
+        const px = cx + Math.cos(a) * dist;
+        const py = cy + Math.sin(a) * dist - CELL * 0.3 * ease;
+        const size = CELL * (0.06 + 0.06 * ((i % 4) / 3)) * (1.2 - ease * 0.5);
+        return (
+          <circle key={i} cx={px} cy={py} r={size}
+            fill={i % 3 === 0
+              ? `rgba(255,${100 + i * 10},0,${0.7 * fade})`
+              : `rgba(100,100,100,${0.5 * fade})`
+            } />
+        );
+      })}
+
+      {/* Smoke plume rising from center */}
+      {Array.from({ length: 5 }).map((_, i) => {
+        const smokeY = cy - CELL * (0.5 + 1.5 * ease) * (1 + i * 0.3);
+        const smokeR = CELL * (0.2 + 0.3 * ease) * (1 + i * 0.15);
+        const smokeFade = Math.max(0, fade - i * 0.12);
+        return (
+          <circle key={`s${i}`} cx={cx + (i % 2 ? 3 : -3)} cy={smokeY} r={smokeR}
+            fill={`rgba(60,60,60,${0.35 * smokeFade})`} />
+        );
+      })}
+    </svg>
+  );
+}
+
 // ── Battle grid (opponent or own) ─────────────────────────────────────────────
 function BattleGrid({
-  board, ships, showShips, clickable, isSpectator, boardSide, onFire,
+  board, ships, showShips, sunkEnemyShips, clickable, isSpectator, boardSide, onFire,
 }: {
   board: string[][];
   ships: PlacedShip[];
   showShips: boolean;
+  sunkEnemyShips?: PlacedShip[];
   clickable: boolean;
   isSpectator: boolean;
   boardSide: 'player' | 'opponent';
   onFire: (r: number, c: number) => void;
 }) {
   const store = useBattleshipStore();
+  const anim = store.animatingShot;
+  const showMissile = anim && anim.board === boardSide;
   return (
     <OceanPanel width={GRID_PX + 16} height={GRID_PX + 16}>
       <div style={{ padding: 8 }}>
@@ -212,17 +709,20 @@ function BattleGrid({
             gridTemplateColumns: `repeat(10, ${CELL}px)`,
             gap: GAP,
             cursor: clickable && !isSpectator ? 'crosshair' : 'default',
+            overflow: 'visible',
           }}
         >
           {board.map((row, r) =>
             row.map((cell, c) => {
-              const anim = store.animatingShot;
               const isAnim = anim?.row === r && anim?.col === c && anim?.board === boardSide;
+              const isHitOrSunk = cell === 'hit' || cell === 'sunk';
+              const fireDelay = ((r * 10 + c) % 5) * 120;
               return (
                 <div
                   key={`${r}-${c}`}
                   onClick={() => clickable && !isSpectator && onFire(r, c)}
                   style={{
+                    position: 'relative',
                     width: CELL, height: CELL,
                     background: cellBg(cell, isAnim),
                     borderRadius: 3,
@@ -234,16 +734,55 @@ function BattleGrid({
                     transition: 'background 0.3s',
                     boxSizing: 'border-box',
                     userSelect: 'none',
+                    overflow: 'visible',
                   }}
                 >
-                  {cell === 'hit'  && '💥'}
+                  {isHitOrSunk && <FireEmoji delay={fireDelay} />}
                   {cell === 'miss' && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,255,255,0.55)' }} />}
-                  {cell === 'sunk' && <span style={{ color: '#fff', fontSize: 11 }}>✕</span>}
                 </div>
               );
             })
           )}
           {showShips && <ShipOverlay ships={ships} />}
+          {sunkEnemyShips && sunkEnemyShips.length > 0 && <ShipOverlay ships={sunkEnemyShips} />}
+
+          {/* Missile + impact overlays */}
+          {showMissile && (store.lastShot?.result === 'sunk' ? (
+            <>
+              <SunkBombOverlay
+                targetRow={anim.row}
+                targetCol={anim.col}
+                shotCount={store.shotCount}
+                outcome="sunk"
+              />
+              <SunkExplosionOverlay
+                targetRow={anim.row}
+                targetCol={anim.col}
+                shotCount={store.shotCount}
+                outcome="sunk"
+              />
+            </>
+          ) : (
+            <>
+              <MissileOverlay
+                targetRow={anim.row}
+                targetCol={anim.col}
+                shotCount={store.shotCount}
+              />
+              <ExplosionOverlay
+                targetRow={anim.row}
+                targetCol={anim.col}
+                shotCount={store.shotCount}
+                outcome={store.lastShot?.result || ''}
+              />
+              <WaterSplashOverlay
+                targetRow={anim.row}
+                targetCol={anim.col}
+                shotCount={store.shotCount}
+                outcome={store.lastShot?.result || ''}
+              />
+            </>
+          ))}
         </div>
       </div>
     </OceanPanel>
@@ -274,6 +813,23 @@ export default function BattleshipPage({
     store.initGame(roomId, myUsername, hasOpponent, opponentName, isSpectator);
     return () => { store.cleanup(); };
   }, [roomId]);
+
+  const prevShotCount = useRef(0);
+  useEffect(() => {
+    if (store.shotCount > 0 && store.shotCount !== prevShotCount.current) {
+      const result = store.lastShot?.result;
+      if (result === 'sunk') {
+        const timer = setTimeout(() => GameSound.bigExplosion(), SUNK_BOMB_FALL_MS - 50);
+        prevShotCount.current = store.shotCount;
+        return () => clearTimeout(timer);
+      } else if (result === 'hit') {
+        GameSound.explosion();
+      } else if (result === 'miss') {
+        GameSound.splash();
+      }
+    }
+    prevShotCount.current = store.shotCount;
+  }, [store.shotCount, store.lastShot]);
 
   // ── Placement phase ─────────────────────────────────────────────────────────
   const renderPlacement = () => (
@@ -550,6 +1106,7 @@ export default function BattleshipPage({
             board={store.opponentBoard}
             ships={[]}
             showShips={false}
+            sunkEnemyShips={store.sunkEnemyShips}
             clickable={store.isMyTurn && !isSpectator}
             isSpectator={isSpectator}
             boardSide="opponent"

@@ -17,6 +17,7 @@ import { useT, hasKey } from '../../../i18n/translations';
 import { applyWsMessagePlaceholders, formatApiMessageForDisplay, formatCatalogInteger, tStatus } from '../../../i18n/ApiMessageDisplay';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import { BoardTileViz, EndIndicatorViz, HandTileViz, END_LEFT, END_RIGHT } from './DominoTileViews';
+import GameSound from '../../../ui/game/GameSound';
 
 function tilesEqual(t1: DominoTile, t2: DominoTile) {
   return (t1.a === t2.a && t1.b === t2.b) || (t1.a === t2.b && t1.b === t2.a);
@@ -75,6 +76,15 @@ export default function DominoPage({
       store.loadGreetings();
     }
   }, [store.phase, isSpectator]);
+
+  // Sound: tile placed (matches Android LaunchedEffect(state.lastPlayedTile))
+  const prevLastTile = useRef(store.lastPlayedTile);
+  useEffect(() => {
+    if (store.lastPlayedTile && store.lastPlayedTile !== prevLastTile.current) {
+      GameSound.tilePlace();
+    }
+    prevLastTile.current = store.lastPlayedTile;
+  }, [store.lastPlayedTile]);
 
   useEffect(() => {
     if (store.navigateBack) onLeaveRequest();
