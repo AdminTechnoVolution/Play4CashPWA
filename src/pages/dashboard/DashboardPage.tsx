@@ -205,6 +205,17 @@ const DashboardPage: React.FC = () => {
           {/* Stats Column (Bottom Left Style) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                width: '8px', height: '8px', borderRadius: '50%', marginLeft: '3px', marginRight: '3px',
+                background: game.activeRooms > 0 ? '#4caf50' : '#555',
+                boxShadow: game.activeRooms > 0 ? '0 0 6px rgba(76,175,80,0.6)' : 'none',
+                display: 'inline-block', flexShrink: 0,
+              }} />
+              <span style={{ color: game.activeRooms > 0 ? '#4caf50' : 'var(--sovereign-text-muted)', fontSize: '12px', fontWeight: '600' }}>
+                {game.activeRooms}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <IonIcon icon={peopleOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px' }} />
               <span style={{ color: 'var(--sovereign-text)', fontSize: '12px', fontWeight: '600' }}>{playerRange}</span>
             </div>

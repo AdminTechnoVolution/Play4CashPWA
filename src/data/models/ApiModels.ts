@@ -37,6 +37,7 @@ export interface GameResponse {
   defaultBets: number[];
   minPlayers: number;
   maxPlayers: number;
+  activeRooms: number;
 }
 
 // ─── Rooms ─────────────────────────────────────────────────────────────────────
