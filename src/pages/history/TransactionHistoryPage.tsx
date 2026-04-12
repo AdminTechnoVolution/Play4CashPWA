@@ -205,13 +205,13 @@ const TransactionHistoryPage: React.FC = () => {
             style={{ '--background': 'var(--sovereign-surface)', borderRadius: '10px' } as React.CSSProperties}
           >
             <IonSegmentButton value="deposits">
-              <IonLabel style={{ fontSize: '13px' }}>{t('history_tab_deposits')}</IonLabel>
+              <IonLabel style={{ fontSize: '12px', textTransform: 'none' }}>{t('history_tab_deposits')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="withdrawals">
-              <IonLabel style={{ fontSize: '13px' }}>{t('history_tab_withdrawals')}</IonLabel>
+              <IonLabel style={{ fontSize: '12px', textTransform: 'none' }}>{t('history_tab_withdrawals')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="games">
-              <IonLabel style={{ fontSize: '13px' }}>{t('history_tab_games')}</IonLabel>
+              <IonLabel style={{ fontSize: '12px', textTransform: 'none' }}>{t('history_tab_games')}</IonLabel>
             </IonSegmentButton>
           </IonSegment>
         </div>
