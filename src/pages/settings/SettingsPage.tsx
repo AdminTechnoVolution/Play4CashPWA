@@ -14,12 +14,13 @@ import {
   IonText,
   IonIcon,
   IonSkeletonText,
-  IonToast,
+  IonAlert,
 } from '@ionic/react';
 import {
+  chevronDownOutline,
+  chevronUpOutline,
   walletOutline,
   globeOutline,
-  checkmarkCircleOutline,
   informationCircleOutline,
 } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
@@ -36,6 +37,7 @@ import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
 import { useLanguageStore } from '../../i18n/languageStore';
+import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -46,65 +48,79 @@ const LANGUAGES = [
   { code: 'pt', label: 'Português' },
 ];
 
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+};
+
 const SettingsPage: React.FC = () => {
   const t = useT();
-  const { lang, setLang } = useLanguageStore();
+  const { setLang } = useLanguageStore();
+
   const [wallets, setWallets] = useState<WalletResponse[]>([]);
-  const [selectedWallet, setSelectedWallet] = useState<WalletResponse | null>(null);
-  const [selectedNetwork, setSelectedNetwork] = useState('');
-  const [newWalletAddress, setNewWalletAddress] = useState('');
-  const [currentWalletAddress, setCurrentWalletAddress] = useState('');
+  const [selectedWalletIndex, setSelectedWalletIndex] = useState(0);
+  const [walletAddress, setWalletAddress] = useState('');
   const [language, setLanguage] = useState(getLanguage());
+
+  const [walletExpanded, setWalletExpanded] = useState(false);
+  const [languageExpanded, setLanguageExpanded] = useState(false);
   const [walletsLoading, setWalletsLoading] = useState(true);
   const [walletSaving, setWalletSaving] = useState(false);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState({ isOpen: false, message: '', color: '' });
+
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+
+  const selectedWallet = wallets[selectedWalletIndex] ?? null;
 
   useEffect(() => {
-    // Load current wallet address
     const account = getUserAccount();
     const storedAddress = getWalletAddress() ?? account?.walletAddress ?? '';
-    setCurrentWalletAddress(storedAddress);
-    setNewWalletAddress(storedAddress);
+    setWalletAddress(storedAddress);
 
     (async () => {
       setWalletsLoading(true);
       try {
         const data = await apiRepository.getWallets();
         setWallets(data);
-        if (data.length > 0) {
-          setSelectedWallet(data[0]);
-          setSelectedNetwork(data[0].network);
+
+        const userNetwork = account?.walletAddress;
+        if (userNetwork && data.length > 0) {
+          const idx = data.findIndex(
+            (w) =>
+              w.network.toLowerCase() === userNetwork.toLowerCase() ||
+              w.network.toLowerCase().includes(userNetwork.toLowerCase()) ||
+              userNetwork.toLowerCase().includes(w.network.toLowerCase()),
+          );
+          if (idx >= 0) setSelectedWalletIndex(idx);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load wallets.');
+        setError(err instanceof Error ? err.message : t('error_try_later_message'));
       } finally {
         setWalletsLoading(false);
       }
     })();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSaveWallet = async () => {
-    if (!newWalletAddress.trim()) {
-      setToast({ isOpen: true, message: 'Please enter a wallet address.', color: 'warning' });
-      return;
-    }
-    if (!selectedNetwork) {
-      setToast({ isOpen: true, message: 'Please select a network.', color: 'warning' });
-      return;
-    }
+    if (!walletAddress.trim()) return;
     setWalletSaving(true);
     try {
+      const network = selectedWallet?.network ?? 'TRX Tron(TRC20)';
       await apiRepository.registerWallet({
-        wallet: newWalletAddress.trim(),
-        coin: selectedWallet?.coin ?? 'USDT',
-        network: selectedNetwork,
+        wallet: walletAddress.trim(),
+        coin: 'USDT',
+        network,
       });
-      saveWalletAddress(newWalletAddress.trim());
-      setCurrentWalletAddress(newWalletAddress.trim());
-      setToast({ isOpen: true, message: t('recharge_success'), color: 'success' });
+      saveWalletAddress(walletAddress.trim());
+      setAlertMessage(t('wallet_saved_success'));
+      setAlertOpen(true);
     } catch (err) {
-      setToast({ isOpen: true, message: err instanceof Error ? err.message : 'Failed to save wallet.', color: 'danger' });
+      const msg = formatApiMessageForDisplay(
+        err instanceof Error ? err.message : null,
+        'error_try_later_message',
+      );
+      setAlertMessage(msg);
+      setAlertOpen(true);
     } finally {
       setWalletSaving(false);
     }
@@ -113,7 +129,8 @@ const SettingsPage: React.FC = () => {
   const handleSaveLanguage = () => {
     saveLanguage(language);
     setLang(language);
-    setToast({ isOpen: true, message: 'Language updated.', color: 'success' });
+    setAlertMessage(t('language_updated'));
+    setAlertOpen(true);
   };
 
   return (
@@ -123,224 +140,166 @@ const SettingsPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('settings_title')}</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>
+            {t('settings_title')}
+          </IonTitle>
         </IonToolbar>
       </IonHeader>
 
       <IonContent style={{ '--background': 'transparent' } as React.CSSProperties}>
-        <div style={{ padding: '24px 20px', maxWidth: '480px', margin: '0 auto', animation: 'fadeInUp 0.5s ease' }}>
+        <div
+          style={{
+            padding: '24px 20px',
+            maxWidth: '480px',
+            margin: '0 auto',
+            animation: 'fadeInUp 0.5s ease',
+          }}
+        >
+          {/* ── Wallet Section ── */}
+          <CollapsibleCard
+            icon={walletOutline}
+            title={t('configure_your_wallet')}
+            expanded={walletExpanded}
+            onToggle={() => setWalletExpanded((v) => !v)}
+          >
+            {/* Coin (read-only) */}
+            <FieldGroup label={t('label_coin')}>
+              <IonInput
+                value={t('value_coin_usdt')}
+                readonly
+                style={inputStyle as React.CSSProperties}
+              />
+            </FieldGroup>
 
-          {/* Wallet Section */}
-          <div style={{ marginBottom: '28px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: 'rgba(201,168,76,0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <IonIcon icon={walletOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '20px' }} />
-              </div>
-              <IonText>
-                <h3 style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '17px', margin: 0 }}>
-                  {t('label_wallet')}
-                </h3>
-              </IonText>
-            </div>
-
-            <div
-              style={{
-                background: 'var(--sovereign-surface)',
-                border: '1px solid var(--sovereign-border)',
-                borderRadius: '16px',
-                padding: '24px',
-              }}
-            >
-              {/* Current address display */}
-              {currentWalletAddress && (
-                <div
-                  style={{
-                    background: 'rgba(201,168,76,0.06)',
-                    border: '1px solid var(--sovereign-border)',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px',
-                  }}
-                >
-                  <IonIcon icon={checkmarkCircleOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '18px', flexShrink: 0, marginTop: '1px' }} />
-                  <div>
-                    <IonText>
-                      <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', margin: '0 0 3px 0', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                        Current address
-                      </p>
-                    </IonText>
-                    <IonText>
-                      <p style={{ color: 'var(--sovereign-text)', fontSize: '13px', margin: 0, fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                        {currentWalletAddress}
-                      </p>
-                    </IonText>
-                  </div>
-                </div>
-              )}
-
-              {/* Network */}
-              <div style={{ marginBottom: '16px' }}>
-                <SectionLabel>{t('label_network')}</SectionLabel>
-                {walletsLoading ? (
-                  <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
-                ) : (
-                  <IonSelect
-                    value={selectedNetwork}
-                    onIonChange={(e) => {
-                      const network = e.detail.value;
-                      setSelectedNetwork(network);
-                      const w = wallets.find((w) => w.network === network);
-                      if (w) setSelectedWallet(w);
-                    }}
-                    interface="action-sheet"
-                    placeholder="Select network"
-                    style={{
-                      '--background': 'transparent',
-                      '--color': 'var(--sovereign-text)',
-                      border: '1px solid var(--sovereign-border)',
-                      borderRadius: '10px',
-                      padding: '12px 14px',
-                      width: '100%',
-                    } as React.CSSProperties}
-                  >
-                    {wallets.map((w) => (
-                      <IonSelectOption key={w.network} value={w.network}>
-                        {w.coin} — {w.network}
-                      </IonSelectOption>
-                    ))}
-                  </IonSelect>
-                )}
-              </div>
-
-              {/* New wallet address */}
-              <div style={{ marginBottom: '20px' }}>
-                <SectionLabel>{t('label_wallet')}</SectionLabel>
-                <IonInput
-                  value={newWalletAddress}
-                  onIonInput={(e) => setNewWalletAddress(e.detail.value ?? '')}
-                  placeholder="Enter your withdrawal address"
-                  style={inputStyle as React.CSSProperties}
-                />
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '8px',
-                  alignItems: 'flex-start',
-                  background: 'rgba(138,155,191,0.08)',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  marginBottom: '20px',
-                }}
-              >
-                <IonIcon icon={informationCircleOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '16px', flexShrink: 0, marginTop: '1px' }} />
-                <IonText>
-                  <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
-                    Make sure the address matches the selected network. Sending to the wrong network may result in permanent loss of funds.
-                  </p>
-                </IonText>
-              </div>
-
-              <SovereignPrimaryButton onClick={handleSaveWallet} loading={walletSaving} expand="block">
-                {t('save_wallet')}
-              </SovereignPrimaryButton>
-            </div>
-          </div>
-
-          {/* Language Section */}
-          <div style={{ marginBottom: '28px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: 'rgba(201,168,76,0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <IonIcon icon={globeOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '20px' }} />
-              </div>
-              <IonText>
-                <h3 style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '17px', margin: 0 }}>
-                  {t('label_language')}
-                </h3>
-              </IonText>
-            </div>
-
-            <div
-              style={{
-                background: 'var(--sovereign-surface)',
-                border: '1px solid var(--sovereign-border)',
-                borderRadius: '16px',
-                padding: '24px',
-              }}
-            >
-              <div style={{ marginBottom: '20px' }}>
-                <SectionLabel>{t('label_language')}</SectionLabel>
+            {/* Network */}
+            <FieldGroup label={t('label_network')}>
+              {walletsLoading ? (
+                <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
+              ) : (
                 <IonSelect
-                  value={language}
-                  onIonChange={(e) => setLanguage(e.detail.value)}
+                  value={selectedWalletIndex}
+                  onIonChange={(e) => setSelectedWalletIndex(e.detail.value)}
                   interface="action-sheet"
-                  style={{
-                    '--background': 'transparent',
-                    '--color': 'var(--sovereign-text)',
-                    border: '1px solid var(--sovereign-border)',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    width: '100%',
-                  } as React.CSSProperties}
+                  placeholder="—"
+                  disabled={wallets.length === 0}
+                  style={selectStyle as React.CSSProperties}
                 >
-                  {LANGUAGES.map((lang) => (
-                    <IonSelectOption key={lang.code} value={lang.code}>
-                      {lang.label}
+                  {wallets.map((w, i) => (
+                    <IonSelectOption key={w.id || i} value={i}>
+                      {w.coin} — {w.network}
                     </IonSelectOption>
                   ))}
                 </IonSelect>
-              </div>
+              )}
+            </FieldGroup>
 
-              <SovereignPrimaryButton onClick={handleSaveLanguage} expand="block">
-                {t('save_wallet')}
-              </SovereignPrimaryButton>
+            {/* Wallet address */}
+            <FieldGroup label={t('label_wallet')}>
+              <IonInput
+                value={walletAddress}
+                onIonInput={(e) => setWalletAddress(e.detail.value ?? '')}
+                placeholder="TRC20, ERC20..."
+                style={inputStyle as React.CSSProperties}
+              />
+            </FieldGroup>
+
+            {/* Min withdrawal hint */}
+            {selectedWallet && selectedWallet.minAmount > 0 && (
+              <IonText>
+                <p style={hintStyle}>
+                  {t('label_min_withdrawal')}: {formatCurrency(selectedWallet.minAmount)}
+                </p>
+              </IonText>
+            )}
+
+            {/* Network withdrawal fee hint */}
+            {selectedWallet && selectedWallet.fee > 0 && (
+              <IonText>
+                <p style={hintStyle}>
+                  {t('withdrawal_fee_charged_note').replace('%s', formatCurrency(selectedWallet.fee))}
+                </p>
+              </IonText>
+            )}
+
+            {/* Warning */}
+            <div style={warningBoxStyle}>
+              <IonIcon
+                icon={informationCircleOutline}
+                style={{
+                  color: 'var(--sovereign-text-muted)',
+                  fontSize: '16px',
+                  flexShrink: 0,
+                  marginTop: '1px',
+                }}
+              />
+              <IonText>
+                <p
+                  style={{
+                    color: 'var(--sovereign-text-muted)',
+                    fontSize: '12px',
+                    margin: 0,
+                    lineHeight: '1.5',
+                  }}
+                >
+                  {t('wallet_network_warning')}
+                </p>
+              </IonText>
             </div>
-          </div>
 
-          {/* App info */}
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '20px',
-            }}
+            <SovereignPrimaryButton onClick={handleSaveWallet} loading={walletSaving} expand="block">
+              {t('save_wallet')}
+            </SovereignPrimaryButton>
+          </CollapsibleCard>
+
+          {/* ── Language Section ── */}
+          <CollapsibleCard
+            icon={globeOutline}
+            title={t('label_language')}
+            expanded={languageExpanded}
+            onToggle={() => setLanguageExpanded((v) => !v)}
           >
+            <FieldGroup label={t('label_language')}>
+              <IonSelect
+                value={language}
+                onIonChange={(e) => setLanguage(e.detail.value)}
+                interface="action-sheet"
+                style={selectStyle as React.CSSProperties}
+              >
+                {LANGUAGES.map((l) => (
+                  <IonSelectOption key={l.code} value={l.code}>
+                    {l.label}
+                  </IonSelectOption>
+                ))}
+              </IonSelect>
+            </FieldGroup>
+
+            <SovereignPrimaryButton onClick={handleSaveLanguage} expand="block">
+              {t('save_language')}
+            </SovereignPrimaryButton>
+          </CollapsibleCard>
+
+          {/* ── App Info Footer ── */}
+          <div style={{ textAlign: 'center', padding: '20px' }}>
             <IonText>
-              <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: 0, lineHeight: '1.8' }}>
+              <p
+                style={{
+                  color: 'var(--sovereign-text-muted)',
+                  fontSize: '12px',
+                  margin: 0,
+                  lineHeight: '1.8',
+                }}
+              >
                 {t('label_version')}
                 <br />
-                <Link to="/terms" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none' }}>
+                <Link to="/terms" style={linkStyle}>
                   Terms &amp; Conditions
                 </Link>
                 {' · '}
-                <Link to="/privacy" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none' }}>
+                <Link to="/privacy" style={linkStyle}>
                   Privacy Policy
                 </Link>
                 {' · '}
-                <Link to="/data-treatment" style={{ color: 'var(--sovereign-gold)', textDecoration: 'none' }}>
+                <Link to="/data-treatment" style={linkStyle}>
                   Data Processing
                 </Link>
               </p>
@@ -350,12 +309,14 @@ const SettingsPage: React.FC = () => {
           <div style={{ height: '40px' }} />
         </div>
 
-        <IonToast
-          isOpen={toast.isOpen}
-          message={toast.message}
-          duration={3000}
-          color={toast.color}
-          onDidDismiss={() => setToast({ ...toast, isOpen: false })}
+        {/* AlertDialog — mirrors Android pattern */}
+        <IonAlert
+          isOpen={alertOpen}
+          onDidDismiss={() => setAlertOpen(false)}
+          header={t('information')}
+          message={alertMessage}
+          buttons={[t('ok')]}
+          cssClass="sovereign-alert"
         />
       </IonContent>
 
@@ -364,23 +325,120 @@ const SettingsPage: React.FC = () => {
   );
 };
 
-const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <IonText>
-    <label
+/* ── Collapsible Card ── */
+
+interface CollapsibleCardProps {
+  icon: string;
+  title: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
+  icon,
+  title,
+  expanded,
+  onToggle,
+  children,
+}) => (
+  <div style={{ marginBottom: '20px' }}>
+    <div
+      onClick={onToggle}
       style={{
-        color: 'var(--sovereign-text-muted)',
-        fontSize: '11px',
-        fontWeight: '700',
-        letterSpacing: '1px',
-        display: 'block',
-        marginBottom: '8px',
-        textTransform: 'uppercase',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        cursor: 'pointer',
+        background: 'var(--sovereign-surface)',
+        border: '1px solid var(--sovereign-border)',
+        borderRadius: expanded ? '16px 16px 0 0' : '16px',
+        padding: '16px 20px',
+        transition: 'border-radius 0.2s ease',
+        userSelect: 'none',
       }}
     >
-      {children}
-    </label>
-  </IonText>
+      <div
+        style={{
+          width: '36px',
+          height: '36px',
+          borderRadius: '10px',
+          background: 'rgba(201,168,76,0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <IonIcon icon={icon} style={{ color: 'var(--sovereign-gold)', fontSize: '20px' }} />
+      </div>
+      <IonText style={{ flex: 1 }}>
+        <h3
+          style={{
+            color: 'var(--sovereign-text)',
+            fontWeight: '700',
+            fontSize: '16px',
+            margin: 0,
+          }}
+        >
+          {title}
+        </h3>
+      </IonText>
+      <IonIcon
+        icon={expanded ? chevronUpOutline : chevronDownOutline}
+        style={{ color: 'var(--sovereign-text)', fontSize: '20px', flexShrink: 0 }}
+      />
+    </div>
+
+    <div
+      style={{
+        maxHeight: expanded ? '800px' : '0',
+        overflow: 'hidden',
+        transition: 'max-height 0.35s ease',
+      }}
+    >
+      <div
+        style={{
+          background: 'var(--sovereign-surface)',
+          border: '1px solid var(--sovereign-border)',
+          borderTop: 'none',
+          borderRadius: '0 0 16px 16px',
+          padding: '20px',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  </div>
 );
+
+/* ── Field Group ── */
+
+const FieldGroup: React.FC<{ label: string; children: React.ReactNode }> = ({
+  label,
+  children,
+}) => (
+  <div style={{ marginBottom: '16px' }}>
+    <IonText>
+      <label
+        style={{
+          color: 'var(--sovereign-text-muted)',
+          fontSize: '11px',
+          fontWeight: '700',
+          letterSpacing: '1px',
+          display: 'block',
+          marginBottom: '8px',
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </label>
+    </IonText>
+    {children}
+  </div>
+);
+
+/* ── Styles ── */
 
 const inputStyle = {
   '--background': 'transparent',
@@ -392,6 +450,37 @@ const inputStyle = {
   '--padding-bottom': '12px',
   border: '1px solid var(--sovereign-border)',
   borderRadius: '10px',
+};
+
+const selectStyle = {
+  '--background': 'transparent',
+  '--color': 'var(--sovereign-text)',
+  border: '1px solid var(--sovereign-border)',
+  borderRadius: '10px',
+  padding: '12px 14px',
+  width: '100%',
+};
+
+const hintStyle: React.CSSProperties = {
+  color: 'var(--sovereign-text-muted)',
+  fontSize: '12px',
+  margin: '0 0 12px 0',
+  lineHeight: '1.5',
+};
+
+const warningBoxStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: '8px',
+  alignItems: 'flex-start',
+  background: 'rgba(138,155,191,0.08)',
+  borderRadius: '8px',
+  padding: '10px 12px',
+  marginBottom: '20px',
+};
+
+const linkStyle: React.CSSProperties = {
+  color: 'var(--sovereign-gold)',
+  textDecoration: 'none',
 };
 
 export default SettingsPage;

@@ -54,8 +54,8 @@ function dispatchAuthFailure(): void {
 
 function extractErrorMessage(error: AxiosError): string {
   const body = error.response?.data as ApiResponse<unknown> | undefined;
-  if (body?.messages && body.messages.length > 0) return body.messages[0];
   if (body?.message) return body.message;
+  if (body?.messages && body.messages.length > 0) return body.messages[0];
   return error.message ?? 'Unknown error';
 }
 

@@ -7,16 +7,13 @@ import {
   IonContent,
   IonBackButton,
   IonButtons,
-  IonSelect,
-  IonSelectOption,
   IonInput,
   IonText,
   IonIcon,
-  IonSkeletonText,
-  IonToast,
+  IonAlert,
 } from '@ionic/react';
 import { useNavigate } from 'react-router-dom';
-import { walletOutline, cashOutline, informationCircleOutline, alertCircleOutline } from 'ionicons/icons';
+import { informationCircleOutline, alertCircleOutline } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
@@ -26,74 +23,123 @@ import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
 
+const ERROR_WITHDRAWAL_PENDING_VERIFY = 'ERROR_WITHDRAWAL_PENDING_VERIFY';
+
+const formatCurrency = (n: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+
 const WithdrawalPage: React.FC = () => {
   const t = useT();
   const navigate = useNavigate();
 
-  // Balance and daily limit come from the account stored locally — no URL params needed
-  const { account } = useDashboardStore();
-  const balance = account?.balance ?? 0;
-  const dailyLimit = account?.limits?.dailyWithdrawal ?? 0;
+  const { account, refreshAccount } = useDashboardStore();
 
-  const [wallets, setWallets] = useState<WalletResponse[]>([]);
-  const [selectedWallet, setSelectedWallet] = useState<WalletResponse | null>(null);
-  const [amount, setAmount] = useState('');
-  const [walletAddress, setWalletAddress] = useState('');
+  const [balance, setBalance] = useState(account?.balance ?? 0);
+  const [dailyLimit, setDailyLimit] = useState(account?.limits?.dailyWithdrawal ?? 0);
+  const [amountText, setAmountText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [walletsLoading, setWalletsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [fieldError, setFieldError] = useState('');
-  const [toast, setToast] = useState({ isOpen: false, message: '', color: '' });
 
-  const remainingDailyLimit = dailyLimit;
+  // Wallet destination info (read-only, from account + wallets API)
+  const [walletInfo, setWalletInfo] = useState<{ coin: string; network: string; address: string } | null>(null);
+  const [minAmount, setMinAmount] = useState(0);
+  const [networkFee, setNetworkFee] = useState(0);
+
+  // AlertDialog state (matches Android pattern)
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [navigateToVerifyOnDismiss, setNavigateToVerifyOnDismiss] = useState(false);
+
+  useEffect(() => {
+    if (!alertOpen && navigateToVerifyOnDismiss) {
+      setNavigateToVerifyOnDismiss(false);
+      navigate('/withdrawal-verify');
+    }
+  }, [alertOpen, navigateToVerifyOnDismiss, navigate]);
 
   useEffect(() => {
     (async () => {
-      setWalletsLoading(true);
       try {
-        const data = await apiRepository.getWallets();
-        setWallets(data);
-        if (data.length > 0) setSelectedWallet(data[0]);
+        if (!account) {
+          refreshAccount();
+        }
+        apiRepository.invalidateAccountCache();
+        const acc = await apiRepository.getUserAccount();
+        setBalance(acc.balance ?? 0);
+        setDailyLimit(acc.limits?.dailyWithdrawal ?? 0);
+
+        const walletAddr = acc.walletAddress;
+        const walletCoin = acc.walletCoin || 'USDT';
+        const walletNet = acc.walletNetwork || '';
+
+        if (walletAddr) {
+          const wallets = await apiRepository.getWallets();
+          const matched = wallets.find(
+            (w) =>
+              w.network.toLowerCase() === walletNet.toLowerCase() ||
+              w.network.toLowerCase().includes(walletNet.toLowerCase()) ||
+              walletNet.toLowerCase().includes(w.network.toLowerCase()),
+          );
+          const networkDisplay = matched
+            ? `${matched.network}${matched.description ? ' - ' + matched.description : ''}`
+            : walletNet || '—';
+          setWalletInfo({ coin: walletCoin, network: networkDisplay, address: walletAddr });
+          setMinAmount(matched?.minAmount ?? 0);
+          setNetworkFee(matched?.fee ?? 0);
+        }
       } catch (err: any) {
         setError(formatApiMessageForDisplay(err));
-      } finally {
-        setWalletsLoading(false);
       }
     })();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const amountNum = parseFloat(amount || '0');
-  const fee = selectedWallet?.fee ?? 0;
-  const youReceive = Math.max(0, amountNum - fee);
+  const amount = parseInt(amountText, 10) || 0;
+  const netReceive = Math.max(0, amount - networkFee);
 
-  const validate = (): string => {
-    if (!walletAddress.trim()) return t('recharge_error_tx_required');
-    if (!selectedWallet) return t('error_generic');
-    if (isNaN(amountNum) || amountNum <= 0) return t('recharge_error_amount_invalid');
-    if (amountNum < selectedWallet.minAmount) return `${t('label_min_withdrawal')} $${selectedWallet.minAmount}.`;
-    if (amountNum > balance) return t('ERROR_WITHDRAWAL_INSUFFICIENT_BALANCE');
-    if (amountNum > remainingDailyLimit) return t('daily_withdrawal_limit_exceeded_warning').replace('%s', `$${remainingDailyLimit}`);
+  const exceedsBalance = balance > 0 && amount > balance;
+  const exceedsDailyLimit = dailyLimit > 0 && amount > dailyLimit;
+  const belowMinimum = minAmount > 0 && amount > 0 && amount < minAmount;
+  const belowFee = networkFee > 0 && amount > 0 && amount <= networkFee;
+
+  const amountError = (() => {
+    if (exceedsBalance)
+      return t('withdrawal_amount_exceeds_balance').replace('%s', formatCurrency(balance));
+    if (exceedsDailyLimit)
+      return t('daily_withdrawal_limit_exceeded_warning').replace('%s', formatCurrency(dailyLimit));
+    if (belowMinimum)
+      return t('withdrawal_amount_below_minimum').replace('%s', formatCurrency(minAmount));
+    if (belowFee)
+      return t('withdrawal_amount_below_fee').replace('%s', formatCurrency(networkFee));
     return '';
-  };
+  })();
+
+  const canSubmit = amount > 0 && !exceedsBalance && !exceedsDailyLimit && !belowMinimum && !belowFee && !loading;
 
   const handleSubmit = async () => {
-    const validationError = validate();
-    if (validationError) {
-      setFieldError(validationError);
-      return;
-    }
-    if (!selectedWallet) return;
-
+    if (!canSubmit) return;
     setLoading(true);
-    setFieldError('');
     try {
-      await apiRepository.withdrawal({ amount: amountNum });
-      navigate('/withdrawal-verify');
+      await apiRepository.withdrawal({ amount });
+      setAlertMessage(t('withdrawal_success'));
+      setNavigateToVerifyOnDismiss(true);
+      setAlertOpen(true);
     } catch (err: any) {
-      setFieldError(formatApiMessageForDisplay(err));
+      const raw = (err.message ?? '').trim();
+      if (raw.includes(ERROR_WITHDRAWAL_PENDING_VERIFY)) {
+        setAlertMessage(t(ERROR_WITHDRAWAL_PENDING_VERIFY));
+        setNavigateToVerifyOnDismiss(true);
+      } else {
+        setAlertMessage(formatApiMessageForDisplay(err.message, 'error_try_later_message'));
+        setNavigateToVerifyOnDismiss(false);
+      }
+      setAlertOpen(true);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAlertOk = () => {
+    setAlertOpen(false);
   };
 
   return (
@@ -103,233 +149,111 @@ const WithdrawalPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('withdrawal_title')}</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>
+            {t('withdrawal_title')}
+          </IonTitle>
         </IonToolbar>
       </IonHeader>
 
       <IonContent style={{ '--background': 'transparent' } as React.CSSProperties}>
         <div style={{ padding: '24px 20px', maxWidth: '480px', margin: '0 auto', animation: 'fadeInUp 0.5s ease' }}>
 
-          {/* Balance display */}
-          <div
-            style={{
-              background: 'linear-gradient(135deg, var(--sovereign-surface) 0%, var(--sovereign-surface-high) 100%)',
-              border: '1px solid var(--sovereign-border)',
-              borderRadius: '16px',
-              padding: '24px',
-              marginBottom: '24px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <div>
+          {/* Wallet destination card (read-only, matching Android) */}
+          {walletInfo && (
+            <div style={cardStyle}>
               <IonText>
-                <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', letterSpacing: '1px', margin: '0 0 4px 0', textTransform: 'uppercase' }}>
-                  {t('withdrawal_available_balance')}
-                </p>
+                <p style={cardTitleStyle}>{t('withdrawal_destination')}</p>
               </IonText>
-              <IonText>
-                <h2 style={{ color: 'var(--sovereign-gold)', fontSize: '28px', fontWeight: '800', margin: 0 }}>
-                  ${balance.toFixed(2)}
-                </h2>
-              </IonText>
-            </div>
-            <div
-              style={{
-                width: '50px',
-                height: '50px',
-                borderRadius: '12px',
-                background: 'rgba(201,168,76,0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <IonIcon icon={cashOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '28px' }} />
-            </div>
-          </div>
-
-          {/* Daily limit */}
-          <div
-            style={{
-              background: 'rgba(138,155,191,0.08)',
-              border: '1px solid rgba(138,155,191,0.15)',
-              borderRadius: '10px',
-              padding: '12px 14px',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-            }}
-          >
-            <IonIcon icon={informationCircleOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '18px', flexShrink: 0 }} />
-            <IonText>
-              <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', margin: 0 }}>
-                {t('daily_withdrawal_limit_label').replace('%s', dailyLimit.toFixed(2))}
-              </p>
-            </IonText>
-          </div>
-
-          {/* Form card */}
-          <div
-            style={{
-              background: 'var(--sovereign-surface)',
-              border: '1px solid var(--sovereign-border)',
-              borderRadius: '16px',
-              padding: '24px',
-              marginBottom: '24px',
-            }}
-          >
-            {/* Network */}
-            <div style={{ marginBottom: '20px' }}>
-              <SectionLabel>{t('label_network')}</SectionLabel>
-              {walletsLoading ? (
-                <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
-              ) : (
-                <IonSelect
-                  value={selectedWallet?.network}
-                  onIonChange={(e) => {
-                    const w = wallets.find((w) => w.network === e.detail.value);
-                    if (w) setSelectedWallet(w);
-                  }}
-                  interface="action-sheet"
-                  placeholder="Select network"
-                  style={{
-                    '--background': 'transparent',
-                    '--color': 'var(--sovereign-text)',
-                    border: '1px solid var(--sovereign-border)',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    width: '100%',
-                  } as React.CSSProperties}
-                >
-                  {wallets.map((w) => (
-                    <IonSelectOption key={w.network} value={w.network}>
-                      {w.coin} — {w.network}
-                    </IonSelectOption>
-                  ))}
-                </IonSelect>
-              )}
-            </div>
-
-            {/* Wallet address */}
-            <div style={{ marginBottom: '20px' }}>
-              <SectionLabel>{t('label_wallet')}</SectionLabel>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <IonIcon icon={walletOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '18px', flexShrink: 0 }} />
-                <IonInput
-                  value={walletAddress}
-                  onIonInput={(e) => setWalletAddress(e.detail.value ?? '')}
-                  placeholder="Enter your wallet address"
-                  style={{
-                    ...inputStyle,
-                    flex: 1,
-                  } as React.CSSProperties}
-                />
+              <div style={{ marginTop: '12px' }}>
+                <InfoRow label={t('label_coin')} value={walletInfo.coin} />
+                <InfoRow label={t('label_network')} value={walletInfo.network} />
+                <InfoRow label={t('label_wallet')} value={walletInfo.address} mono />
+                {minAmount > 0 && (
+                  <InfoRow label={t('label_min_withdrawal')} value={formatCurrency(minAmount)} />
+                )}
+                {networkFee > 0 && (
+                  <IonText>
+                    <p style={hintStyle}>
+                      {t('withdrawal_fee_charged_note').replace('%s', formatCurrency(networkFee))}
+                    </p>
+                  </IonText>
+                )}
               </div>
             </div>
+          )}
 
-            {/* Amount */}
-            <div style={{ marginBottom: '20px' }}>
-              <SectionLabel>{t('label_amount')}</SectionLabel>
+          {/* Amount card */}
+          <div style={cardStyle}>
+            {/* Available balance */}
+            <IonText>
+              <p style={{ ...cardTitleStyle, marginBottom: '4px' }}>
+                {t('withdrawal_available_balance')}: {formatCurrency(balance)}
+              </p>
+            </IonText>
+
+            {/* Daily limit */}
+            {dailyLimit > 0 && (
+              <IonText>
+                <p style={hintStyle}>
+                  {t('daily_withdrawal_limit_label').replace('%s', formatCurrency(dailyLimit))}
+                </p>
+              </IonText>
+            )}
+
+            {/* Amount input */}
+            <div style={{ marginTop: '16px', marginBottom: '4px' }}>
+              <SectionLabel>{t('withdrawal_amount_label')}</SectionLabel>
               <IonInput
                 type="number"
-                value={amount}
+                inputmode="numeric"
+                value={amountText}
                 onIonInput={(e) => {
-                  setAmount(e.detail.value ?? '');
-                  setFieldError('');
+                  const v = e.detail.value ?? '';
+                  if (v === '' || /^\d*$/.test(v)) setAmountText(v);
                 }}
-                placeholder={selectedWallet ? `Min $${selectedWallet.minAmount}` : 'Amount'}
-                min={String(selectedWallet?.minAmount ?? 0)}
-                max={String(Math.min(balance, remainingDailyLimit))}
-                step="0.01"
-                style={inputStyle as React.CSSProperties}
+                placeholder="0"
+                style={{
+                  ...inputStyle,
+                  ...(amountError ? { border: '1px solid var(--sovereign-error)' } : {}),
+                } as React.CSSProperties}
               />
             </div>
 
-            {/* Fee calculation */}
-            {amountNum > 0 && selectedWallet && (
-              <div
-                style={{
-                  background: 'var(--sovereign-bg)',
-                  border: '1px solid var(--sovereign-border)',
-                  borderRadius: '10px',
-                  padding: '14px',
-                  marginBottom: '20px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <IonText>
-                    <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>{t('label_amount')}</span>
-                  </IonText>
-                  <IonText>
-                    <span style={{ color: 'var(--sovereign-text)', fontSize: '13px' }}>${amountNum.toFixed(2)}</span>
-                  </IonText>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <IonText>
-                    <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>{t('label_network_withdrawal_fee')}</span>
-                  </IonText>
-                  <IonText>
-                    <span style={{ color: 'var(--sovereign-error)', fontSize: '13px' }}>-${fee.toFixed(2)}</span>
-                  </IonText>
-                </div>
-                <div
-                  style={{
-                    borderTop: '1px solid var(--sovereign-border)',
-                    paddingTop: '10px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <IonText>
-                    <span style={{ color: 'var(--sovereign-text)', fontWeight: '600', fontSize: '14px' }}>{t('withdrawal_you_will_receive').replace('%s', '')}</span>
-                  </IonText>
-                  <IonText>
-                    <span style={{ color: 'var(--sovereign-gold)', fontWeight: '800', fontSize: '16px' }}>
-                      ${youReceive.toFixed(2)}
-                    </span>
-                  </IonText>
-                </div>
-              </div>
-            )}
-
-            {/* Error */}
-            {fieldError && (
-              <div
-                style={{
-                  background: 'rgba(207,102,121,0.12)',
-                  border: '1px solid rgba(207,102,121,0.4)',
-                  borderRadius: '10px',
-                  padding: '12px 14px',
-                  marginBottom: '20px',
-                  display: 'flex',
-                  gap: '8px',
-                  alignItems: 'flex-start',
-                }}
-              >
-                <IonIcon icon={alertCircleOutline} style={{ color: 'var(--sovereign-error)', fontSize: '18px', flexShrink: 0, marginTop: '1px' }} />
+            {/* Validation error */}
+            {amountError && (
+              <div style={errorBoxStyle}>
+                <IonIcon icon={alertCircleOutline} style={{ color: 'var(--sovereign-error)', fontSize: '16px', flexShrink: 0, marginTop: '1px' }} />
                 <IonText>
-                  <p style={{ color: 'var(--sovereign-error)', fontSize: '13px', margin: 0 }}>{fieldError}</p>
+                  <p style={{ color: 'var(--sovereign-error)', fontSize: '12px', margin: 0 }}>{amountError}</p>
                 </IonText>
               </div>
             )}
 
-            <SovereignPrimaryButton onClick={handleSubmit} loading={loading} expand="block">
-              {loading ? t('loading') : t('withdrawal_request_button')}
-            </SovereignPrimaryButton>
+            {/* You will receive */}
+            {amount > 0 && !amountError && (
+              <IonText>
+                <p style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '15px', margin: '12px 0 0 0' }}>
+                  {t('withdrawal_you_will_receive').replace('%s', formatCurrency(netReceive))}
+                </p>
+              </IonText>
+            )}
+
+            <div style={{ marginTop: '24px' }}>
+              <SovereignPrimaryButton onClick={handleSubmit} loading={loading} disabled={!canSubmit} expand="block">
+                {t('withdrawal_request_button')}
+              </SovereignPrimaryButton>
+            </div>
           </div>
 
           <div style={{ height: '40px' }} />
         </div>
 
-        <IonToast
-          isOpen={toast.isOpen}
-          message={formatApiMessageForDisplay(toast.message)}
-          duration={3000}
-          color={toast.color}
-          onDidDismiss={() => setToast({ ...toast, isOpen: false })}
+        <IonAlert
+          isOpen={alertOpen}
+          onDidDismiss={handleAlertOk}
+          header={t('information')}
+          message={alertMessage}
+          buttons={[{ text: t('ok'), handler: handleAlertOk }]}
         />
       </IonContent>
 
@@ -338,23 +262,54 @@ const WithdrawalPage: React.FC = () => {
   );
 };
 
+/* ── Sub-components ── */
+
+const InfoRow: React.FC<{ label: string; value: string; mono?: boolean }> = ({ label, value, mono }) => (
+  <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+    <IonText>
+      <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', fontWeight: '700' }}>{label}:</span>
+    </IonText>
+    <IonText style={{ flex: 1, minWidth: 0 }}>
+      <span style={{ color: 'var(--sovereign-text)', fontSize: '13px', wordBreak: 'break-all', ...(mono ? { fontFamily: 'monospace' } : {}) }}>
+        {value}
+      </span>
+    </IonText>
+  </div>
+);
+
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <IonText>
-    <label
-      style={{
-        color: 'var(--sovereign-text-muted)',
-        fontSize: '11px',
-        fontWeight: '700',
-        letterSpacing: '1px',
-        display: 'block',
-        marginBottom: '8px',
-        textTransform: 'uppercase',
-      }}
-    >
+    <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', fontWeight: '700', letterSpacing: '1px', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>
       {children}
     </label>
   </IonText>
 );
+
+/* ── Styles ── */
+
+const cardStyle: React.CSSProperties = {
+  background: 'var(--sovereign-surface)',
+  border: '1px solid var(--sovereign-border)',
+  borderRadius: '16px',
+  padding: '20px',
+  marginBottom: '16px',
+};
+
+const cardTitleStyle: React.CSSProperties = {
+  color: 'var(--sovereign-text-muted)',
+  fontSize: '13px',
+  fontWeight: '700',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+  margin: 0,
+};
+
+const hintStyle: React.CSSProperties = {
+  color: 'var(--sovereign-text-muted)',
+  fontSize: '12px',
+  margin: '6px 0 0 0',
+  lineHeight: '1.5',
+};
 
 const inputStyle = {
   '--background': 'transparent',
@@ -366,6 +321,13 @@ const inputStyle = {
   '--padding-bottom': '12px',
   border: '1px solid var(--sovereign-border)',
   borderRadius: '10px',
+};
+
+const errorBoxStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: '6px',
+  alignItems: 'flex-start',
+  marginTop: '8px',
 };
 
 export default WithdrawalPage;

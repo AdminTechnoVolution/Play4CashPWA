@@ -142,14 +142,19 @@ const TransactionHistoryPage: React.FC = () => {
 
   const statusLabel = (status: string): string => {
     const s = status.toLowerCase();
-    // Android history screen displays raw status with first letter uppercased
+    if (s.includes('success') || s.includes('approved') || s.includes('complete'))
+      return t('APP.HISTORY.STATUS_COMPLETED');
+    if (s.includes('pending') || s.includes('processing'))
+      return t('APP.HISTORY.STATUS_PENDING');
+    if (s.includes('fail') || s.includes('reject') || s.includes('error'))
+      return t('APP.HISTORY.STATUS_FAILED');
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   const gameResultStyle = (result: 'win' | 'lose' | 'draw'): { bg: string; color: string; label: string } => {
-    if (result === 'win') return { bg: 'rgba(76,175,80,0.15)', color: '#4caf50', label: t('game_history_status_won') };
-    if (result === 'lose') return { bg: 'rgba(207,102,121,0.15)', color: 'var(--sovereign-error)', label: t('game_history_status_lost') };
-    return { bg: 'rgba(138,155,191,0.15)', color: 'var(--sovereign-text-muted)', label: t('game_history_status_draw') };
+    if (result === 'win') return { bg: 'rgba(76,175,80,0.15)', color: '#4caf50', label: t('APP.HISTORY.RESULT_WIN') };
+    if (result === 'lose') return { bg: 'rgba(207,102,121,0.15)', color: 'var(--sovereign-error)', label: t('APP.HISTORY.RESULT_LOSE') };
+    return { bg: 'rgba(138,155,191,0.15)', color: 'var(--sovereign-text-muted)', label: t('APP.HISTORY.RESULT_DRAW') };
   };
 
   const SkeletonItem = () => (

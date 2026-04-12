@@ -140,6 +140,152 @@ ion-badge {
   padding: 3px 8px;
 }
 
+/* ── Overlay contrast fixes (action-sheet, popover, alert) ───────────────── */
+
+ion-action-sheet {
+  --background: var(--sovereign-surface);
+  --button-color: var(--sovereign-text);
+  --color: var(--sovereign-text);
+}
+
+ion-action-sheet .action-sheet-group {
+  background: var(--sovereign-surface) !important;
+}
+
+ion-action-sheet .action-sheet-title {
+  color: var(--sovereign-text-muted) !important;
+}
+
+ion-action-sheet .action-sheet-button {
+  color: var(--sovereign-text) !important;
+  background: transparent !important;
+}
+
+ion-action-sheet .action-sheet-button:hover {
+  background: var(--sovereign-surface-high) !important;
+}
+
+ion-action-sheet .action-sheet-cancel .action-sheet-button-inner {
+  color: var(--sovereign-error) !important;
+}
+
+ion-action-sheet .action-sheet-selected {
+  color: var(--sovereign-gold) !important;
+}
+
+ion-popover {
+  --background: var(--sovereign-surface);
+  --color: var(--sovereign-text);
+}
+
+ion-popover ion-content {
+  --background: var(--sovereign-surface) !important;
+}
+
+ion-popover ion-list {
+  background: var(--sovereign-surface) !important;
+}
+
+ion-popover ion-item {
+  --background: var(--sovereign-surface) !important;
+  --color: var(--sovereign-text) !important;
+  color: var(--sovereign-text) !important;
+}
+
+ion-popover ion-item ion-label {
+  color: var(--sovereign-text) !important;
+}
+
+ion-popover ion-item ion-radio {
+  --color: var(--sovereign-text-muted);
+  --color-checked: var(--sovereign-gold);
+}
+
+ion-popover ion-select-popover ion-list {
+  background: var(--sovereign-surface) !important;
+}
+
+ion-alert {
+  --background: var(--sovereign-surface) !important;
+  --color: var(--sovereign-text) !important;
+}
+
+ion-alert .alert-wrapper {
+  background: var(--sovereign-surface) !important;
+}
+
+ion-alert .alert-head {
+  border-bottom: 1px solid var(--sovereign-border);
+}
+
+ion-alert .alert-title {
+  color: var(--sovereign-text) !important;
+  font-weight: 700;
+}
+
+ion-alert .alert-sub-title {
+  color: var(--sovereign-text-muted) !important;
+}
+
+ion-alert .alert-message {
+  color: var(--sovereign-text) !important;
+}
+
+ion-alert .alert-button {
+  color: var(--sovereign-gold) !important;
+  font-weight: 600;
+}
+
+ion-alert .alert-button.alert-button-role-destructive {
+  color: var(--sovereign-error) !important;
+}
+
+ion-alert .alert-input {
+  background: var(--sovereign-bg) !important;
+  color: var(--sovereign-text) !important;
+  border-color: var(--sovereign-border) !important;
+}
+
+/* IonSelect alert interface (radio/checkbox list) */
+ion-alert .alert-radio-group,
+ion-alert .alert-checkbox-group {
+  border-top: 1px solid var(--sovereign-border);
+  border-bottom: 1px solid var(--sovereign-border);
+}
+
+ion-alert .alert-radio-label,
+ion-alert .alert-checkbox-label {
+  color: var(--sovereign-text) !important;
+}
+
+ion-alert .alert-radio-icon {
+  border-color: var(--sovereign-text-muted) !important;
+}
+
+ion-alert .alert-radio-inner {
+  background-color: var(--sovereign-gold) !important;
+}
+
+ion-alert [aria-checked="true"] .alert-radio-icon {
+  border-color: var(--sovereign-gold) !important;
+}
+
+ion-alert [aria-checked="true"] .alert-radio-label {
+  color: var(--sovereign-gold) !important;
+}
+
+ion-alert .alert-tappable {
+  background: transparent !important;
+}
+
+ion-alert .alert-tappable:hover {
+  background: var(--sovereign-surface-high) !important;
+}
+
+ion-alert .alert-button-group {
+  border-top: 1px solid var(--sovereign-border);
+}
+
 @keyframes gradientShift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }

@@ -12,13 +12,12 @@ import {
   IonInput,
   IonText,
   IonIcon,
-  IonSkeletonText,
-  IonToast,
-  IonSpinner,
+  IonAlert,
 } from '@ionic/react';
-import { QRCodeSVG } from 'qrcode.react';
-import { copyOutline, checkmarkOutline, informationCircleOutline } from 'ionicons/icons';
+import { useNavigate } from 'react-router-dom';
+import { copyOutline, checkmarkOutline } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
+import { useDashboardStore } from '../../store/dashboardStore';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
@@ -26,76 +25,118 @@ import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
 
+function isValidDepositAmountInput(s: string): boolean {
+  if (s === '') return true;
+  if ((s.match(/\./g) || []).length > 1) return false;
+  return /^\d*(\.\d*)?$/.test(s);
+}
+
 const AddFundsPage: React.FC = () => {
   const t = useT();
+  const navigate = useNavigate();
+  const { refreshAccount } = useDashboardStore();
+
+  const [step, setStep] = useState(1);
   const [wallets, setWallets] = useState<WalletResponse[]>([]);
-  const [selectedWallet, setSelectedWallet] = useState<WalletResponse | null>(null);
-  const [txId, setTxId] = useState('');
-  const [amount, setAmount] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [selectedWalletIndex, setSelectedWalletIndex] = useState(0);
   const [walletsLoading, setWalletsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState({ isOpen: false, message: '', color: '' });
   const [copied, setCopied] = useState(false);
+
+  // Step 2 form
+  const [txId, setTxId] = useState('');
+  const [amountText, setAmountText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Alert state (matches Android AlertDialog)
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!alertOpen && isSuccess) {
+      setIsSuccess(false);
+      refreshAccount();
+      navigate('/dashboard');
+    }
+  }, [alertOpen, isSuccess, refreshAccount, navigate]);
 
   useEffect(() => {
     (async () => {
       setWalletsLoading(true);
       try {
-        const data = await apiRepository.getWallets();
-        setWallets(data);
-        if (data.length > 0) setSelectedWallet(data[0]);
+        const acc = await apiRepository.getUserAccount();
+        const userNetwork = acc.walletNetwork || '';
+        const allWallets = await apiRepository.getWallets();
+        const active = allWallets.filter((w) => w.isActive);
+        setWallets(active);
+
+        const idx = userNetwork
+          ? active.findIndex(
+              (w) =>
+                w.network.toLowerCase() === userNetwork.toLowerCase() ||
+                w.network.toLowerCase().includes(userNetwork.toLowerCase()) ||
+                userNetwork.toLowerCase().includes(w.network.toLowerCase()),
+            )
+          : -1;
+        setSelectedWalletIndex(idx >= 0 ? idx : 0);
       } catch (err: any) {
         setError(formatApiMessageForDisplay(err));
       } finally {
         setWalletsLoading(false);
       }
     })();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedWallet = wallets[selectedWalletIndex] ?? null;
+  const depositAddress = selectedWallet?.address ?? '';
 
   const handleCopyAddress = async () => {
-    if (!selectedWallet) return;
+    if (!depositAddress) return;
     try {
-      await navigator.clipboard.writeText(selectedWallet.address);
+      await navigator.clipboard.writeText(depositAddress);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setToast({ isOpen: true, message: 'Could not copy address', color: 'warning' });
+      /* clipboard not available */
     }
   };
 
-  const handleSubmit = async () => {
-    if (!selectedWallet) return;
-    if (!txId.trim()) {
-      setToast({ isOpen: true, message: 'Transaction ID is required.', color: 'warning' });
+  const handleSubmit = () => {
+    const txIdTrimmed = txId.trim();
+    const amountDouble = parseFloat(amountText.trim());
+
+    if (!txIdTrimmed) {
+      setAlertMessage(t('recharge_error_tx_required'));
+      setAlertOpen(true);
       return;
     }
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      setToast({ isOpen: true, message: 'Please enter a valid amount.', color: 'warning' });
-      return;
-    }
-    if (amountNum < selectedWallet.minAmount) {
-      setToast({ isOpen: true, message: `Minimum amount is $${selectedWallet.minAmount}.`, color: 'warning' });
+    if (isNaN(amountDouble) || amountDouble <= 0) {
+      setAlertMessage(t('recharge_error_amount_invalid'));
+      setAlertOpen(true);
       return;
     }
 
-    setLoading(true);
-    try {
-      await apiRepository.recharge({ txId: txId.trim(), amount: amountNum, coin: 'usdt' });
-      setTxId('');
-      setAmount('');
-      setToast({ isOpen: true, message: t('recharge_success'), color: 'success' });
-    } catch (err: any) {
-      setToast({ isOpen: true, message: formatApiMessageForDisplay(err), color: 'danger' });
-    } finally {
-      setLoading(false);
-    }
+    setIsSubmitting(true);
+    (async () => {
+      try {
+        await apiRepository.recharge({
+          txId: txIdTrimmed,
+          amount: amountDouble,
+          coin: 'usdt',
+        });
+        setAlertMessage(t('recharge_success'));
+        setIsSuccess(true);
+        setAlertOpen(true);
+      } catch (err: any) {
+        setAlertMessage(formatApiMessageForDisplay(err.message, 'error_try_later_message'));
+        setIsSuccess(false);
+        setAlertOpen(true);
+      } finally {
+        setIsSubmitting(false);
+      }
+    })();
   };
-
-  const receiveAmount = selectedWallet
-    ? Math.max(0, parseFloat(amount || '0') - selectedWallet.fee)
-    : 0;
 
   return (
     <IonPage>
@@ -104,230 +145,203 @@ const AddFundsPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
-          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('add_funds_title')}</IonTitle>
+          <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>
+            {t('add_funds_title')}
+          </IonTitle>
         </IonToolbar>
       </IonHeader>
 
       <IonContent style={{ '--background': 'transparent' } as React.CSSProperties}>
         <div style={{ padding: '24px 20px', maxWidth: '480px', margin: '0 auto', animation: 'fadeInUp 0.5s ease' }}>
 
-          {/* Select network */}
-          <div style={{ marginBottom: '24px' }}>
-            <SectionLabel>{t('label_network')}</SectionLabel>
-            {walletsLoading ? (
-              <IonSkeletonText animated style={{ height: '48px', borderRadius: '10px' }} />
-            ) : (
-              <IonSelect
-                value={selectedWallet?.network}
-                onIonChange={(e) => {
-                  const w = wallets.find((w) => w.network === e.detail.value);
-                  if (w) setSelectedWallet(w);
-                }}
-                interface="action-sheet"
-                placeholder="Select network"
-                style={{
-                  '--background': 'var(--sovereign-surface)',
-                  '--color': 'var(--sovereign-text)',
-                  border: '1px solid var(--sovereign-border)',
-                  borderRadius: '10px',
-                  padding: '12px 14px',
-                  width: '100%',
-                } as React.CSSProperties}
-              >
-                {wallets.map((w) => (
-                  <IonSelectOption key={w.network} value={w.network}>
-                    {w.coin} — {w.network}
-                  </IonSelectOption>
-                ))}
-              </IonSelect>
-            )}
-          </div>
-
-          {/* Wallet details card */}
-          {selectedWallet && !walletsLoading && (
-            <div
-              style={{
-                background: 'var(--sovereign-surface)',
-                border: '1px solid var(--sovereign-border)',
-                borderRadius: '16px',
-                padding: '24px',
-                marginBottom: '24px',
-                animation: 'fadeInUp 0.4s ease',
-              }}
-            >
-              {/* QR Code */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  marginBottom: '20px',
-                  padding: '16px',
-                  background: '#ffffff',
-                  borderRadius: '12px',
-                }}
-              >
-                <QRCodeSVG
-                  value={selectedWallet.address}
-                  size={180}
-                  bgColor="#ffffff"
-                  fgColor="#0a1628"
-                  level="M"
-                />
-              </div>
-
-              {/* Network info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <InfoChip label={t('label_coin') || 'Coin'} value={selectedWallet.coin} />
-                <InfoChip label={t('label_network') || 'Network'} value={selectedWallet.network} />
-                <InfoChip label={t('label_min_withdrawal') || 'Min Amount'} value={`$${selectedWallet.minAmount}`} />
-                <InfoChip label={t('label_network_withdrawal_fee') || 'Fee'} value={`$${selectedWallet.fee}`} />
-              </div>
-
-              {/* Address */}
-              <div>
-                <SectionLabel>{t('deposit_address')}</SectionLabel>
-                <div
-                  style={{
-                    background: 'var(--sovereign-bg)',
-                    border: '1px solid var(--sovereign-border)',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '8px',
-                  }}
-                >
-                  <IonText>
-                    <span
-                      style={{
-                        color: 'var(--sovereign-text)',
-                        fontSize: '13px',
-                        wordBreak: 'break-all',
-                        flex: 1,
-                        fontFamily: 'monospace',
-                      }}
-                    >
-                      {selectedWallet.address}
-                    </span>
-                  </IonText>
-                  <IonIcon
-                    icon={copied ? checkmarkOutline : copyOutline}
-                    onClick={handleCopyAddress}
-                    style={{
-                      color: copied ? '#4caf50' : 'var(--sovereign-gold)',
-                      fontSize: '20px',
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                      transition: 'color 0.2s',
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Transaction form */}
-          {selectedWallet && (
-            <div
-              style={{
-                background: 'var(--sovereign-surface)',
-                border: '1px solid var(--sovereign-border)',
-                borderRadius: '16px',
-                padding: '24px',
-                marginBottom: '24px',
-                animation: 'fadeInUp 0.5s ease',
-              }}
-            >
-              <IonText>
-                <h3 style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '16px', margin: '0 0 20px 0' }}>
-                  Submit Recharge Request
-                </h3>
-              </IonText>
-
-              <div style={{ marginBottom: '16px' }}>
-                <SectionLabel>{t('label_transaction_id')}</SectionLabel>
-                <IonInput
-                  value={txId}
-                  onIonInput={(e) => setTxId(e.detail.value ?? '')}
-                  placeholder={t('label_transaction_id')}
-                  style={inputStyle}
-                />
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <SectionLabel>{t('label_amount')}</SectionLabel>
-                <IonInput
-                  type="number"
-                  value={amount}
-                  onIonInput={(e) => setAmount(e.detail.value ?? '')}
-                  placeholder={`${t('label_min_withdrawal')} $${selectedWallet.minAmount}`}
-                  min={String(selectedWallet.minAmount)}
-                  step="0.01"
-                  style={inputStyle}
-                />
-              </div>
-
-              {parseFloat(amount) > 0 && (
-                <div
-                  style={{
-                    background: 'rgba(201,168,76,0.08)',
-                    border: '1px solid var(--sovereign-border)',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <IonText>
-                    <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>
-                      {t('label_network_withdrawal_fee') || 'Fee'}: -${selectedWallet.fee}
-                    </span>
-                  </IonText>
-                  <IonText>
-                    <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '15px' }}>
-                      {t('withdrawal_you_will_receive').replace('%s', '')}: ${receiveAmount.toFixed(2)}
-                    </span>
-                  </IonText>
-                </div>
-              )}
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '8px',
-                  alignItems: 'flex-start',
-                  background: 'rgba(138,155,191,0.08)',
-                  borderRadius: '10px',
-                  padding: '12px',
-                  marginBottom: '20px',
-                }}
-              >
-                <IonIcon icon={informationCircleOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '18px', flexShrink: 0, marginTop: '1px' }} />
+          {step === 1 ? (
+            <>
+              {/* Important information card */}
+              <div style={cardStyle}>
                 <IonText>
-                  <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: 0, lineHeight: '1.6' }}>
-                    Send only {selectedWallet.coin} on the {selectedWallet.network} network to this address. Sending other assets may result in permanent loss.
+                  <p style={{ ...cardTitleStyle, fontSize: '15px' }}>{t('important_information')}</p>
+                </IonText>
+                <IonText>
+                  <p style={{ color: 'var(--sovereign-text)', fontSize: '13px', margin: '12px 0 0 0', lineHeight: '1.6' }}>
+                    {t('add_funds_important_info_text')}
                   </p>
                 </IonText>
               </div>
 
-              <SovereignPrimaryButton onClick={handleSubmit} loading={loading} expand="block">
-                {loading ? <IonSpinner name="crescent" /> : t('verify_button')}
-              </SovereignPrimaryButton>
-            </div>
+              {/* Wallet selection card */}
+              <div style={cardStyle}>
+                {/* Coin (read-only) */}
+                <div style={{ marginBottom: '16px' }}>
+                  <SectionLabel>{t('label_coin')}</SectionLabel>
+                  <IonInput
+                    value={selectedWallet?.coin || 'USDT'}
+                    readonly
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Network dropdown */}
+                <div style={{ marginBottom: '16px' }}>
+                  <SectionLabel>{t('label_network')}</SectionLabel>
+                  {walletsLoading ? (
+                    <div style={{ ...inputStyleBase, color: 'var(--sovereign-text-muted)', padding: '14px' }}>...</div>
+                  ) : (
+                    <IonSelect
+                      value={selectedWallet?.network}
+                      onIonChange={(e) => {
+                        const idx = wallets.findIndex((w) => w.network === e.detail.value);
+                        if (idx >= 0) setSelectedWalletIndex(idx);
+                      }}
+                      interface="action-sheet"
+                      placeholder="—"
+                      disabled={wallets.length === 0}
+                      style={{
+                        '--background': 'transparent',
+                        '--color': 'var(--sovereign-text)',
+                        border: '1px solid var(--sovereign-border)',
+                        borderRadius: '10px',
+                        padding: '4px 14px',
+                        width: '100%',
+                      } as React.CSSProperties}
+                    >
+                      {wallets.map((w) => (
+                        <IonSelectOption key={w.network} value={w.network}>
+                          {w.displayLabel}
+                        </IonSelectOption>
+                      ))}
+                    </IonSelect>
+                  )}
+                </div>
+
+                {/* Deposit address (read-only + copy) */}
+                <div style={{ marginBottom: '24px' }}>
+                  <SectionLabel>{t('deposit_address')}</SectionLabel>
+                  <div
+                    style={{
+                      ...inputStyleBase,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: depositAddress ? 'pointer' : 'default',
+                    }}
+                    onClick={handleCopyAddress}
+                  >
+                    <span
+                      style={{
+                        flex: 1,
+                        color: 'var(--sovereign-text)',
+                        fontSize: '13px',
+                        wordBreak: 'break-all',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {depositAddress || '—'}
+                    </span>
+                    {depositAddress && (
+                      <IonIcon
+                        icon={copied ? checkmarkOutline : copyOutline}
+                        style={{
+                          color: copied ? '#4caf50' : 'var(--sovereign-gold)',
+                          fontSize: '20px',
+                          flexShrink: 0,
+                          transition: 'color 0.2s',
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Continue to step 2 */}
+                <SovereignPrimaryButton
+                  onClick={() => setStep(2)}
+                  disabled={walletsLoading || !depositAddress}
+                  expand="block"
+                >
+                  {t('done_recharge_done')}
+                </SovereignPrimaryButton>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Step 2: Important information */}
+              <div style={cardStyle}>
+                <IonText>
+                  <p style={{ ...cardTitleStyle, fontSize: '15px' }}>{t('important_information')}</p>
+                </IonText>
+                <IonText>
+                  <p style={{ color: 'var(--sovereign-text)', fontSize: '13px', margin: '12px 0 0 0', lineHeight: '1.6' }}>
+                    {t('add_funds_step2_important_info_text')}
+                  </p>
+                </IonText>
+              </div>
+
+              {/* Step 2: Recharge form */}
+              <div style={cardStyle}>
+                <IonText>
+                  <p style={{ ...cardTitleStyle, fontSize: '15px', marginBottom: '16px' }}>
+                    {t('add_funds_form_title')}
+                  </p>
+                </IonText>
+
+                {/* Transaction ID */}
+                <div style={{ marginBottom: '16px' }}>
+                  <SectionLabel>{t('label_transaction_id')}</SectionLabel>
+                  <IonInput
+                    value={txId}
+                    onIonInput={(e) => setTxId(e.detail.value ?? '')}
+                    placeholder={t('label_transaction_id')}
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Amount */}
+                <div style={{ marginBottom: '16px' }}>
+                  <SectionLabel>{t('label_amount')}</SectionLabel>
+                  <IonInput
+                    type="text"
+                    inputmode="decimal"
+                    value={amountText}
+                    onIonInput={(e) => {
+                      const v = (e.detail.value ?? '').replace(',', '.');
+                      if (isValidDepositAmountInput(v)) setAmountText(v);
+                    }}
+                    placeholder="0"
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Coin (read-only) */}
+                <div style={{ marginBottom: '24px' }}>
+                  <SectionLabel>{t('label_coin')}</SectionLabel>
+                  <IonInput
+                    value={t('value_coin_usdt')}
+                    readonly
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Submit */}
+                <SovereignPrimaryButton
+                  onClick={handleSubmit}
+                  loading={isSubmitting}
+                  disabled={isSubmitting}
+                  expand="block"
+                >
+                  {isSubmitting ? '...' : t('verify_button')}
+                </SovereignPrimaryButton>
+              </div>
+            </>
           )}
 
           <div style={{ height: '40px' }} />
         </div>
 
-        <IonToast
-          isOpen={toast.isOpen}
-          message={toast.message}
-          duration={4000}
-          color={toast.color}
-          onDidDismiss={() => setToast({ ...toast, isOpen: false })}
+        <IonAlert
+          isOpen={alertOpen}
+          onDidDismiss={() => setAlertOpen(false)}
+          header={t('information')}
+          message={alertMessage}
+          buttons={[{ text: t('ok'), handler: () => setAlertOpen(false) }]}
         />
       </IonContent>
 
@@ -336,49 +350,39 @@ const AddFundsPage: React.FC = () => {
   );
 };
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+/* ── Sub-components ── */
 
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <IonText>
-    <label
-      style={{
-        color: 'var(--sovereign-text-muted)',
-        fontSize: '11px',
-        fontWeight: '700',
-        letterSpacing: '1px',
-        display: 'block',
-        marginBottom: '8px',
-        textTransform: 'uppercase',
-      }}
-    >
+    <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', fontWeight: '700', letterSpacing: '1px', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>
       {children}
     </label>
   </IonText>
 );
 
-const InfoChip: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div
-    style={{
-      background: 'var(--sovereign-bg)',
-      border: '1px solid var(--sovereign-border)',
-      borderRadius: '8px',
-      padding: '8px 12px',
-    }}
-  >
-    <IonText>
-      <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px', margin: '0 0 2px 0', letterSpacing: '0.5px' }}>
-        {label}
-      </p>
-    </IonText>
-    <IonText>
-      <p style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '14px', margin: 0 }}>
-        {value}
-      </p>
-    </IonText>
-  </div>
-);
+/* ── Styles ── */
 
-const inputStyle: React.CSSProperties = {
+const cardStyle: React.CSSProperties = {
+  background: 'var(--sovereign-surface)',
+  border: '1px solid var(--sovereign-border)',
+  borderRadius: '16px',
+  padding: '20px',
+  marginBottom: '16px',
+};
+
+const cardTitleStyle: React.CSSProperties = {
+  color: 'var(--sovereign-text)',
+  fontWeight: '700',
+  margin: 0,
+};
+
+const inputStyleBase: React.CSSProperties = {
+  border: '1px solid var(--sovereign-border)',
+  borderRadius: '10px',
+  padding: '12px 14px',
+};
+
+const inputStyle = {
   '--background': 'transparent',
   '--color': 'var(--sovereign-text)',
   '--placeholder-color': 'var(--sovereign-text-muted)',

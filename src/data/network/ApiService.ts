@@ -67,6 +67,8 @@ export const apiService = {
       username: raw.username ?? '',
       balance: raw.balance ?? 0,
       walletAddress: raw.wallet_address?.wallet ?? raw.wallet ?? '',
+      walletCoin: raw.wallet_address?.coin ?? 'USDT',
+      walletNetwork: raw.wallet_address?.network ?? '',
       limits: raw.limits
         ? { dailyWithdrawal: raw.limits.daily_withdrawal ?? undefined }
         : undefined,
@@ -114,15 +116,24 @@ export const apiService = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any[]>>('/api/wallets');
     const raw = unwrap(res.data);
-    return raw.map((w) => ({
-      id: w._id ?? '',
-      coin: w.coin ?? '',
-      address: w.address ?? '',
-      network: w.red ?? '',           // red is the network name in the backend
-      description: w.description ?? '',
-      minAmount: w.minAmount ?? 0,
-      fee: w.networkWithdrawalFee ?? 0,
-    }));
+    return raw.map((w) => {
+      const network = w.red ?? '';
+      const description = w.description ?? '';
+      const displayLabel = network && description
+        ? `${network} - ${description}`
+        : network || description || (w.address ?? '').slice(0, 12) + '…';
+      return {
+        id: w._id ?? '',
+        coin: w.coin ?? '',
+        address: w.address ?? '',
+        network,
+        description,
+        isActive: w.isActive ?? true,
+        minAmount: w.minAmount ?? 0,
+        fee: w.networkWithdrawalFee ?? 0,
+        displayLabel,
+      };
+    });
   },
 
   // ─── Rooms ─────────────────────────────────────────────────────────────────
@@ -232,12 +243,18 @@ export const apiService = {
 
   // Android: POST /api/transactions/withdrawal with { amount } only
   async withdrawal(req: WithdrawalRequest): Promise<void> {
-    await apiClient.post<ApiResponse<void>>('/api/transactions/withdrawal', req);
+    const res = await apiClient.post<ApiResponse<void>>('/api/transactions/withdrawal', req);
+    if (!res.data?.success) {
+      throw new Error(res.data?.message ?? res.data?.messages?.[0] ?? 'error_try_later_message');
+    }
   },
 
   // Android: POST /api/transactions/verify-withdrawal with { verification_code }
   async verifyWithdrawal(req: VerifyWithdrawalRequest): Promise<void> {
-    await apiClient.post<ApiResponse<void>>('/api/transactions/verify-withdrawal', req);
+    const res = await apiClient.post<ApiResponse<void>>('/api/transactions/verify-withdrawal', req);
+    if (!res.data?.success) {
+      throw new Error(res.data?.messages?.[0] ?? res.data?.message ?? 'error_try_later_message');
+    }
   },
 
   // ─── History ───────────────────────────────────────────────────────────────

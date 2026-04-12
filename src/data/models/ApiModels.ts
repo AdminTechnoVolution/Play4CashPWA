@@ -19,7 +19,9 @@ export interface UserAccountResponse {
   email: string;
   username: string;
   balance: number;
-  walletAddress: string; // normalized from wallet_address.wallet || wallet
+  walletAddress: string;
+  walletCoin: string;
+  walletNetwork: string;
   limits?: { dailyWithdrawal?: number };
 }
 
@@ -128,8 +130,10 @@ export interface WalletResponse {
   address: string;
   network: string;
   description: string;
+  isActive: boolean;
   minAmount: number;
   fee: number;
+  displayLabel: string;
 }
 
 // ─── Greetings ─────────────────────────────────────────────────────────────────

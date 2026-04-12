@@ -842,5 +842,11 @@
   "pwa_install_dismiss": "Später",
   "pwa_ios_subtitle": "Installiere diese App auf deinem iPhone in zwei einfachen Schritten",
   "pwa_ios_step1": "Tippe auf die Teilen-Taste in der Safari-Leiste",
-  "pwa_ios_step2": "Scrolle nach unten und tippe auf \u201EZum Home-Bildschirm\u201C"
+  "pwa_ios_step2": "Scrolle nach unten und tippe auf \u201EZum Home-Bildschirm\u201C",
+  "label_language": "Sprache",
+  "language_updated": "Sprache aktualisiert",
+  "current_address": "Aktuelle Adresse",
+  "wallet_network_warning": "Stelle sicher, dass die Adresse zum ausgewählten Netzwerk passt. Das Senden an das falsche Netzwerk kann zum dauerhaften Verlust der Mittel führen.",
+  "save_language": "Speichern",
+  "label_version": "Play4Cash v1.0"
 }
