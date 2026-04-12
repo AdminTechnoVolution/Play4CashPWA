@@ -699,7 +699,7 @@
   "rooms_filter_started": "In corso",
   "rooms_filter_waiting": "In attesa",
   "rooms_join_confirm_button": "Entra nella stanza",
-  "rooms_join_confirm_message": "Sei sicuro di voler entrare in \\",
+  "rooms_join_confirm_message": "Sei sicuro di voler entrare in \"%s\"?",
   "rooms_join_confirm_stake_notice": "Entrando, verranno detratti %s dal tuo saldo per questa puntata. Se abbandoni la stanza, perdi quell’importo; non ti verrà restituito.",
   "rooms_join_confirm_title": "Vuoi unirti?",
   "rooms_join_error_title": "Impossibile entrare nella stanza",

@@ -725,7 +725,7 @@
   "rooms_filter_started": "En juego",
   "rooms_filter_waiting": "En espera",
   "rooms_join_confirm_button": "Unirse a la sala",
-  "rooms_join_confirm_message": "¿Seguro que quieres unirte a \\",
+  "rooms_join_confirm_message": "¿Seguro que quieres unirte a \"%s\"?",
   "rooms_join_confirm_stake_notice": "Al unirte, se descontarán %s de tu saldo por la apuesta. Si abandonas la sala, perderás ese dinero; no se te devolverá.",
   "rooms_join_confirm_title": "¿Unirse a la sala?",
   "rooms_join_error_title": "No se pudo unir a la sala",

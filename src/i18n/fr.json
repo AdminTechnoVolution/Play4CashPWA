@@ -699,7 +699,7 @@
   "rooms_filter_started": "En cours",
   "rooms_filter_waiting": "En attente",
   "rooms_join_confirm_button": "Rejoindre la salle",
-  "rooms_join_confirm_message": "Voulez-vous vraiment rejoindre \\",
+  "rooms_join_confirm_message": "Voulez-vous vraiment rejoindre \"%s\" ?",
   "rooms_join_confirm_stake_notice": "En rejoignant, %s seront déduits de votre solde pour cette mise. Si vous quittez la salle, vous perdez cette somme ; elle ne vous sera pas remboursée.",
   "rooms_join_confirm_title": "Rejoindre la salle ?",
   "rooms_join_error_title": "Impossible de rejoindre la salle",

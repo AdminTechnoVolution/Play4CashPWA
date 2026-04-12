@@ -722,7 +722,7 @@
   "rooms_filter_started": "Started",
   "rooms_filter_waiting": "Waiting",
   "rooms_join_confirm_button": "Join Room",
-  "rooms_join_confirm_message": "Are you sure you want to join \\",
+  "rooms_join_confirm_message": "Are you sure you want to join \"%s\"?",
   "rooms_join_confirm_stake_notice": "Once you join, %s will be deducted from your balance for this stake. If you leave the room, you forfeit that amount—it will not be refunded.",
   "rooms_join_confirm_title": "Join Room?",
   "rooms_join_error_title": "Can't join this room",

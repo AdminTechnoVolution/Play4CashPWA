@@ -699,7 +699,7 @@
   "rooms_filter_started": "Gestartet",
   "rooms_filter_waiting": "Wartend",
   "rooms_join_confirm_button": "Raum beitreten",
-  "rooms_join_confirm_message": "Möchtest du wirklich \\",
+  "rooms_join_confirm_message": "Möchtest du wirklich \"%s\" beitreten?",
   "rooms_join_confirm_stake_notice": "Beim Beitritt werden %s von deinem Guthaben für den Einsatz abgezogen. Wenn du den Raum verlässt, verlierst du diesen Betrag—eine Rückerstattung gibt es nicht.",
   "rooms_join_confirm_title": "Raum beitreten?",
   "rooms_join_error_title": "Beitritt zum Raum nicht möglich",

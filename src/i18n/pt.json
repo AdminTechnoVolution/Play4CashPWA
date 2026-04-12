@@ -699,7 +699,7 @@
   "rooms_filter_started": "Em jogo",
   "rooms_filter_waiting": "Aguardando",
   "rooms_join_confirm_button": "Entrar na sala",
-  "rooms_join_confirm_message": "Tem certeza que deseja entrar em \\",
+  "rooms_join_confirm_message": "Tem certeza que deseja entrar em \"%s\"?",
   "rooms_join_confirm_stake_notice": "Ao entrar, %s serão deduzidos do seu saldo pela aposta. Se sair da sala, você perde esse valor; não haverá reembolso.",
   "rooms_join_confirm_title": "Entrar na sala?",
   "rooms_join_error_title": "Não foi possível entrar na sala",

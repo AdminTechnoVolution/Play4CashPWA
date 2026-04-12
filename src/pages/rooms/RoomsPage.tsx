@@ -101,6 +101,17 @@ const RoomsPage: React.FC = () => {
   const [toast, setToast] = useState({ isOpen: false, message: '', color: '' });
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [spectatingId, setSpectatingId] = useState<string | null>(null);
+
+  /** Matches PlayPage routing: chess / halma / domino use upfront stake; naval-battle uses ship-placement flow. */
+  const showJoinStakeConfirm = ['chess', 'halma', 'domino'].includes(
+    (gameSocketCode || '').toLowerCase(),
+  );
+  const [joinConfirmRoom, setJoinConfirmRoom] = useState<{
+    id: string;
+    name: string;
+    betAmount: number;
+    opponentName: string;
+  } | null>(null);
   
   // Reset form and default to minBet when modal opens
   useEffect(() => {
@@ -492,7 +503,18 @@ const RoomsPage: React.FC = () => {
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {canJoin && (
                         <SovereignPrimaryButton
-                          onClick={() => handleJoin(room.id, room.name, room.betAmount, opponentName)}
+                          onClick={() => {
+                            if (showJoinStakeConfirm) {
+                              setJoinConfirmRoom({
+                                id: room.id,
+                                name: room.name,
+                                betAmount: room.betAmount,
+                                opponentName,
+                              });
+                            } else {
+                              void handleJoin(room.id, room.name, room.betAmount, opponentName);
+                            }
+                          }}
                           loading={joiningId === room.id}
                           expand="block"
                           style={{ flex: 1, margin: 0 } as React.CSSProperties}
@@ -677,6 +699,100 @@ const RoomsPage: React.FC = () => {
               </SovereignSecondaryButton>
             </div>
           </IonContent>
+        </IonModal>
+
+        {/* Join confirmation (Android JoinConfirmDialog) — chess / halma / domino only */}
+        <IonModal
+          isOpen={!!joinConfirmRoom}
+          onDidDismiss={() => setJoinConfirmRoom(null)}
+          style={{
+            '--height': 'fit-content',
+            '--width': '90%',
+            '--max-width': '380px',
+            '--border-radius': '16px',
+            '--background': 'var(--sovereign-surface)',
+          } as React.CSSProperties}
+        >
+          <div
+            style={{
+              padding: '24px 20px 28px',
+              background: 'var(--sovereign-surface)',
+              textAlign: 'center',
+            }}
+          >
+            <IonIcon
+              icon={gameControllerOutline}
+              style={{
+                fontSize: 36,
+                color: 'var(--sovereign-gold)',
+                display: 'block',
+                margin: '0 auto 12px',
+              }}
+            />
+            <IonText>
+              <h2
+                style={{
+                  fontSize: 19,
+                  fontWeight: 800,
+                  margin: '0 0 14px 0',
+                  color: 'var(--sovereign-text)',
+                }}
+              >
+                {t('rooms_join_confirm_title')}
+              </h2>
+            </IonText>
+            <IonText>
+              <p
+                style={{
+                  color: 'var(--sovereign-text-muted)',
+                  fontSize: 15,
+                  lineHeight: 1.45,
+                  margin: '0 0 12px 0',
+                }}
+              >
+                {t('rooms_join_confirm_message').replace('%s', joinConfirmRoom?.name ?? '')}
+              </p>
+            </IonText>
+            {joinConfirmRoom && joinConfirmRoom.betAmount > 0 && (
+              <IonText>
+                <p
+                  style={{
+                    color: 'var(--sovereign-text-muted)',
+                    fontSize: 14,
+                    lineHeight: 1.45,
+                    margin: '0 0 22px 0',
+                    padding: '12px 14px',
+                    background: 'rgba(201,168,76,0.10)',
+                    border: '1px solid rgba(201,168,76,0.22)',
+                    borderRadius: 10,
+                    textAlign: 'left',
+                  }}
+                >
+                  {t('rooms_join_confirm_stake_notice').replace(
+                    '%s',
+                    `$${formatUSD(joinConfirmRoom.betAmount)}`,
+                  )}
+                </p>
+              </IonText>
+            )}
+            {joinConfirmRoom && joinConfirmRoom.betAmount <= 0 && <div style={{ height: 8 }} />}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <SovereignPrimaryButton
+                onClick={() => {
+                  const r = joinConfirmRoom;
+                  setJoinConfirmRoom(null);
+                  if (r) void handleJoin(r.id, r.name, r.betAmount, r.opponentName);
+                }}
+                loading={joiningId === joinConfirmRoom?.id}
+                expand="block"
+              >
+                {t('rooms_join_confirm_button')}
+              </SovereignPrimaryButton>
+              <SovereignSecondaryButton onClick={() => setJoinConfirmRoom(null)} expand="block">
+                {t('cancel')}
+              </SovereignSecondaryButton>
+            </div>
+          </div>
         </IonModal>
 
         <IonToast
