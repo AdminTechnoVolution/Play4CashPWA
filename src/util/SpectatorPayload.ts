@@ -283,11 +283,16 @@ export const SpectatorPayload = {
    */
   resolveStandardGameOver: (data: any, myUsername: string, isSpectator: boolean, profile: PlayerGameEndReasonProfile): GameOverPayload => {
     const outcome = data.outcome || "";
+    const reasonNorm = normalizedGameEndReason(data);
     // Android match end outcomes: win, lose, draw, forfeit, timeout_loss, opponent_disconnected
     const isDraw = outcome === "draw" || !!data.isDraw;
+    const isOpponentDisconnect =
+      outcome === "opponent_disconnected" ||
+      GAME_END_OPPONENT_DISCONNECT_REASONS.has(reasonNorm);
     const youWon = !isSpectator && (
       outcome === "win" ||
-      ((outcome === "forfeit" || outcome === "opponent_disconnected") && (data.youWon || data.you_won || false))
+      isOpponentDisconnect ||
+      ((outcome === "forfeit") && (data.youWon || data.you_won || false))
     );
 
     const prize = typeof data.prize === 'number' ? data.prize : undefined;

@@ -405,7 +405,7 @@ export function playerGameEndReasonFallback(
     return t('room_winner_reason_forfeit_won');
   }
   if (!youWon && (o === 'opponent_disconnected' || GAME_END_OPPONENT_DISCONNECT_REASONS.has(reason))) {
-    return t('spectator_end_disconnected');
+    return t('room_winner_reason_forfeit_won');
   }
   
   if (o === 'forfeit') {
