@@ -59,6 +59,15 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
     prevMoveCount.current = store.moveCount;
   }, [store.moveCount]);
 
+  const resolveStatus = (raw: string): string => {
+    if (!raw) return '';
+    const sep = raw.indexOf('|');
+    if (sep < 0) return t(raw) || raw;
+    const key = raw.slice(0, sep);
+    const param = raw.slice(sep + 1);
+    return (t(key) || key).replace('%s', param);
+  };
+
   const cellSize = Math.min(Math.floor((window.innerWidth - 32) / 8), 44);
 
   const getCellBg = (r: number, c: number) => {
@@ -87,7 +96,7 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
           </IonText>
           <IonSpinner name="crescent" style={{ color: '#c9a84c', marginBottom: '24px', width: '48px', height: '48px' }} />
           <IonText style={{ color: '#8a9bbf', fontSize: '15px', display: 'block', marginBottom: '32px', lineHeight: '1.4' }}>
-            {store.statusMessage}
+            {resolveStatus(store.statusMessage)}
           </IonText>
           <IonButton expand="block" onClick={onLeaveRequest} style={{ '--background': 'transparent', '--color': '#8a9bbf', '--border-radius': '12px', border: '1px solid rgba(138,155,191,0.3)', fontWeight: 'bold' }}>
             {t('bs_leave_room')}

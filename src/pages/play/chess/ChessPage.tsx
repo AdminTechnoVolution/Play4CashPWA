@@ -25,8 +25,28 @@ const PIECE_SYMBOL: Record<string, string> = {
   [`${ChessPieceType.BISHOP}_false`]: '♝', [`${ChessPieceType.KNIGHT}_false`]: '♞', [`${ChessPieceType.PAWN}_false`]: '♟',
 };
 
-const LIGHT_SQ = '#f0d9b5';
-const DARK_SQ = '#b58863';
+// Inject CSS keyframes for selected piece glow (Android SelectedPieceGlow — alpha pulse 0.35↔0.85)
+let chessGlowInjected = false;
+function ensureChessGlowStyle() {
+  if (chessGlowInjected) return;
+  chessGlowInjected = true;
+  const s = document.createElement('style');
+  s.textContent = `@keyframes chessSelGlow{0%,100%{opacity:.35}50%{opacity:.85}}.chess-sel-glow{animation:chessSelGlow 1.3s ease-in-out infinite}`;
+  document.head.appendChild(s);
+}
+
+// Android-matching dark teal palette (ChessScreen.kt lines 108–111)
+const LIGHT_SQ = 'rgba(45,74,94,0.50)';
+const DARK_SQ  = 'rgba(30,58,78,0.50)';
+const CELL_GAP = 2;
+const CELL_RADIUS = 4;
+const BOARD_BG = '#152A3F';
+const COLOR_SELECTED = 'rgba(233,195,73,0.50)';
+const COLOR_LAST_MOVE = 'rgba(129,200,132,0.50)';
+const COLOR_CHECK = 'rgba(229,57,53,0.60)';
+const COLOR_VALID_MOVE_DOT = 'rgba(129,200,132,0.92)';
+const COLOR_VALID_CAPTURE_RING = '#66BB6A';
+const COLOR_VALID_CAPTURE_BG = 'rgba(76,175,80,0.35)';
 
 interface Props {
   roomId: string;
@@ -40,6 +60,7 @@ interface Props {
 }
 
 export default function ChessPage({ roomId, betAmount, roomName, opponentName, hasOpponent, isSpectator, onLeaveRequest }: Props) {
+  ensureChessGlowStyle();
   const { user } = useAuthStore();
   const store = useChessStore();
   const t = useT();
@@ -122,20 +143,29 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
   const displayCols = playingWhite ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
 
   const getCellBg = (row: number, col: number) => {
+    const piece = store.board[row]?.[col]?.piece;
     const isSelected = store.selectedRow === row && store.selectedCol === col;
-    const isValidMove = store.validMoves.some((m) => m.toRow === row && m.toCol === col);
-    const isLight = (row + col) % 2 === 0;
-    const base = isLight ? LIGHT_SQ : DARK_SQ;
-    if (isSelected) return '#c9a84c';
-    if (isValidMove) return isLight ? '#cdd16f' : '#aaa23a';
-    if (store.isCheck) {
-      const piece = store.board[row][col].piece;
-      if (piece?.type === ChessPieceType.KING && piece.isWhite === playingWhite) return '#e05050';
-    }
-    return base;
+    const isValidDest = store.validMoves.some((m) => m.toRow === row && m.toCol === col);
+    const isCaptureTarget = isValidDest && piece != null;
+    const isLastMove = (store.lastMove && (
+      (store.lastMove.fromRow === row && store.lastMove.fromCol === col) ||
+      (store.lastMove.toRow === row && store.lastMove.toCol === col)
+    )) || (store.optimisticRookSlide && (
+      (store.optimisticRookSlide.fromRow === row && store.optimisticRookSlide.fromCol === col) ||
+      (store.optimisticRookSlide.toRow === row && store.optimisticRookSlide.toCol === col)
+    ));
+    const isCheckCell = store.isCheck && piece?.type === ChessPieceType.KING &&
+      ((piece.isWhite && playingWhite) || (!piece.isWhite && !playingWhite));
+
+    if (isCheckCell) return COLOR_CHECK;
+    if (isSelected) return COLOR_SELECTED;
+    if (isCaptureTarget) return COLOR_VALID_CAPTURE_BG;
+    if (isLastMove) return COLOR_LAST_MOVE;
+    return (row + col) % 2 === 0 ? LIGHT_SQ : DARK_SQ;
   };
 
-  const cellSize = Math.min(Math.floor((window.innerWidth - 32) / 8), 52);
+  // 8 cells + 7 gaps + 16px board padding + outer padding
+  const cellSize = Math.min(Math.floor((window.innerWidth - 32 - 16 - 7 * CELL_GAP) / 8), 42);
 
   return (
     <IonPage style={{ '--background': '#0a1628' }}>
@@ -266,66 +296,112 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
               turnPlayerName={store.isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
             />
 
+            {/* Board frame — matches Android ChessBoard outer Box */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(8, ${cellSize}px)`,
-              gridTemplateRows: `repeat(8, ${cellSize}px)`,
-              border: '3px solid #8b6914',
-              borderRadius: 6,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-              overflow: 'hidden',
+              background: BOARD_BG,
+              border: '2px solid rgba(233,195,73,0.30)',
+              borderRadius: 12,
+              padding: 8,
               margin: '12px auto',
-              width: 8 * cellSize,
+              width: 8 * cellSize + 7 * CELL_GAP + 16,
+              boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
             }}>
-              {displayRows.map((row) =>
-                displayCols.map((col) => {
-                  const cell = store.board[row]?.[col] || { piece: null };
-                  const piece = cell.piece;
-                  const isValidMove = store.validMoves.some((m) => m.toRow === row && m.toCol === col);
-                  const isLastMove = (store.lastMove && (
-                    (store.lastMove.fromRow === row && store.lastMove.fromCol === col) ||
-                    (store.lastMove.toRow === row && store.lastMove.toCol === col)
-                  )) || (store.optimisticRookSlide && (
-                    (store.optimisticRookSlide.fromRow === row && store.optimisticRookSlide.fromCol === col) ||
-                    (store.optimisticRookSlide.toRow === row && store.optimisticRookSlide.toCol === col)
-                  ));
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(8, ${cellSize}px)`,
+                gridTemplateRows: `repeat(8, ${cellSize}px)`,
+                gap: CELL_GAP,
+              }}>
+                {displayRows.map((row) =>
+                  displayCols.map((col) => {
+                    const cell = store.board[row]?.[col] || { piece: null };
+                    const piece = cell.piece;
+                    const isSelected = store.selectedRow === row && store.selectedCol === col;
+                    const isValidDest = store.validMoves.some((m) => m.toRow === row && m.toCol === col);
+                    const isCaptureTarget = isValidDest && piece != null;
 
-                  return (
-                    <div
-                      key={`${row}-${col}`}
-                      onClick={() => store.onCellTap(row, col, roomId)}
-                      style={{
-                        width: cellSize, height: cellSize,
-                        background: getCellBg(row, col),
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: !isSpectator ? 'pointer' : 'default',
-                        position: 'relative',
-                      }}
-                    >
-                      {isLastMove && (
-                        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(201,168,76,0.3)', pointerEvents: 'none' }} />
-                      )}
-                      {isValidMove && !piece && (
-                        <div style={{ width: cellSize * 0.25, height: cellSize * 0.25, borderRadius: '50%', background: 'rgba(0,0,0,0.2)' }} />
-                      )}
-                      {piece && (
-                        <span style={{
-                          fontSize: cellSize * 0.75,
-                          lineHeight: 1,
-                          color: piece.isWhite ? '#fff' : '#1a1a1a',
-                          textShadow: piece.isWhite ? '0 1px 2px rgba(0,0,0,0.6)' : '0 1px 2px rgba(255,255,255,0.4)',
-                          userSelect: 'none',
-                          zIndex: 2,
-                          transition: 'transform 0.1s ease-out',
-                          transform: (store.selectedRow === row && store.selectedCol === col) ? 'scale(1.15)' : 'scale(1)'
-                        }}>
-                          {PIECE_SYMBOL[`${piece.type}_${piece.isWhite}`]}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })
-              )}
+                    return (
+                      <div
+                        key={`${row}-${col}`}
+                        onClick={() => store.onCellTap(row, col, roomId)}
+                        style={{
+                          width: cellSize, height: cellSize,
+                          background: getCellBg(row, col),
+                          borderRadius: CELL_RADIUS,
+                          border: '1px solid rgba(233,195,73,0.20)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: !isSpectator ? 'pointer' : 'default',
+                          position: 'relative',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        {/* Valid move dot (empty square) — Android 9dp circle */}
+                        {isValidDest && !piece && (
+                          <div style={{
+                            width: 9, height: 9,
+                            borderRadius: '50%',
+                            background: COLOR_VALID_MOVE_DOT,
+                            zIndex: 2,
+                          }} />
+                        )}
+                        {/* Capture ring — Android 2.5dp stroke circle */}
+                        {isCaptureTarget && (
+                          <div style={{
+                            position: 'absolute',
+                            width: cellSize - 5, height: cellSize - 5,
+                            borderRadius: '50%',
+                            border: `2.5px solid ${COLOR_VALID_CAPTURE_RING}`,
+                            pointerEvents: 'none',
+                            zIndex: 1,
+                          }} />
+                        )}
+                        {/* Selected piece glow — Android SelectedPieceGlow */}
+                        {isSelected && piece && (
+                          <div className="chess-sel-glow" style={{
+                            position: 'absolute',
+                            width: cellSize - 4, height: cellSize - 4,
+                            borderRadius: '50%',
+                            background: 'rgba(233,195,73,0.55)',
+                            pointerEvents: 'none',
+                            zIndex: 1,
+                          }} />
+                        )}
+                        {piece && (
+                          piece.isWhite ? (
+                            <span style={{
+                              fontSize: cellSize * 0.62,
+                              fontWeight: 700,
+                              lineHeight: 1,
+                              color: '#E8E8E8',
+                              textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                              userSelect: 'none',
+                              zIndex: 3,
+                              transition: 'transform 0.1s ease-out',
+                              transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+                            }}>
+                              {PIECE_SYMBOL[`${piece.type}_true`]}
+                            </span>
+                          ) : (
+                            <span style={{
+                              fontSize: cellSize * 0.62,
+                              fontWeight: 700,
+                              lineHeight: 1,
+                              color: '#141414',
+                              WebkitTextStroke: '0.6px rgba(255,255,255,0.4)',
+                              userSelect: 'none',
+                              zIndex: 3,
+                              transition: 'transform 0.1s ease-out',
+                              transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+                            }}>
+                              {PIECE_SYMBOL[`${piece.type}_false`]}
+                            </span>
+                          )
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
             {!isSpectator && (

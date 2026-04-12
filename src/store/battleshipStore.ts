@@ -335,6 +335,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
             }
           }
 
+          const isSunkShot = outcome === 'win' || outcome === 'lose' || outcome === 'sunk';
           set({
             phase: 'finished',
             playerBoard: pBoard,
@@ -343,10 +344,12 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
             hasPendingFire: false,
             isMyTurn: false,
             animatingShot: row >= 0 ? { row, col, board: finalBoard } : null,
+            lastShot: row >= 0 ? { row, col, result: isSunkShot ? 'sunk' : 'hit' } : get().lastShot,
+            shotCount: row >= 0 ? get().shotCount + 1 : get().shotCount,
             gameOver,
           });
           if (row >= 0) {
-            const animDur = outcome === 'sunk' ? 4000 : 2000;
+            const animDur = isSunkShot ? 4000 : 2000;
             setTimeout(() => set({ animatingShot: null }), animDur);
           }
           return;

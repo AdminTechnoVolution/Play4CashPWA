@@ -746,8 +746,8 @@ function BattleGrid({
           {showShips && <ShipOverlay ships={ships} />}
           {sunkEnemyShips && sunkEnemyShips.length > 0 && <ShipOverlay ships={sunkEnemyShips} />}
 
-          {/* Missile + impact overlays */}
-          {showMissile && (store.lastShot?.result === 'sunk' ? (
+          {/* Missile + impact overlays — skip while player's shot is pending (outcome unknown) */}
+          {showMissile && !store.hasPendingFire && (store.lastShot?.result === 'sunk' ? (
             <>
               <SunkBombOverlay
                 targetRow={anim.row}

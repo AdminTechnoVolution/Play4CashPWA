@@ -3,7 +3,7 @@ import type { Socket } from 'socket.io-client';
 import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken, getRefreshToken, saveTokens } from '../auth/AuthSessionStore';
 import { bareClient } from './ApiClient';
-import { socketIoExtraHeaders } from './socketExtraHeaders';
+import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import type { ApiResponse, LoginResponse, ChatMessage } from '../models/ApiModels';
 import { parseChatEnvelope } from '../../util/ChatGreetingModels';
 
@@ -56,6 +56,7 @@ export class ChatSocketManager {
       return;
     }
 
+    const lang = acceptLanguageTag();
     this.socket = io(`${BASE_URL}/chat`, {
       transports: ['polling', 'websocket'],
       autoConnect: false,
@@ -65,13 +66,13 @@ export class ChatSocketManager {
       reconnectionDelayMax: 5000,
       timeout: SOCKET_TIMEOUT_MS,
       forceNew: true,
-      query: { token },
-      auth: { token },
+      query: { token, lang },
+      auth: { token, lang },
       extraHeaders: socketIoExtraHeaders(token),
     });
 
     this.socket.on('connect', () => {
-      this.socket?.emit('join', { room_id: roomId });
+      this.socket?.emit('join', { room_id: roomId, lang: acceptLanguageTag() });
     });
 
     this.socket.on('connect_error', async (err: Error & { data?: { status?: number } }) => {
@@ -133,10 +134,14 @@ export class ChatSocketManager {
     this.socket = null;
   }
 
-  /** Android: JSONObject room_id + greeting_id */
+  /** Android: JSONObject room_id + greeting_id — lang for server-side translation */
   sendGreeting(roomId: string, greetingId: string): void {
     if (!greetingId?.trim()) return;
-    this.socket?.emit('greeting', { room_id: roomId, greeting_id: greetingId });
+    this.socket?.emit('greeting', {
+      room_id: roomId,
+      greeting_id: greetingId,
+      lang: acceptLanguageTag(),
+    });
   }
 
   /** Legacy: Domino/Halma — normalized line for last-message display */
