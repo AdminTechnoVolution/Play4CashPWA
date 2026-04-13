@@ -17,6 +17,7 @@ import SpectatorBadge from '../components/SpectatorBadge';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import GameSound from '../../../ui/game/GameSound';
+import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
 
 interface Props {
   roomId: string;
@@ -56,6 +57,17 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
       chat.disconnect();
     };
   }, [roomId]);
+
+  useEffect(() => {
+    return registerPlayBackConsumer(() => {
+      const st = useHalmaStore.getState();
+      if (st.opponentLeftMessage) {
+        st.clearOpponentLeft();
+        return true;
+      }
+      return false;
+    });
+  }, []);
 
   // Sound: piece move (matches Android LaunchedEffect(state.moveCount))
   const prevMoveCount = useRef(0);

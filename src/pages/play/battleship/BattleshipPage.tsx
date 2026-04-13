@@ -17,6 +17,7 @@ import { formatApiMessageForDisplay, applyWsMessagePlaceholders } from '../../..
 import { formatUSD } from '../../../util/formatCurrency';
 import OceanCanvas from './OceanCanvas';
 import GameSound from '../../../ui/game/GameSound';
+import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
 
 // ── Grid constants ─────────────────────────────────────────────────────────────
 const CELL = 32;
@@ -748,8 +749,8 @@ function BattleGrid({
           {showShips && <ShipOverlay ships={ships} />}
           {sunkEnemyShips && sunkEnemyShips.length > 0 && <ShipOverlay ships={sunkEnemyShips} />}
 
-          {/* Missile + impact overlays — skip while player's shot is pending (outcome unknown) */}
-          {showMissile && !store.hasPendingFire && (store.lastShot?.result === 'sunk' ? (
+          {/* Missile + impact overlays */}
+          {showMissile && (store.lastShot?.result === 'sunk' ? (
             <>
               <SunkBombOverlay
                 targetRow={anim.row}
@@ -815,6 +816,17 @@ export default function BattleshipPage({
     store.initGame(roomId, myUsername, hasOpponent, opponentName, isSpectator);
     return () => { store.cleanup(); };
   }, [roomId]);
+
+  useEffect(() => {
+    return registerPlayBackConsumer(() => {
+      const st = useBattleshipStore.getState();
+      if (st.opponentLeftDialog) {
+        st.clearOpponentLeftDialog();
+        return true;
+      }
+      return false;
+    });
+  }, []);
 
   const prevShotCount = useRef(0);
   useEffect(() => {

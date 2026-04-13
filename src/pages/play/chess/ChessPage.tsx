@@ -18,6 +18,7 @@ import { useT } from '../../../i18n/translations';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import GameSound from '../../../ui/game/GameSound';
+import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
 
 const PIECE_SYMBOL: Record<string, string> = {
   [`${ChessPieceType.KING}_true`]: '♔', [`${ChessPieceType.QUEEN}_true`]: '♕', [`${ChessPieceType.ROOK}_true`]: '♖',
@@ -97,6 +98,21 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
   useEffect(() => {
     if (store.navigateBack) onLeaveRequest();
   }, [store.navigateBack]);
+
+  useEffect(() => {
+    return registerPlayBackConsumer(() => {
+      const st = useChessStore.getState();
+      if (st.promotionPending) {
+        st.dismissPromotion();
+        return true;
+      }
+      if (st.opponentLeftMessage) {
+        st.clearOpponentLeft();
+        return true;
+      }
+      return false;
+    });
+  }, []);
 
   useEffect(() => {
     if (store.illegalMoveToast) {

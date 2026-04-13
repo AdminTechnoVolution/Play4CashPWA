@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { IonAlert, IonLoading, IonModal, IonText } from '@ionic/react';
 import { useT } from '../../i18n/translations';
@@ -17,6 +17,11 @@ import HalmaPage from './halma/HalmaPage';
 import { getPlayContext, clearPlayContext } from '../../util/routingStorage';
 import { formatUSD } from '../../util/formatCurrency';
 import { useAuthStore } from '../../store/authStore';
+import {
+  tryConsumePlayBack,
+  PLAY_BACK_TRAP_KEY,
+  consumePlayBackTrapThenNavigate,
+} from '../../util/playBackNavigation';
 // ── Leave-context snapshot (called at the moment the user requests to leave) ──
 function getLeaveContext(gameSocketCode: string): {
   gameIsOver: boolean;
@@ -66,6 +71,30 @@ function getLeaveContext(gameSocketCode: string): {
   }
 }
 
+/** Stable primitive for `useSyncExternalStore` (new objects each render would loop forever). */
+function getLeaveContextSnapshotKey(gameSocketCode: string): string {
+  const c = getLeaveContext(gameSocketCode);
+  return `${c.gameIsOver ? 1 : 0}|${c.isPastPlacement ? 1 : 0}|${c.opponentConfirmed ? 1 : 0}`;
+}
+
+function subscribeActiveGameStore(gameSocketCode: string, onChange: () => void) {
+  switch (gameSocketCode) {
+    case 'chess':
+      return useChessStore.subscribe(onChange);
+    case 'domino':
+      return useDominoStore.subscribe(onChange);
+    case 'halma':
+      return useHalmaStore.subscribe(onChange);
+    default:
+      return useBattleshipStore.subscribe(onChange);
+  }
+}
+
+function subscribeActiveGameStoreSafe(gameSocketCode: string, onChange: () => void) {
+  if (!gameSocketCode) return () => {};
+  return subscribeActiveGameStore(gameSocketCode, onChange);
+}
+
 export default function PlayPage() {
   const { gameSocketCode = '' } = useParams<{ gameSocketCode: string }>();
   const navigate    = useNavigate();
@@ -74,27 +103,20 @@ export default function PlayPage() {
   const playCtx = getPlayContext();
   const me = useAuthStore((s) => s.user);
 
-  useEffect(() => {
-    if (!playCtx || !gameSocketCode) {
-      console.warn('[PlayPage] Missing play context, redirecting to dashboard');
-      navigate('/dashboard', { replace: true });
-    }
-  }, [playCtx, gameSocketCode, navigate]);
+  const roomId = playCtx?.roomId ?? '';
+  const isSpectator = playCtx?.isSpectator ?? false;
 
-  // ── Protection / Fallback ──────────────────────────────────────────────────
-  if (!playCtx || !gameSocketCode) {
-    return null;
-  }
+  const leaveSnapKey = useSyncExternalStore(
+    (onChange) => subscribeActiveGameStoreSafe(gameSocketCode, onChange),
+    () => (gameSocketCode ? getLeaveContextSnapshotKey(gameSocketCode) : '0|0|0'),
+    () => (gameSocketCode ? getLeaveContextSnapshotKey(gameSocketCode) : '0|0|0'),
+  );
 
-  const {
-    roomId,
-    betAmount: bet,
-    roomName: room,
-    opponentName: opponent,
-    hasOpponent,
-    isSpectator,
-    isPlayer1,
-  } = playCtx;
+  const [snapOver, snapPast, snapOpp] = leaveSnapKey.split('|').map((x) => x === '1');
+
+  /** Same as Rule 2 “should warn about money” — only then we trap OS/gesture back. */
+  const needsForfeitBackTrap =
+    !snapOver && !isSpectator && snapOpp && snapPast;
 
   // ── Leave state ─────────────────────────────────────────────────────────────
   const [checkingLeave,    setCheckingLeave]    = useState(false);
@@ -102,8 +124,22 @@ export default function PlayPage() {
   const [showFinished,     setShowFinished]     = useState(false);
   const [finishedStatus,   setFinishedStatus]   = useState<RoomStatusResponse | null>(null);
 
+  const showForfeitRef = useRef(false);
+  showForfeitRef.current = showForfeit;
+
+  const handleLeaveRef = useRef<() => Promise<void>>(async () => {});
+  const trapInstalledRef = useRef(false);
+
+  useEffect(() => {
+    if (!playCtx || !gameSocketCode) {
+      console.warn('[PlayPage] Missing play context, redirecting to dashboard');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [playCtx, gameSocketCode, navigate]);
+
   // ── Best-effort leave API + navigate back ───────────────────────────────────
   const doLeave = async (silent = false) => {
+    if (!roomId) return;
     try {
       const status = await apiRepository.leaveRoom(roomId);
       const serverSettled = isRoomTerminalWithWinner(status);
@@ -118,7 +154,7 @@ export default function PlayPage() {
       console.error('[PlayPage] Error during leaveRoom:', e);
     }
     clearPlayContext();
-    navigate(-1);
+    consumePlayBackTrapThenNavigate(() => navigate(-1));
   };
 
   // ── Android-equivalent leave validation ─────────────────────────────────────
@@ -164,8 +200,68 @@ export default function PlayPage() {
 
     // Rule 3: spectator / placement phase / no opponent → leave directly, no API call needed
     clearPlayContext();
-    navigate(-1);
+    consumePlayBackTrapThenNavigate(() => navigate(-1));
   };
+
+  handleLeaveRef.current = handleLeaveRequest;
+
+  // Extra history entry only while a staked match is live (same case as the forfeit / money popup).
+  useEffect(() => {
+    if (!playCtx || !gameSocketCode) return;
+    if (!needsForfeitBackTrap) {
+      trapInstalledRef.current = false;
+      return;
+    }
+    if (trapInstalledRef.current) return;
+    const url = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.pushState({ [PLAY_BACK_TRAP_KEY]: 1 }, '', url);
+    trapInstalledRef.current = true;
+  }, [playCtx, gameSocketCode, needsForfeitBackTrap]);
+
+  useEffect(() => {
+    if (!playCtx || !gameSocketCode) return;
+
+    const onPopState = () => {
+      const { gameIsOver, isPastPlacement, opponentConfirmed: oc } = getLeaveContext(gameSocketCode);
+      const needsTrap =
+        !gameIsOver && !isSpectator && oc && isPastPlacement;
+
+      if (showForfeitRef.current) {
+        setShowForfeit(false);
+        if (needsTrap) {
+          window.history.pushState({ [PLAY_BACK_TRAP_KEY]: 1 }, '', window.location.href);
+        }
+        return;
+      }
+
+      if (tryConsumePlayBack()) {
+        if (needsTrap) {
+          window.history.pushState({ [PLAY_BACK_TRAP_KEY]: 1 }, '', window.location.href);
+        }
+        return;
+      }
+
+      if (!needsTrap) return;
+
+      window.history.pushState({ [PLAY_BACK_TRAP_KEY]: 1 }, '', window.location.href);
+      void handleLeaveRef.current();
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [playCtx, gameSocketCode, isSpectator]);
+
+  if (!playCtx || !gameSocketCode) {
+    return null;
+  }
+
+  const {
+    betAmount: bet,
+    roomName: room,
+    opponentName: opponent,
+    hasOpponent,
+    isPlayer1,
+  } = playCtx;
 
   const finishedDialogCopy = finishedStatus ? buildFinishedLeaveDialogText(finishedStatus, me, t) : null;
 

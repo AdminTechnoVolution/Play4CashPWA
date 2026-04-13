@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
+import { IonApp, setupIonicReact } from '@ionic/react';
 import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom';
 
 import { useAuthStore } from './store/authStore';
@@ -18,6 +18,7 @@ import TransactionHistoryPage from './pages/history/TransactionHistoryPage';
 import TermsPage from './pages/legal/TermsPage';
 import PrivacyPage from './pages/legal/PrivacyPage';
 import DataTreatmentPage from './pages/legal/DataTreatmentPage';
+import { tryConsumePlayBack } from './util/playBackNavigation';
 
 setupIonicReact({ mode: 'md' });
 
@@ -42,6 +43,18 @@ export default function App() {
 
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, [setDeferredPrompt]);
+
+  useEffect(() => {
+    const onIonBack = (ev: Event) => {
+      const e = ev as CustomEvent<{ register: (priority: number, fn: () => void) => void }>;
+      e.detail.register(10, () => {
+        if (tryConsumePlayBack()) return;
+        window.history.back();
+      });
+    };
+    document.addEventListener('ionBackButton', onIonBack);
+    return () => document.removeEventListener('ionBackButton', onIonBack);
+  }, []);
 
   return (
     <IonApp>

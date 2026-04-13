@@ -153,6 +153,38 @@ interface BattleshipStoreActions {
 
 type BattleshipStore = BattleshipStoreState & BattleshipStoreActions;
 
+/** GET /rooms/:id/status every 10s while alone in placement — catches opponent join if socket lags. */
+const BS_OPPONENT_STATUS_POLL_MS = 10_000;
+
+let battleshipOpponentPollInterval: ReturnType<typeof setInterval> | null = null;
+
+function clearBattleshipOpponentPoll() {
+  if (battleshipOpponentPollInterval) {
+    clearInterval(battleshipOpponentPollInterval);
+    battleshipOpponentPollInterval = null;
+  }
+}
+
+function startBattleshipOpponentPoll(roomId: string, get: () => BattleshipStore) {
+  clearBattleshipOpponentPoll();
+  battleshipOpponentPollInterval = window.setInterval(async () => {
+    const s = get();
+    if (s.isSpectator || s.opponentConfirmed || s.phase !== 'placement') {
+      clearBattleshipOpponentPoll();
+      return;
+    }
+    try {
+      const status = await apiRepository.getRoomStatus(roomId);
+      const st = (status.status || '').toLowerCase();
+      if (status.playerCount >= 2 || st === 'started') {
+        s.socket?.requestSync(roomId);
+      }
+    } catch {
+      /* ignore transient network errors */
+    }
+  }, BS_OPPONENT_STATUS_POLL_MS);
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────
 export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
   phase: 'placement',
@@ -189,6 +221,8 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
   // ── initGame ────────────────────────────────────────────────────────────────
   initGame(roomId, myUsername, hasOpponent = false, initialOpponentName = '', isSpectator = false) {
     console.log('[SPECTATOR][7] battleshipStore.initGame → roomId:', roomId, '| myUsername:', myUsername, '| isSpectator:', isSpectator, '| hasOpponent:', hasOpponent, '| initialOpponentName:', initialOpponentName);
+    clearBattleshipOpponentPoll();
+
     const socket = new BattleshipSocketManager();
     socket.connect(roomId);
 
@@ -201,6 +235,8 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       }, 1500);
     } else if (hasOpponent) {
       set({ opponentConfirmed: true, opponentName: initialOpponentName });
+    } else {
+      startBattleshipOpponentPoll(roomId, get);
     }
 
     socket.onGameUpdate((raw: unknown) => {
@@ -270,6 +306,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
             opponentLeftDialog: true,
             pendingBattleStart: null,
           });
+          startBattleshipOpponentPoll(roomId, get);
         }
         return;
       }
@@ -277,6 +314,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       // ── Opponent joined ─────────────────────────────────────────────────────
       if (data.opponentJoined === true) {
         const name = ((data.userName ?? data.opponentName ?? 'Opponent') as string).trim();
+        clearBattleshipOpponentPoll();
         set({ opponentConfirmed: true, opponentName: name, opponentJoinedToast: 'ws.games.opponentJoined' });
         return;
       }
@@ -439,6 +477,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
 
   // ── cleanup ─────────────────────────────────────────────────────────────────
   cleanup() {
+    clearBattleshipOpponentPoll();
     get().socket?.disconnect();
     set({
       socket: null,

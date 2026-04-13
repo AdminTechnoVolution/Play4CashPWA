@@ -19,6 +19,7 @@ import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import { BoardTileViz, EndIndicatorViz, HandTileViz, END_LEFT, END_RIGHT } from './DominoTileViews';
 import GameSound from '../../../ui/game/GameSound';
+import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
 
 function tilesEqual(t1: DominoTile, t2: DominoTile) {
   return (t1.a === t2.a && t1.b === t2.b) || (t1.a === t2.b && t1.b === t2.a);
@@ -90,6 +91,17 @@ export default function DominoPage({
   useEffect(() => {
     if (store.navigateBack) onLeaveRequest();
   }, [store.navigateBack]);
+
+  useEffect(() => {
+    return registerPlayBackConsumer(() => {
+      const st = useDominoStore.getState();
+      if (st.opponentLeftMessage) {
+        st.clearOpponentLeft();
+        return true;
+      }
+      return false;
+    });
+  }, []);
 
   useEffect(() => {
     if (store.chatErrorToast) {

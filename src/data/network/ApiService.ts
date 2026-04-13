@@ -204,7 +204,11 @@ export const apiService = {
     return {
       id: raw.id ?? '',
       status: raw.status ?? '',
-      playerCount: raw.playerCount ?? 0,
+      playerCount:
+        raw.playerCount ??
+        raw.player_count ??
+        (Array.isArray(raw.players) ? raw.players.length : 0) ??
+        0,
       betAmount: raw.bet_amount,
       winner: raw.winner,
       winnerReason: raw.winner_reason,
