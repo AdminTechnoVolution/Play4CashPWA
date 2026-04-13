@@ -170,6 +170,31 @@ const LoginPage: React.FC = () => {
               </p>
             </IonText>
           </div>
+
+          {/* Footer */}
+          <div
+            style={{
+              marginTop: 'auto',
+              width: '100%',
+              paddingTop: 28,
+              paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
+              textAlign: 'center',
+            }}
+          >
+            <IonText>
+              <p
+                style={{
+                  color: 'var(--sovereign-text-muted)',
+                  fontSize: 12,
+                  margin: 0,
+                  opacity: 0.7,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                By Techno Volution
+              </p>
+            </IonText>
+          </div>
         </div>
 
         <GenericErrorModal isOpen={!!error} message={error ?? ''} onDismiss={clearError} />
