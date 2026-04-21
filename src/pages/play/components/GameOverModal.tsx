@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { IonModal } from '@ionic/react';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../../ui/components/SovereignButton';
 import type { GameOverPayload } from '../../../data/models/ApiModels';
 import { useT } from '../../../i18n/translations';
-import { 
-  resolveGameEndFallbackMessage, 
-  playerGameEndReasonFallback, 
+import {
+  resolveGameEndFallbackMessage,
+  playerGameEndReasonFallback,
   PlayerGameEndReasonProfile,
   GameEndMessageKeys,
   applyWsMessagePlaceholders
 } from '../../../i18n/ApiMessageDisplay';
 import { formatUSD } from '../../../util/formatCurrency';
+
+const DEFEAT_DELAY_MS = 5000;
 
 interface GameOverModalProps {
   isOpen: boolean;
@@ -28,6 +30,30 @@ const GameOverModal: React.FC<GameOverModalProps> = ({
   onExit,
   gameProfile = 'CHESS', // Default to CHESS if not provided
 }) => {
+  const [visibleOpen, setVisibleOpen] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    if (!isOpen) {
+      setVisibleOpen(false);
+      return;
+    }
+
+    const isDefeat = !isSpectator && gameOver != null && !gameOver.youWon && !gameOver.isDraw;
+
+    if (isDefeat) {
+      timerRef.current = setTimeout(() => setVisibleOpen(true), DEFEAT_DELAY_MS);
+    } else {
+      setVisibleOpen(true);
+    }
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [isOpen, isSpectator, gameOver]);
+
   const t = useT();
   if (!gameOver) return null;
 
@@ -98,7 +124,7 @@ const GameOverModal: React.FC<GameOverModalProps> = ({
 
   return (
     <IonModal
-      isOpen={isOpen}
+      isOpen={visibleOpen}
       backdropDismiss={false}
       style={{
         '--background': 'transparent',

@@ -192,7 +192,7 @@ export const SpectatorPayload = {
   },
 
   fallbackPlayerName: (oneBasedIndex: number): string => {
-    return `spectator_player_n|${oneBasedIndex}`; // Returning key with placeholder info
+    return `Player ${oneBasedIndex}`;
   },
 
   spectatorEndReasonFallback: (data: any, outcomeRaw: string): string => {

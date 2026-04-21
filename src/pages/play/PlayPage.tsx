@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { IonAlert, IonLoading, IonModal, IonText } from '@ionic/react';
 import { useT } from '../../i18n/translations';
 import { SovereignPrimaryButton, SovereignDangerButton } from '../../ui/components/SovereignButton';
@@ -22,6 +22,12 @@ import {
   PLAY_BACK_TRAP_KEY,
   consumePlayBackTrapThenNavigate,
 } from '../../util/playBackNavigation';
+
+/** Defer clearing play context until after navigation unmounts PlayPage (avoids one frame of blank UI). */
+function scheduleClearPlayContext() {
+  setTimeout(() => clearPlayContext(), 0);
+}
+
 // ── Leave-context snapshot (called at the moment the user requests to leave) ──
 function getLeaveContext(gameSocketCode: string): {
   gameIsOver: boolean;
@@ -130,13 +136,6 @@ export default function PlayPage() {
   const handleLeaveRef = useRef<() => Promise<void>>(async () => {});
   const trapInstalledRef = useRef(false);
 
-  useEffect(() => {
-    if (!playCtx || !gameSocketCode) {
-      console.warn('[PlayPage] Missing play context, redirecting to dashboard');
-      navigate('/dashboard', { replace: true });
-    }
-  }, [playCtx, gameSocketCode, navigate]);
-
   // ── Best-effort leave API + navigate back ───────────────────────────────────
   const doLeave = async (silent = false) => {
     if (!roomId) return;
@@ -153,8 +152,10 @@ export default function PlayPage() {
     } catch (e) {
       console.error('[PlayPage] Error during leaveRoom:', e);
     }
-    clearPlayContext();
-    consumePlayBackTrapThenNavigate(() => navigate(-1));
+    consumePlayBackTrapThenNavigate(() => {
+      navigate(-1);
+      scheduleClearPlayContext();
+    });
   };
 
   // ── Android-equivalent leave validation ─────────────────────────────────────
@@ -199,8 +200,10 @@ export default function PlayPage() {
     }
 
     // Rule 3: spectator / placement phase / no opponent → leave directly, no API call needed
-    clearPlayContext();
-    consumePlayBackTrapThenNavigate(() => navigate(-1));
+    consumePlayBackTrapThenNavigate(() => {
+      navigate(-1);
+      scheduleClearPlayContext();
+    });
   };
 
   handleLeaveRef.current = handleLeaveRequest;
@@ -252,7 +255,7 @@ export default function PlayPage() {
   }, [playCtx, gameSocketCode, isSpectator]);
 
   if (!playCtx || !gameSocketCode) {
-    return null;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const {

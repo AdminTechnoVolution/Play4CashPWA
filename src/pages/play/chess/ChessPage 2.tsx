@@ -19,13 +19,7 @@ import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import GameSound from '../../../ui/game/GameSound';
 import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
-
-const PIECE_SYMBOL: Record<string, string> = {
-  [`${ChessPieceType.KING}_true`]: '♔', [`${ChessPieceType.QUEEN}_true`]: '♕', [`${ChessPieceType.ROOK}_true`]: '♖',
-  [`${ChessPieceType.BISHOP}_true`]: '♗', [`${ChessPieceType.KNIGHT}_true`]: '♘', [`${ChessPieceType.PAWN}_true`]: '♙',
-  [`${ChessPieceType.KING}_false`]: '♚', [`${ChessPieceType.QUEEN}_false`]: '♛', [`${ChessPieceType.ROOK}_false`]: '♜',
-  [`${ChessPieceType.BISHOP}_false`]: '♝', [`${ChessPieceType.KNIGHT}_false`]: '♞', [`${ChessPieceType.PAWN}_false`]: '♟',
-};
+import { ChessPieceSvg } from './ChessPieces';
 
 // Inject CSS keyframes for selected piece glow (Android SelectedPieceGlow — alpha pulse 0.35↔0.85)
 let chessGlowInjected = false;
@@ -172,7 +166,11 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
       (store.optimisticRookSlide.toRow === row && store.optimisticRookSlide.toCol === col)
     ));
     const isCheckCell = store.isCheck && piece?.type === ChessPieceType.KING &&
-      ((piece.isWhite && playingWhite) || (!piece.isWhite && !playingWhite));
+      (
+        store.isPlayerTurn
+          ? ((piece.isWhite && playingWhite) || (!piece.isWhite && !playingWhite))
+          : ((piece.isWhite && !playingWhite) || (!piece.isWhite && playingWhite))
+      );
 
     if (isCheckCell) return COLOR_CHECK;
     if (isSelected) return COLOR_SELECTED;
@@ -318,7 +316,6 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
               <IonText style={{ color: store.isPlayerTurn ? '#c9a84c' : '#8a9bbf', fontSize: 13, fontWeight: '600' }}>
                 {store.statusMessage || (store.isPlayerTurn ? t('chess_your_turn') : t('chess_opponent_turn'))}
               </IonText>
-              {store.isCheck && <IonText style={{ color: '#e05050', fontSize: 12, fontWeight: '800' }}>{t('ws.chess.check') || 'CHECK!'}</IonText>}
             </div>
 
             <TurnTimer 
@@ -403,35 +400,14 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
                           }} />
                         )}
                         {piece && (
-                          piece.isWhite ? (
-                            <span style={{
-                              fontSize: cellSize * 0.62,
-                              fontWeight: 700,
-                              lineHeight: 1,
-                              color: '#E8E8E8',
-                              textShadow: '0 1px 3px rgba(0,0,0,0.5)',
-                              userSelect: 'none',
-                              zIndex: 3,
-                              transition: 'transform 0.1s ease-out',
-                              transform: isSelected ? 'scale(1.1)' : 'scale(1)',
-                            }}>
-                              {PIECE_SYMBOL[`${piece.type}_true`]}
-                            </span>
-                          ) : (
-                            <span style={{
-                              fontSize: cellSize * 0.62,
-                              fontWeight: 700,
-                              lineHeight: 1,
-                              color: '#141414',
-                              WebkitTextStroke: '0.6px rgba(255,255,255,0.4)',
-                              userSelect: 'none',
-                              zIndex: 3,
-                              transition: 'transform 0.1s ease-out',
-                              transform: isSelected ? 'scale(1.1)' : 'scale(1)',
-                            }}>
-                              {PIECE_SYMBOL[`${piece.type}_false`]}
-                            </span>
-                          )
+                          <div style={{ position: 'relative', zIndex: 3, userSelect: 'none', pointerEvents: 'none' }}>
+                            <ChessPieceSvg
+                              type={piece.type}
+                              isWhite={piece.isWhite}
+                              size={cellSize - 2}
+                              isSelected={isSelected}
+                            />
+                          </div>
                         )}
                       </div>
                     );

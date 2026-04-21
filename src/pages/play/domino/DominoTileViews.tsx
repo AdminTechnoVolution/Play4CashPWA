@@ -162,21 +162,38 @@ export function BoardTileViz({
   right,
   cellPx = 20,
   highlight = false,
+  forceVertical = false,
+  bridgeIn = false,
+  bridgeOut = false,
 }: {
   left: number;
   right: number;
   cellPx?: number;
   highlight?: boolean;
+  /** Corner / bend: vertical tile (single bridge between horizontal runs). */
+  forceVertical?: boolean;
+  bridgeIn?: boolean;
+  bridgeOut?: boolean;
 }) {
   const isDouble = left === right;
+  const vertical = forceVertical || isDouble;
+  const bridgeStyle =
+    bridgeIn || bridgeOut
+      ? ({
+          marginLeft: bridgeIn ? -2 : undefined,
+          marginRight: bridgeOut ? -2 : undefined,
+        } as const)
+      : undefined;
   return (
-    <DominoVizTile
-      left={left}
-      right={right}
-      cellPx={cellPx}
-      orientation={isDouble ? 'vertical' : 'horizontal'}
-      highlight={highlight}
-    />
+    <div style={{ display: 'inline-flex', alignItems: 'center', ...bridgeStyle }}>
+      <DominoVizTile
+        left={left}
+        right={right}
+        cellPx={cellPx}
+        orientation={vertical ? 'vertical' : 'horizontal'}
+        highlight={highlight}
+      />
+    </div>
   );
 }
 

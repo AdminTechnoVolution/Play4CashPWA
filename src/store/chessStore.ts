@@ -681,10 +681,12 @@ function mergeSpectatorChessLabels(data: any, state: any, set: any) {
   const co = SpectatorPayload.creatorOpponentUsernames(data);
   const [w, b] = SpectatorPayload.whiteBlackDisplayNames(data, seats);
   const useCreatorOpponent = co && !w && !b;
-  const wFinal = (useCreatorOpponent ? co[0] : w) || SpectatorPayload.fallbackPlayerName(1);
-  const bFinal = (useCreatorOpponent ? co[1] : b) || SpectatorPayload.fallbackPlayerName(2);
-  const s1 = (co && co[0]) || (seats[0]?.displayName) || SpectatorPayload.fallbackPlayerName(1);
-  const s2 = (co && co[1]) || (seats[1]?.displayName) || SpectatorPayload.fallbackPlayerName(2);
+  const p1 = t('spectator_player_n').replace('%d', '1');
+  const p2 = t('spectator_player_n').replace('%d', '2');
+  const wFinal = (useCreatorOpponent ? co[0] : w) || p1;
+  const bFinal = (useCreatorOpponent ? co[1] : b) || p2;
+  const s1 = (co && co[0]) || (seats[0]?.displayName) || p1;
+  const s2 = (co && co[1]) || (seats[1]?.displayName) || p2;
   
   set({
     spectatorWhiteLabel: wFinal,

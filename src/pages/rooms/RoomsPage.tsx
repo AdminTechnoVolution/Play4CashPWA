@@ -711,6 +711,29 @@ const RoomsPage: React.FC = () => {
                 </div>
               )}
 
+              {['chess', 'halma', 'domino'].includes(gameSocketCode) && (
+                <div style={{
+                  background: 'rgba(255,107,53,0.10)',
+                  border: '1px solid rgba(255,107,53,0.30)',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                }}>
+                  <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>⚠️</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <p style={{ color: '#ff8a5c', fontSize: '13px', margin: 0, lineHeight: 1.4 }}>
+                      {t('rooms_create_bet_deduction_warning')}
+                    </p>
+                    <p style={{ color: '#ff8a5c', fontSize: '13px', margin: 0, lineHeight: 1.4 }}>
+                      {t('rooms_join_forfeit_warning')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <SovereignPrimaryButton onClick={handleCreate} loading={createLoading} expand="block">
                 {t('create_room')}
               </SovereignPrimaryButton>
