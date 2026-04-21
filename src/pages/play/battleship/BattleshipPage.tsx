@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import type { CSSProperties, RefObject } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonIcon, IonText, IonToast, IonModal,
 } from '@ionic/react';
-import { arrowBackOutline, refreshOutline, swapHorizontalOutline } from 'ionicons/icons';
+import { arrowBackOutline, refreshOutline } from 'ionicons/icons';
 import { useAuthStore } from '../../../store/authStore';
 import { useBattleshipStore, SHIP_CATALOG } from '../../../store/battleshipStore';
 import type { PlacedShip } from '../../../store/battleshipStore';
@@ -23,6 +24,9 @@ import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
 const CELL = 32;
 const GAP  = 2;
 const GRID_PX = CELL * 10 + GAP * 9; // 338 px
+const BS_DND_MIME = 'application/p4c-battleship';
+/** Below this distance (px) pointer-up counts as tap (rotate); above = move ship. */
+const PLACEMENT_DRAG_THRESHOLD_PX = 12;
 const MISSILE_FALL_MS = 820;
 const SUNK_BOMB_FALL_MS = 1800;
 
@@ -79,10 +83,127 @@ function FireEmoji({ delay }: { delay: number }) {
   );
 }
 
+function pointerClientToPlacementCell(
+  clientX: number,
+  clientY: number,
+  gridEl: HTMLDivElement | null,
+): { row: number; col: number } | null {
+  if (!gridEl) return null;
+  const rect = gridEl.getBoundingClientRect();
+  const col = Math.floor((clientX - rect.left) / (CELL + GAP));
+  const row = Math.floor((clientY - rect.top) / (CELL + GAP));
+  if (row < 0 || row >= 10 || col < 0 || col >= 10) return null;
+  return { row, col };
+}
+
+/** Which segment of the ship (cells from anchor) lies under the pointer — used on drag end so anchor ≠ “drop cell” when grabbing mid-ship. */
+function grabOffsetFromClientOnShip(
+  ship: PlacedShip,
+  clientX: number,
+  clientY: number,
+  gridEl: HTMLDivElement | null,
+): { dr: number; dc: number } {
+  if (!gridEl) return { dr: 0, dc: 0 };
+  const rect = gridEl.getBoundingClientRect();
+  const col = Math.floor((clientX - rect.left) / (CELL + GAP));
+  const row = Math.floor((clientY - rect.top) / (CELL + GAP));
+  if (ship.horizontal) {
+    const dc = Math.max(0, Math.min(ship.size - 1, col - ship.col));
+    return { dr: 0, dc };
+  }
+  const dr = Math.max(0, Math.min(ship.size - 1, row - ship.row));
+  return { dr, dc: 0 };
+}
+
+/** Keep translated ship overlay box inside the GRID_PX square (drag preview). */
+function clampDragToGridBox(
+  boxLeft: number,
+  boxTop: number,
+  boxW: number,
+  boxH: number,
+  tx: number,
+  ty: number,
+): { tx: number; ty: number } {
+  const maxTx = GRID_PX - boxW - boxLeft;
+  const minTx = -boxLeft;
+  const maxTy = GRID_PX - boxH - boxTop;
+  const minTy = -boxTop;
+  if (!Number.isFinite(tx) || !Number.isFinite(ty)) return { tx: 0, ty: 0 };
+  return {
+    tx: Math.min(maxTx, Math.max(minTx, tx)),
+    ty: Math.min(maxTy, Math.max(minTy, ty)),
+  };
+}
+
 // ── Ship image overlay (absolutely positioned on top of grid) ─────────────────
-function ShipOverlay({ ships }: { ships: PlacedShip[] }) {
-  const beamPad = CELL * 0.28;
-  const bowPad  = CELL * 0.10;
+function ShipOverlay({
+  ships,
+  interactive = false,
+  placementGridRef,
+  onPlacedShipClick,
+  onPlacedShipDragStart,
+  onPlacedShipMove,
+}: {
+  ships: PlacedShip[];
+  interactive?: boolean;
+  placementGridRef?: RefObject<HTMLDivElement | null>;
+  onPlacedShipClick?: (type: string) => void;
+  onPlacedShipDragStart?: (e: React.DragEvent, ship: PlacedShip) => void;
+  /** Pointer-based move (works with touch + mouse); takes priority over HTML5 drag when set with placementGridRef. */
+  onPlacedShipMove?: (type: string, row: number, col: number) => void;
+}) {
+  const pointerDragRef = useRef<{
+    type: string;
+    sx: number;
+    sy: number;
+    /** Segment index from ship anchor toward bow — subtract from drop cell to get new anchor. */
+    grabDr: number;
+    grabDc: number;
+  } | null>(null);
+  /** Live pixel offset while dragging — gives visible DnD feedback before pointerup commits. */
+  const [dragDelta, setDragDelta] = useState<{ type: string; dx: number; dy: number } | null>(null);
+
+  const usePointerPlacement = !!(placementGridRef && onPlacedShipMove);
+
+  const finishPointerPlacement = useCallback(
+    (e: React.PointerEvent, ship: PlacedShip) => {
+      try {
+        (e.currentTarget as HTMLImageElement).releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      const d = pointerDragRef.current;
+      pointerDragRef.current = null;
+      setDragDelta(null);
+      if (!placementGridRef?.current || !onPlacedShipMove) return;
+      if (!d || d.type !== ship.type) return;
+      const dist = Math.hypot(e.clientX - d.sx, e.clientY - d.sy);
+      if (dist < PLACEMENT_DRAG_THRESHOLD_PX) {
+        onPlacedShipClick?.(ship.type);
+        return;
+      }
+      const drop = pointerClientToPlacementCell(e.clientX, e.clientY, placementGridRef.current);
+      if (!drop) return;
+      const anchorRow = drop.row - d.grabDr;
+      const anchorCol = drop.col - d.grabDc;
+      onPlacedShipMove(ship.type, anchorRow, anchorCol);
+    },
+    [onPlacedShipMove, onPlacedShipClick, placementGridRef],
+  );
+
+  const imgStyleBase = (interactive: boolean): CSSProperties => ({
+    objectFit: 'fill',
+    // Ionic global normalize sets `img { max-width: 100% }` — breaks explicit px sizes when
+    // the wrapper is shrink-to-fit (vertical ships looked like tiny thumbnails).
+    maxWidth: 'none',
+    pointerEvents: interactive ? 'auto' : 'none',
+    zIndex: 3,
+    borderRadius: 4,
+    filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
+    cursor: interactive ? 'grab' : undefined,
+    touchAction: interactive ? 'none' : undefined,
+    userSelect: interactive ? 'none' : undefined,
+  });
 
   return (
     <>
@@ -90,48 +211,144 @@ function ShipOverlay({ ships }: { ships: PlacedShip[] }) {
         const x        = s.col * (CELL + GAP);
         const y        = s.row * (CELL + GAP);
         const longSide = s.size * CELL + (s.size - 1) * GAP;
+        /** Pixel box exactly covering occupied cells (anchor = top-left cell of ship). */
+        const overlayW = s.horizontal ? longSide : CELL;
+        const overlayH = s.horizontal ? CELL : longSide;
+
+        const pointerHandlers = usePointerPlacement
+          ? {
+              draggable: false as const,
+              onPointerDown: (e: React.PointerEvent<HTMLImageElement>) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const g = placementGridRef?.current
+                  ? grabOffsetFromClientOnShip(s, e.clientX, e.clientY, placementGridRef.current)
+                  : { dr: 0, dc: 0 };
+                pointerDragRef.current = {
+                  type: s.type,
+                  sx: e.clientX,
+                  sy: e.clientY,
+                  grabDr: g.dr,
+                  grabDc: g.dc,
+                };
+                setDragDelta({ type: s.type, dx: 0, dy: 0 });
+                e.currentTarget.setPointerCapture(e.pointerId);
+              },
+              onPointerMove: (e: React.PointerEvent<HTMLImageElement>) => {
+                const d = pointerDragRef.current;
+                if (!d || d.type !== s.type) return;
+                const rawDx = e.clientX - d.sx;
+                const rawDy = e.clientY - d.sy;
+                const { tx, ty } = clampDragToGridBox(x, y, overlayW, overlayH, rawDx, rawDy);
+                setDragDelta({ type: s.type, dx: tx, dy: ty });
+              },
+              onPointerUp: (e: React.PointerEvent<HTMLImageElement>) => finishPointerPlacement(e, s),
+              onPointerCancel: () => {
+                pointerDragRef.current = null;
+                setDragDelta(null);
+              },
+            }
+          : {};
+
+        const draggingThis =
+          usePointerPlacement && dragDelta?.type === s.type ? dragDelta : null;
+        const dragTx = draggingThis?.dx ?? 0;
+        const dragTy = draggingThis?.dy ?? 0;
+
+        const legacyDragHandlers =
+          interactive && !usePointerPlacement
+            ? {
+                draggable: true as const,
+                onDragStart: (e: React.DragEvent<HTMLImageElement>) => {
+                  e.stopPropagation();
+                  onPlacedShipDragStart?.(e, s);
+                },
+                onClick: (e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onPlacedShipClick?.(s.type);
+                },
+              }
+            : { draggable: false as const };
 
         if (s.horizontal) {
           return (
-            <img
+            <div
               key={s.type}
-              src={shipImageSrc(s.type)}
-              alt={s.type}
-              draggable={false}
               style={{
                 position: 'absolute',
-                left: x - bowPad, top: y - beamPad,
-                width: longSide + bowPad * 2, height: CELL + beamPad * 2,
-                objectFit: 'fill',
-                pointerEvents: 'none',
-                zIndex: 3,
-                borderRadius: 4,
-                filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
+                left: x,
+                top: y,
+                width: overlayW,
+                height: overlayH,
+                overflow: 'hidden',
+                borderRadius: 3,
+                transform: draggingThis ? `translate(${dragTx}px, ${dragTy}px)` : undefined,
+                zIndex: draggingThis ? 50 : 3,
+                pointerEvents: interactive ? 'auto' : 'none',
               }}
-            />
+            >
+              <img
+                src={shipImageSrc(s.type)}
+                alt={s.type}
+                {...pointerHandlers}
+                {...legacyDragHandlers}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  height: '100%',
+                  ...imgStyleBase(interactive),
+                  opacity: draggingThis ? 0.92 : 1,
+                  cursor: draggingThis ? 'grabbing' : interactive ? 'grab' : undefined,
+                  filter: draggingThis
+                    ? 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))'
+                    : 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
+                }}
+              />
+            </div>
           );
         }
 
-        // Vertical: rotate(90deg) with transformOrigin '0 0'. The overflow adjustments
-        // apply to the pre-rotation coordinate space (width = length, height = beam).
         return (
-          <img
+          <div
             key={s.type}
-            src={shipImageSrc(s.type)}
-            alt={s.type}
-            draggable={false}
             style={{
               position: 'absolute',
-              left: x + CELL + beamPad, top: y - bowPad,
-              width: longSide + bowPad * 2, height: CELL + beamPad * 2,
-              objectFit: 'fill',
-              transform: 'rotate(90deg)',
-              transformOrigin: '0 0',
-              pointerEvents: 'none',
-              zIndex: 3,
-              filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
+              left: x,
+              top: y,
+              width: overlayW,
+              height: overlayH,
+              overflow: 'hidden',
+              borderRadius: 3,
+              transform: draggingThis ? `translate(${dragTx}px, ${dragTy}px)` : undefined,
+              zIndex: draggingThis ? 50 : 3,
+              pointerEvents: interactive ? 'auto' : 'none',
             }}
-          />
+          >
+            <img
+              src={shipImageSrc(s.type)}
+              alt={s.type}
+              {...pointerHandlers}
+              {...legacyDragHandlers}
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                width: longSide,
+                height: CELL,
+                marginLeft: -longSide / 2,
+                marginTop: -CELL / 2,
+                transform: 'rotate(90deg)',
+                transformOrigin: 'center center',
+                ...imgStyleBase(interactive),
+                opacity: draggingThis ? 0.92 : 1,
+                cursor: draggingThis ? 'grabbing' : interactive ? 'grab' : undefined,
+                filter: draggingThis
+                  ? 'drop-shadow(0 8px 14px rgba(0,0,0,0.55))'
+                  : 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
+              }}
+            />
+          </div>
         );
       })}
     </>
@@ -810,6 +1027,7 @@ export default function BattleshipPage({
   const store    = useBattleshipStore();
   const t        = useT();
   const [showReadyConfirm, setShowReadyConfirm] = useState(false);
+  const placementGridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const myUsername = user?.username ?? '';
@@ -846,6 +1064,37 @@ export default function BattleshipPage({
   }, [store.shotCount, store.lastShot]);
 
   // ── Placement phase ─────────────────────────────────────────────────────────
+  const handlePlacementDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const el = placementGridRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const col = Math.floor((e.clientX - rect.left) / (CELL + GAP));
+    const row = Math.floor((e.clientY - rect.top) / (CELL + GAP));
+    if (row < 0 || row >= 10 || col < 0 || col >= 10) return;
+
+    let payload: { kind: 'place' | 'move'; shipType: string } | null = null;
+    const raw = e.dataTransfer.getData(BS_DND_MIME);
+    try {
+      const o = raw ? (JSON.parse(raw) as { kind?: string; shipType?: string }) : null;
+      if (o?.shipType && (o.kind === 'place' || o.kind === 'move')) {
+        payload = { kind: o.kind, shipType: o.shipType };
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!payload?.shipType) return;
+
+    const st = useBattleshipStore.getState();
+    if (payload.kind === 'move') {
+      st.moveShipTo(payload.shipType, row, col);
+    } else {
+      if (st.placedShips.some((p) => p.type === payload.shipType)) return;
+      st.selectShipType(payload.shipType);
+      st.placeShipAt(row, col);
+    }
+  };
+
   const renderPlacement = () => (
     <IonContent style={{ '--background': '#060e1e' }}>
       <div style={{
@@ -926,18 +1175,20 @@ export default function BattleshipPage({
         <OceanPanel width={GRID_PX + 16} height={GRID_PX + 16}>
           <div style={{ padding: 8 }}>
             <div
+              ref={placementGridRef}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+              }}
+              onDrop={handlePlacementDrop}
               style={{
                 position: 'relative',
                 display: 'grid',
                 gridTemplateColumns: `repeat(10, ${CELL}px)`,
                 gap: GAP,
-                cursor: 'crosshair',
-              }}
-              onClick={(e) => {
-                const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-                const col  = Math.floor((e.clientX - rect.left)  / (CELL + GAP));
-                const row  = Math.floor((e.clientY - rect.top)   / (CELL + GAP));
-                if (row >= 0 && row < 10 && col >= 0 && col < 10) store.placeShipAt(row, col);
+                width: GRID_PX,
+                height: GRID_PX,
+                overflow: 'hidden',
               }}
             >
               {store.playerBoard.map((row, r) =>
@@ -954,28 +1205,16 @@ export default function BattleshipPage({
                   />
                 ))
               )}
-              <ShipOverlay ships={store.placedShips} />
+              <ShipOverlay
+                ships={store.placedShips}
+                interactive
+                placementGridRef={placementGridRef}
+                onPlacedShipClick={(type) => store.togglePlacedShipOrientation(type)}
+                onPlacedShipMove={(type, row, col) => store.moveShipTo(type, row, col)}
+              />
             </div>
           </div>
         </OceanPanel>
-
-        {/* Orientation toggle */}
-        <button
-          onClick={() => store.toggleOrientation()}
-          style={{
-            background: 'rgba(201,168,76,0.15)',
-            border: '1px solid rgba(201,168,76,0.45)',
-            borderRadius: 8,
-            color: '#c9a84c',
-            padding: '8px 20px',
-            fontSize: 13,
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}
-        >
-          <IonIcon icon={swapHorizontalOutline} style={{ fontSize: 16 }} />
-          {store.selectedHorizontal ? t('bs_horizontal') : t('bs_vertical')}
-        </button>
 
         {/* Ship list */}
         <div style={{ width: GRID_PX + 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -992,21 +1231,38 @@ export default function BattleshipPage({
                   borderRadius: 10,
                   background: isSelected ? 'rgba(201,168,76,0.18)' : 'rgba(13,31,52,0.85)',
                   border: `1px solid ${isSelected ? '#c9a84c' : 'rgba(255,255,255,0.08)'}`,
-                  cursor: 'pointer',
+                  cursor: 'default',
                   boxShadow: isSelected ? '0 0 14px rgba(201,168,76,0.18)' : 'none',
                   backdropFilter: 'blur(6px)',
                 }}
               >
-                {/* Ship mini-image */}
+                {/* Drag only the sprite — not the full row */}
                 <img
                   src={shipImageSrc(s.type)}
                   alt={s.type}
+                  draggable={!placed}
+                  onDragStart={(e) => {
+                    if (placed) {
+                      e.preventDefault();
+                      return;
+                    }
+                    e.dataTransfer.setData(
+                      BS_DND_MIME,
+                      JSON.stringify({ kind: 'place', shipType: s.type }),
+                    );
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
                   style={{
-                    width: s.size * 18 + 4, height: 22,
+                    width: s.size * 18 + 4,
+                    height: 22,
                     objectFit: 'fill',
                     borderRadius: 3,
                     flexShrink: 0,
                     filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+                    maxWidth: 'none',
+                    cursor: placed ? 'default' : 'grab',
+                    touchAction: 'none',
+                    userSelect: 'none',
                   }}
                 />
                 <span style={{ color: '#e8eaf0', fontSize: 13, flex: 1 }}>
@@ -1016,6 +1272,7 @@ export default function BattleshipPage({
                   <>
                     <span style={{ color: '#4caf50', fontSize: 14 }}>✓</span>
                     <button
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); store.removeShip(s.type); }}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',

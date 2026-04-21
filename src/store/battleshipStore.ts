@@ -8,6 +8,27 @@ import { SpectatorPayload } from '../util/SpectatorPayload';
 const EMPTY_BOARD = (): BattleshipCell[][] =>
   Array.from({ length: 10 }, () => Array(10).fill('empty') as BattleshipCell[]);
 
+/** Shift anchor minimally so every cell of the ship stays on the 10×10 grid. */
+function clampBattleshipAnchor(
+  row: number,
+  col: number,
+  size: number,
+  horizontal: boolean,
+): { row: number; col: number } {
+  const r0 = Number.isFinite(row) ? row : 0;
+  const c0 = Number.isFinite(col) ? col : 0;
+  if (horizontal) {
+    return {
+      row: Math.max(0, Math.min(9, Math.round(r0))),
+      col: Math.max(0, Math.min(10 - size, Math.round(c0))),
+    };
+  }
+  return {
+    row: Math.max(0, Math.min(10 - size, Math.round(r0))),
+    col: Math.max(0, Math.min(9, Math.round(c0))),
+  };
+}
+
 const GAME_OVER_OUTCOMES = new Set([
   'win', 'lose', 'forfeit', 'opponent_disconnected', 'timeout_loss', 'draw', 'match_cancelled',
 ]);
@@ -140,6 +161,10 @@ interface BattleshipStoreActions {
   selectShipType: (type: string) => void;
   toggleOrientation: () => void;
   placeShipAt: (row: number, col: number) => void;
+  /** Reposition an already placed ship (same orientation). */
+  moveShipTo: (type: string, row: number, col: number) => void;
+  /** Toggle horizontal/vertical for a ship already on the board. */
+  togglePlacedShipOrientation: (type: string) => void;
   removeShip: (type: string) => void;
   submitPlacement: (roomId: string) => Promise<void>;
   fire: (roomId: string, row: number, col: number) => void;
@@ -516,6 +541,82 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
 
   toggleOrientation() { set(s => ({ selectedHorizontal: !s.selectedHorizontal })); },
 
+  moveShipTo(type: string, row: number, col: number) {
+    const { placedShips, playerBoard } = get();
+    const ship = placedShips.find((s) => s.type === type);
+    if (!ship) return;
+    const catalog = SHIP_CATALOG.find((s) => s.type === type);
+    if (!catalog) return;
+    const horiz = ship.horizontal;
+    const { row: ar, col: ac } = clampBattleshipAnchor(row, col, catalog.size, horiz);
+    if (ship.row === ar && ship.col === ac) return;
+
+    const newBoard = playerBoard.map((r) => [...r]) as BattleshipCell[][];
+    for (let i = 0; i < ship.size; i++) {
+      const r = ship.horizontal ? ship.row : ship.row + i;
+      const c = ship.horizontal ? ship.col + i : ship.col;
+      newBoard[r][c] = 'empty';
+    }
+
+    for (let i = 0; i < catalog.size; i++) {
+      const r = horiz ? ar : ar + i;
+      const c = horiz ? ac + i : ac;
+      if (newBoard[r][c] !== 'empty') {
+        set({ placementError: 'bs_error_overlapping' });
+        return;
+      }
+      newBoard[r][c] = 'ship';
+    }
+
+    const filtered = placedShips.filter((s) => s.type !== type);
+    const newPlacedShips = [...filtered, { type, size: catalog.size, row: ar, col: ac, horizontal: horiz }];
+    set({
+      playerBoard: newBoard,
+      placedShips: newPlacedShips,
+      selectedShipType: type,
+      placementError: null,
+    });
+  },
+
+  togglePlacedShipOrientation(type: string) {
+    const { placedShips, playerBoard } = get();
+    const ship = placedShips.find((s) => s.type === type);
+    if (!ship) return;
+    const catalog = SHIP_CATALOG.find((s) => s.type === type);
+    if (!catalog) return;
+    const newHorizontal = !ship.horizontal;
+    const { row, col } = clampBattleshipAnchor(ship.row, ship.col, catalog.size, newHorizontal);
+    const filtered = placedShips.filter((s) => s.type !== type);
+
+    const newBoard = playerBoard.map((r) => [...r]) as BattleshipCell[][];
+    for (let i = 0; i < ship.size; i++) {
+      const r = ship.horizontal ? ship.row : ship.row + i;
+      const c = ship.horizontal ? ship.col + i : ship.col;
+      newBoard[r][c] = 'empty';
+    }
+
+    for (let i = 0; i < catalog.size; i++) {
+      const r = newHorizontal ? row : row + i;
+      const c = newHorizontal ? col + i : col;
+      if (newBoard[r][c] !== 'empty') {
+        set({ placementError: 'bs_error_overlapping' });
+        return;
+      }
+      newBoard[r][c] = 'ship';
+    }
+
+    const newPlacedShips = [
+      ...filtered,
+      { type, size: catalog.size, row, col, horizontal: newHorizontal },
+    ];
+    set({
+      playerBoard: newBoard,
+      placedShips: newPlacedShips,
+      selectedShipType: type,
+      placementError: null,
+    });
+  },
+
   placeShipAt(row, col) {
     const { selectedShipType, selectedHorizontal, placedShips, playerBoard } = get();
     if (!selectedShipType) return;
@@ -523,15 +624,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
     if (!catalog) return;
 
     const filtered = placedShips.filter(s => s.type !== selectedShipType);
-
-    if (selectedHorizontal && col + catalog.size > 10) {
-      set({ placementError: 'bs_error_ship_out' });
-      return;
-    }
-    if (!selectedHorizontal && row + catalog.size > 10) {
-      set({ placementError: 'bs_error_ship_out' });
-      return;
-    }
+    const { row: ar, col: ac } = clampBattleshipAnchor(row, col, catalog.size, selectedHorizontal);
 
     // Build board with only OTHER ships, then check overlap
     const newBoard = playerBoard.map(r => [...r]) as BattleshipCell[][];
@@ -551,8 +644,8 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
     });
 
     for (let i = 0; i < catalog.size; i++) {
-      const r = selectedHorizontal ? row : row + i;
-      const c = selectedHorizontal ? col + i : col;
+      const r = selectedHorizontal ? ar : ar + i;
+      const c = selectedHorizontal ? ac + i : ac;
       if (newBoard[r][c] !== 'empty') {
         set({ placementError: 'bs_error_overlapping' });
         return;
@@ -560,7 +653,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       newBoard[r][c] = 'ship';
     }
 
-    const newPlacedShips = [...filtered, { type: selectedShipType, size: catalog.size, row, col, horizontal: selectedHorizontal }];
+    const newPlacedShips = [...filtered, { type: selectedShipType, size: catalog.size, row: ar, col: ac, horizontal: selectedHorizontal }];
 
     // Auto-select the next unplaced ship in catalog order
     const nextShip = SHIP_CATALOG.find(s => !newPlacedShips.some(p => p.type === s.type));
@@ -569,6 +662,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       placedShips: newPlacedShips,
       playerBoard: newBoard,
       selectedShipType: nextShip?.type ?? null,
+      placementError: null,
     });
   },
 

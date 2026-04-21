@@ -424,7 +424,7 @@
   "bs_outcome_you_hit": "Acerto direto no %s deles!",
   "bs_outcome_you_miss": "Errou! Vez do adversário.",
   "bs_outcome_you_sunk": "Você afundou o %s deles!",
-  "bs_placement_hint": "Toque em uma célula para colocar • Toque em um navio colocado para removê-lo",
+  "bs_placement_hint": "Arraste um navio da lista para a grade • Toque em um navio colocado para mudar a orientação",
   "bs_placement_waiting_opponent": "Aguardando um oponente… Posicione seus navios enquanto isso!",
   "bs_play_again": "Jogar novamente",
   "bs_ready_button": "PRONTO",

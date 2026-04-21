@@ -424,7 +424,7 @@
   "bs_outcome_you_hit": "Colpo diretto sulla loro %s!",
   "bs_outcome_you_miss": "Mancato! Turno dell'avversario.",
   "bs_outcome_you_sunk": "Hai affondato la loro %s!",
-  "bs_placement_hint": "Tocca una cella per posizionare • Tocca una nave posizionata per rimuoverla",
+  "bs_placement_hint": "Trascina una nave dalla lista sulla griglia • Tocca una nave posizionata per cambiare orientamento",
   "bs_placement_waiting_opponent": "In attesa di un avversario… Posiziona le tue navi nel frattempo!",
   "bs_play_again": "Gioca ancora",
   "bs_ready_button": "PRONTO",

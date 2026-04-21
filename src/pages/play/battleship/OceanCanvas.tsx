@@ -3,7 +3,6 @@ import React, { useEffect, useRef } from 'react';
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface WhaleSpec  { phaseShift: number; speed: number; yFrac: number; lengthFrac: number; direction: number }
 interface SharkSpec  { phaseShift: number; speed: number; yFrac: number; lengthFrac: number; direction: number }
-interface FishSlot   { startT: number; endT: number; xStartFrac: number; xEndFrac: number; ySurface: number; jumpH: number }
 interface BubbleSpec { xFrac: number; speed: number; phase: number; size: number }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -16,12 +15,6 @@ const WHALE_SPECS: WhaleSpec[] = [
 const SHARK_SPECS: SharkSpec[] = [
   { phaseShift: 1.8, speed: 0.140, yFrac: 0.36, lengthFrac: 0.22, direction: 1 },
   { phaseShift: 5.2, speed: 0.115, yFrac: 0.60, lengthFrac: 0.18, direction: 1 },
-];
-
-const FISH_SLOTS: FishSlot[] = [
-  { startT: 0.05, endT: 0.26, xStartFrac: 0.06, xEndFrac: 0.90, ySurface: 0.38, jumpH: 0.22 },
-  { startT: 0.52, endT: 0.74, xStartFrac: 0.08, xEndFrac: 0.88, ySurface: 0.33, jumpH: 0.18 },
-  { startT: 0.80, endT: 0.97, xStartFrac: 0.04, xEndFrac: 0.86, ySurface: 0.41, jumpH: 0.16 },
 ];
 
 const BUBBLE_SPECS: BubbleSpec[] = [
@@ -103,68 +96,11 @@ function drawBubbles(
   ctx.restore();
 }
 
-// ── Sea floor: sand + corals + seaweed ───────────────────────────────────────
-function drawBranchCoral(
-  ctx: CanvasRenderingContext2D,
-  baseX: number,
-  baseY: number,
-  height: number,
-  color: string,
-): void {
-  function seg(x: number, y: number, angle: number, len: number, depth: number): void {
-    if (depth === 0 || len < 2) return;
-    const ex = x + Math.cos(angle) * len;
-    const ey = y + Math.sin(angle) * len;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(ex, ey);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(0.7, depth * 1.1);
-    ctx.lineCap = 'round';
-    ctx.stroke();
-    seg(ex, ey, angle - 0.44, len * 0.68, depth - 1);
-    seg(ex, ey, angle + 0.40, len * 0.70, depth - 1);
-  }
-  seg(baseX, baseY, -Math.PI / 2, height * 0.50, 4);
-}
-
-function drawFanCoral(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  size: number,
-  color: string,
-): void {
-  ctx.save();
-  ctx.globalAlpha = 0.62;
-  const n = 9;
-  for (let i = 0; i < n; i++) {
-    const angle = -Math.PI + (i / (n - 1)) * Math.PI;
-    const ex  = cx + Math.cos(angle) * size;
-    const ey  = cy + Math.sin(angle) * size;
-    const cpx = cx + Math.cos(angle + 0.18) * size * 0.52;
-    const cpy = cy + Math.sin(angle + 0.08) * size * 0.52 - size * 0.12;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.quadraticCurveTo(cpx, cpy, ex, ey);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-  }
-  // Stalk base
-  ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.10, -Math.PI, 0);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
-}
-
+// ── Sea floor: sand + pebbles ─────────────────────────────────────────────────
 function drawSeaFloor(
   ctx: CanvasRenderingContext2D,
   gw: number,
   gh: number,
-  elapsedS: number,
 ): void {
   const fy = gh * 0.82;  // floor Y
 
@@ -226,70 +162,6 @@ function drawSeaFloor(
     ctx.ellipse(xf * gw - rr * 0.2, yf * gh - rr * 0.25, rr * 0.5, rr * 0.28, 0.3, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(115, 92, 58, 0.38)';
     ctx.fill();
-  });
-
-  // ── Seaweed ───────────────────────────────────────────────────────────────
-  const weeds = [
-    { xf: 0.07, hf: 0.135, g: 0 },
-    { xf: 0.20, hf: 0.100, g: 1 },
-    { xf: 0.36, hf: 0.155, g: 2 },
-    { xf: 0.56, hf: 0.115, g: 3 },
-    { xf: 0.72, hf: 0.145, g: 4 },
-    { xf: 0.90, hf: 0.095, g: 5 },
-  ];
-  weeds.forEach(({ xf, hf, g }) => {
-    const sx   = xf * gw;
-    const sh   = hf * gh;
-    const sway = Math.sin(elapsedS * 0.75 + g * 1.35) * 0.18;
-    const green = 100 + g * 8;
-
-    ctx.save();
-    ctx.lineWidth = 2.8;
-    ctx.lineCap = 'round';
-
-    // Main strand
-    ctx.beginPath();
-    ctx.moveTo(sx, fy);
-    ctx.bezierCurveTo(
-      sx + sway * sh * 0.55, fy - sh * 0.38,
-      sx + sway * sh * 0.40, fy - sh * 0.72,
-      sx + sway * sh * 0.80, fy - sh,
-    );
-    ctx.strokeStyle = `rgba(30, ${green}, 50, 0.68)`;
-    ctx.stroke();
-
-    // Second thinner strand
-    ctx.globalAlpha = 0.42;
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(sx + 5, fy);
-    ctx.bezierCurveTo(
-      sx + 5 + sway * sh * 0.45, fy - sh * 0.30,
-      sx + 5 + sway * sh * 0.28, fy - sh * 0.62,
-      sx + 5 + sway * sh * 0.60, fy - sh * 0.82,
-    );
-    ctx.strokeStyle = `rgba(40, ${green + 15}, 60, 0.68)`;
-    ctx.stroke();
-    ctx.restore();
-  });
-
-  // ── Corals ────────────────────────────────────────────────────────────────
-  // Branch corals
-  [
-    { xf: 0.14, hf: 0.130, color: 'rgba(218, 72, 88, 0.74)'  },
-    { xf: 0.44, hf: 0.115, color: 'rgba(228, 105, 52, 0.70)' },
-    { xf: 0.62, hf: 0.140, color: 'rgba(208, 68, 92, 0.72)'  },
-    { xf: 0.84, hf: 0.095, color: 'rgba(222, 112, 48, 0.66)' },
-  ].forEach(({ xf, hf, color }) => {
-    drawBranchCoral(ctx, xf * gw, fy, hf * gh, color);
-  });
-
-  // Fan corals (purple)
-  [
-    { xf: 0.30, hf: 0.090, color: 'rgba(165, 65, 195, 0.62)' },
-    { xf: 0.76, hf: 0.075, color: 'rgba(145, 58, 180, 0.58)' },
-  ].forEach(({ xf, hf, color }) => {
-    drawFanCoral(ctx, xf * gw, fy, hf * gh, color);
   });
 }
 
@@ -511,91 +383,6 @@ function drawShark(
   ctx.restore();
 }
 
-// ── Fish (surface jumper) ─────────────────────────────────────────────────────
-function drawFish(
-  ctx: CanvasRenderingContext2D,
-  cycleT: number,
-  slot: FishSlot,
-  gw: number,
-  gh: number,
-): void {
-  if (cycleT < slot.startT || cycleT > slot.endT) return;
-
-  const u   = (cycleT - slot.startT) / (slot.endT - slot.startT);
-  const su  = u * u * (3 - 2 * u);
-  const arc = Math.sin(Math.PI * su);
-
-  const fLen = Math.min(gw, gh) * 0.11;
-  const fH   = fLen * 0.38;
-
-  const x0 = slot.xStartFrac * gw;
-  const x1 = slot.xEndFrac   * gw;
-  const x  = x0 + (x1 - x0) * su;
-  const y  = slot.ySurface * gh - arc * slot.jumpH * gh;
-
-  let alpha = 1;
-  if      (u < 0.12) alpha = u / 0.12;
-  else if (u > 0.85) alpha = (1 - u) / 0.15;
-
-  // Tilt from analytical arc derivative — always faces left→right
-  const dudt = 6 * u * (1 - u);                                       // d(smoothstep)/du
-  const dxdt = (x1 - x0) * dudt;                                      // always ≥ 0
-  const dydt = -Math.cos(Math.PI * su) * Math.PI * dudt * slot.jumpH * gh;
-  const angle = Math.atan2(dydt, Math.max(dxdt, 0.001));              // nose-up when ascending
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-
-  ctx.beginPath();
-  ctx.moveTo(-fLen * 0.45,  0);
-  ctx.lineTo(-fLen * 0.75, -fH * 0.55);
-  ctx.lineTo(-fLen * 0.60,  0);
-  ctx.lineTo(-fLen * 0.75,  fH * 0.55);
-  ctx.closePath();
-  ctx.fillStyle = '#1E4A5A';
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.ellipse(0, 0, fLen * 0.45, fH * 0.50, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#2D5F72';
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.ellipse(fLen * 0.06, 0, fLen * 0.28, fH * 0.33, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#4A8FA5';
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.ellipse(fLen * 0.08, fH * 0.13, fLen * 0.24, fH * 0.21, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(184, 221, 232, 0.65)';
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo( fLen * 0.14, -fH * 0.48);
-  ctx.lineTo( fLen * 0.05, -fH * 0.88);
-  ctx.lineTo(-fLen * 0.08, -fH * 0.48);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(30, 74, 90, 0.8)';
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(fLen * 0.28, -fH * 0.06, fH * 0.14, 0, Math.PI * 2);
-  ctx.fillStyle = '#E8F4F8';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(fLen * 0.28, -fH * 0.06, fH * 0.075, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(16, 34, 40, 0.92)';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(fLen * 0.295, -fH * 0.09, fH * 0.028, 0, Math.PI * 2);
-  ctx.fillStyle = '#fff';
-  ctx.fill();
-
-  ctx.restore();
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 interface OceanCanvasProps {
   width:  number;
@@ -625,13 +412,12 @@ const OceanCanvas: React.FC<OceanCanvasProps> = ({ width, height, style }) => {
 
       // Ocean background drawn by canvas (not CSS)
       drawOcean(ctx, width, height, phase);
-      drawSeaFloor(ctx, width, height, elapsedS);
+      drawSeaFloor(ctx, width, height);
       drawBubbles(ctx, elapsed, width, height);
 
       // Creatures — position uses elapsedS (no jump on cycle reset)
       WHALE_SPECS.forEach(spec => drawWhale(ctx, elapsedS, spec, width, height));
       SHARK_SPECS.forEach(spec => drawShark(ctx, elapsedS, spec, width, height));
-      FISH_SLOTS.forEach(slot  => drawFish (ctx, cycleT,   slot, width, height));
 
       animId = requestAnimationFrame(render);
     };

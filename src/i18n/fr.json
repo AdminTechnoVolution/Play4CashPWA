@@ -424,7 +424,7 @@
   "bs_outcome_you_hit": "Coup direct sur leur %s !",
   "bs_outcome_you_miss": "Raté ! Tour de l'adversaire.",
   "bs_outcome_you_sunk": "Vous avez coulé leur %s !",
-  "bs_placement_hint": "Touchez une case pour placer • Touchez un navire placé pour le retirer",
+  "bs_placement_hint": "Glissez un navire de la liste vers la grille • Touchez un navire placé pour changer l'orientation",
   "bs_placement_waiting_opponent": "En attente d'un adversaire… Placez vos navires en attendant !",
   "bs_play_again": "Rejouer",
   "bs_ready_button": "PRÊT",

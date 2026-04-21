@@ -424,7 +424,7 @@
   "bs_outcome_you_hit": "Volltreffer auf deren %s!",
   "bs_outcome_you_miss": "Verfehlt! Gegner ist dran.",
   "bs_outcome_you_sunk": "Du hast deren %s versenkt!",
-  "bs_placement_hint": "Feld antippen zum Platzieren • Platziertes Schiff antippen zum Entfernen",
+  "bs_placement_hint": "Ziehe ein Schiff aus der Liste auf das Feld • Tippe auf ein platziertes Schiff, um die Ausrichtung zu ändern",
   "bs_placement_waiting_opponent": "Warte auf einen Gegner… Platziere schon mal deine Schiffe!",
   "bs_play_again": "Nochmal spielen",
   "bs_ready_button": "BEREIT",
