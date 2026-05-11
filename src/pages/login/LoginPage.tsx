@@ -9,16 +9,13 @@ import '../../ui/theme/variables.css';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isLoading, error, signInWithGoogle, loadSession, clearError } = useAuthStore();
+  const { isLoading, error, signInWithGoogle, clearError, user, authHydrated } = useAuthStore();
   const t = useT();
 
   useEffect(() => {
-    (async () => {
-      await loadSession();
-      const { user } = useAuthStore.getState();
-      if (user) navigate('/dashboard');
-    })();
-  }, []);
+    if (!authHydrated || isLoading) return;
+    if (user) navigate('/dashboard', { replace: true });
+  }, [user, authHydrated, isLoading, navigate]);
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     const { credential } = credentialResponse;

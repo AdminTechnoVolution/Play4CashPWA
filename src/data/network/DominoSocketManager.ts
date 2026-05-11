@@ -1,39 +1,9 @@
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
-import { getAccessToken, getRefreshToken, saveTokens } from '../auth/AuthSessionStore';
-import { bareClient } from './ApiClient';
+import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
-import type { ApiResponse, LoginResponse } from '../models/ApiModels';
-
-let socketRefreshPromise: Promise<void> | null = null;
-
-async function refreshSocketToken(socket: Socket): Promise<void> {
-  if (socketRefreshPromise) {
-    return socketRefreshPromise;
-  }
-
-  socketRefreshPromise = (async () => {
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) throw new Error('No refresh token available');
-
-    const res = await bareClient.post<ApiResponse<LoginResponse>>('/api/login/refresh', {
-      refreshToken,
-    });
-    const data = res.data?.data;
-    if (!data?.token || !data?.refreshToken) throw new Error('Invalid refresh response');
-
-    saveTokens(data.token, data.refreshToken);
-
-    const newToken = data.token;
-    (socket.io.opts as Record<string, unknown>).query = { token: newToken };
-    (socket.io.opts as Record<string, unknown>).extraHeaders = socketIoExtraHeaders(newToken);
-  })().finally(() => {
-    socketRefreshPromise = null;
-  });
-
-  return socketRefreshPromise;
-}
+import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 
 export class DominoSocketManager {
   private socket: Socket | null = null;
@@ -76,11 +46,10 @@ export class DominoSocketManager {
       this.onPayload?.(payload);
     });
 
-    this.socket.on('connect_error', async (err: Error & { data?: { status?: number } }) => {
-      const status = (err as unknown as { data?: { status?: number } }).data?.status;
-      if (status === 401 && this.socket) {
+    this.socket.on('connect_error', async (err: Error) => {
+      if (isSocketUnauthorizedConnectError(err) && this.socket) {
         try {
-          await refreshSocketToken(this.socket);
+          await refreshSocketHandshake(this.socket);
           this.socket.connect();
         } catch {
           window.dispatchEvent(new CustomEvent('p4c:auth-failure'));

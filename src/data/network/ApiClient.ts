@@ -2,9 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, InternalAxiosRequ
 import { BASE_URL, REQUEST_TIMEOUT_MS } from '../../config/api.config';
 import {
   getAccessToken,
-  getRefreshToken,
   saveTokens,
-  clearTokens,
   getLanguage,
 } from '../auth/AuthSessionStore';
 import type { ApiResponse, LoginResponse } from '../models/ApiModels';
@@ -15,6 +13,7 @@ export const bareClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: REQUEST_TIMEOUT_MS,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
 // ─── Authenticated client ─────────────────────────────────────────────────────
@@ -23,6 +22,7 @@ export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: REQUEST_TIMEOUT_MS,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
 // ─── Single-flight refresh state ──────────────────────────────────────────────
@@ -30,26 +30,40 @@ export const apiClient: AxiosInstance = axios.create({
 let refreshPromise: Promise<string> | null = null;
 
 async function doRefresh(): Promise<string> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) throw new Error('No refresh token available');
-
-  const response = await bareClient.post<ApiResponse<LoginResponse>>(
-    '/api/login/refresh',
-    { refreshToken },
-  );
+  // Refresh token lives in an httpOnly cookie sent automatically because `withCredentials: true`.
+  const response = await bareClient.post<ApiResponse<LoginResponse>>('/api/login/refresh', {});
 
   const data = response.data?.data;
-  if (!data?.token || !data?.refreshToken) {
+  if (!data?.token) {
     throw new Error('Invalid refresh response');
   }
 
-  saveTokens(data.token, data.refreshToken);
+  saveTokens(data.token);
   return data.token;
 }
 
-function dispatchAuthFailure(): void {
-  clearTokens();
+/** Ask API to clear httpOnly refresh cookie (best-effort). */
+export async function requestRefreshCookieCleared(): Promise<void> {
+  try {
+    await bareClient.post('/api/login/invalidate-browser-session');
+  } catch {
+    // ignore
+  }
+}
+
+/** Notifies the app to clear session (listener clears Zustand, storage, and httpOnly refresh cookie). */
+export function emitAuthFailureEvent(): void {
   window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
+}
+
+/** Same refresh used on HTTP 401; single-flight so callers and the interceptor share one in-flight refresh. */
+export async function refreshAccessTokenWithLock(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = doRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 function extractErrorMessage(error: AxiosError): string {
@@ -94,12 +108,7 @@ apiClient.interceptors.response.use(
       originalRequest._retried = true;
 
       try {
-        if (!refreshPromise) {
-          refreshPromise = doRefresh().finally(() => {
-            refreshPromise = null;
-          });
-        }
-        const newToken = await refreshPromise;
+        const newToken = await refreshAccessTokenWithLock();
 
         // Retry original request with new token
         if (originalRequest.headers) {
@@ -110,7 +119,7 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch {
-        dispatchAuthFailure();
+        emitAuthFailureEvent();
         throw new Error('error_session_expired');
       }
     }

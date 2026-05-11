@@ -1,0 +1,76 @@
+---
+description: Workflow obligatorio del agente para cada petición (PWA)
+alwaysApply: true
+---
+
+# Workflow del agente — Play4CashPWA
+
+Aplica este flujo en **cada petición**, sin excepción. Es el "agente" que el usuario espera:
+consultar skills, ejecutar, verificar y guardar memoria de los cambios.
+
+## 1. Antes de tocar código — cargar contexto
+
+1. **Lee siempre** la regla compañera `auth-session.mdc` (esta carpeta) si la petición toca
+   autenticación, sesión, refresh, sockets, login, rutas protegidas o cookies.
+2. **Revisa skills relevantes** en este orden:
+   - `.claude/skills/play4cash-pwa/SKILL.md` — convenciones generales del PWA.
+   - `.claude/skills/play4cash-app/SKILL.md` — visión producto.
+   - `.claude/skills/android-ui/SKILL.md` y `.claude/skills/redesign/SKILL.md` — solo si la
+     petición toca UI/UX de juegos.
+   - `.claude/skills/chess-castling/SKILL.md` — solo cuando la tarea es de ajedrez.
+   - `.claude/skills/halma-redesign/SKILL.md` — solo cuando la tarea es de Halma.
+   No leas todas las skills siempre — usa el título/descripción para decidir. Cuando dudes,
+   lee la del módulo (`pages/play/<juego>`) o pregunta.
+3. Si la tarea tiene >2 pasos, crea un `TodoWrite`.
+
+## 2. Implementar
+
+- Respeta el contrato definido en `auth-session.mdc` (token en memoria, refresh httpOnly,
+  `BroadcastChannel`, `RequireAuth`, etc.).
+- No duplicar lógica de refresh de socket — usa `src/data/network/socketSessionRefresh.ts`.
+- Edita siempre con `StrReplace` / `Write`; no uses `sed`/`echo` para modificar archivos.
+
+## 3. Verificar antes de cerrar — obligatorio
+
+Ejecuta estos comandos y resuelve cualquier error antes de responder al usuario:
+
+```bash
+npx tsc --noEmit
+```
+
+Si tocaste tests:
+
+```bash
+npm run test --silent
+```
+
+Si el cambio afecta build:
+
+```bash
+npm run build --silent
+```
+
+El hook `stop` (en `.cursor/hooks.json`) corre `tsc --noEmit` automáticamente. Si falla,
+**no cierres la respuesta** sin arreglarlo.
+
+## 4. Guardar memoria de los ajustes
+
+Al final de cada petición que modifique código de autenticación, sesión, sockets, rutas, o
+arquitectura general:
+
+1. Actualiza `auth-session.mdc` si el nuevo comportamiento contradice o extiende lo escrito
+   ahí. Mantén las invariantes "Forbidden patterns" alineadas con la realidad.
+2. Si la decisión es trans-repo, replica el ajuste en `docs/SECURITY-ENV.md` de **los tres
+   repos** y en `auth-session.mdc` de los repos afectados.
+3. Si la decisión es nueva y no encaja en `auth-session.mdc`, añade una nueva regla en
+   `.cursor/rules/` con `alwaysApply: true` (descriptivo, <80 líneas, con ejemplos).
+
+No documentes en código vivo — usa estas reglas o `docs/`.
+
+## 5. Patrones prohibidos universales
+
+- ❌ Commits sin pedirlo explícitamente.
+- ❌ `tsc` con errores ignorados.
+- ❌ Crear archivos nuevos cuando puedes editar uno existente.
+- ❌ `console.log` o logs con bytes de tokens.
+- ❌ Saltar la sección 3 (Verificar).

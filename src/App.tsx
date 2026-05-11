@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { IonApp, setupIonicReact } from '@ionic/react';
-import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { useAuthStore } from './store/authStore';
+import { RequireAuth, RootRedirect } from './auth/RequireAuth';
 import { usePWAInstallStore } from './store/pwaInstallStore';
 import PWAInstallBanner from './ui/components/PWAInstallBanner';
 
@@ -23,7 +24,7 @@ import { tryConsumePlayBack } from './util/playBackNavigation';
 setupIonicReact({ mode: 'md' });
 
 export default function App() {
-  const { user, loadSession } = useAuthStore();
+  const { loadSession } = useAuthStore();
   const setDeferredPrompt = usePWAInstallStore((s) => s.setDeferredPrompt);
 
   useEffect(() => {
@@ -61,25 +62,21 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/history" element={<TransactionHistoryPage />} />
-          <Route path="/add-funds" element={<AddFundsPage />} />
-          <Route path="/withdrawal" element={<WithdrawalPage />} />
-          <Route path="/withdrawal-verify" element={<WithdrawalVerifyPage />} />
-          <Route
-            path="/rooms/:gameSocketCode"
-            element={<RoomsPage />}
-          />
-          <Route
-            path="/play/:gameSocketCode"
-            element={<PlayPage />}
-          />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/data-treatment" element={<DataTreatmentPage />} />
-          <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
-          <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+          <Route element={<RequireAuth />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/history" element={<TransactionHistoryPage />} />
+            <Route path="/add-funds" element={<AddFundsPage />} />
+            <Route path="/withdrawal" element={<WithdrawalPage />} />
+            <Route path="/withdrawal-verify" element={<WithdrawalVerifyPage />} />
+            <Route path="/rooms/:gameSocketCode" element={<RoomsPage />} />
+            <Route path="/play/:gameSocketCode" element={<PlayPage />} />
+          </Route>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="*" element={<RootRedirect />} />
         </Routes>
       </BrowserRouter>
       <PWAInstallBanner />

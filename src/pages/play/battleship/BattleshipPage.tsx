@@ -24,6 +24,8 @@ import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
 const CELL = 32;
 const GAP  = 2;
 const GRID_PX = CELL * 10 + GAP * 9; // 338 px
+/** Outer size of one battle board block (grid + 8px padding each side). */
+const BATTLE_BOARD_FRAME = GRID_PX + 16;
 const BS_DND_MIME = 'application/p4c-battleship';
 /** Below this distance (px) pointer-up counts as tap (rotate); above = move ship. */
 const PLACEMENT_DRAG_THRESHOLD_PX = 12;
@@ -903,8 +905,8 @@ function SunkExplosionOverlay({ targetRow, targetCol, shotCount, outcome }: {
   );
 }
 
-// ── Battle grid (opponent or own) ─────────────────────────────────────────────
-function BattleGrid({
+// ── Battle grid body (cells + overlays) — place inside a shared OceanPanel in battle ──
+function BattleGridBody({
   board, ships, showShips, sunkEnemyShips, clickable, isSpectator, boardSide, onFire,
 }: {
   board: string[][];
@@ -920,18 +922,19 @@ function BattleGrid({
   const anim = store.animatingShot;
   const showMissile = anim && anim.board === boardSide;
   return (
-    <OceanPanel width={GRID_PX + 16} height={GRID_PX + 16}>
-      <div style={{ padding: 8 }}>
-        <div
-          style={{
-            position: 'relative',
-            display: 'grid',
-            gridTemplateColumns: `repeat(10, ${CELL}px)`,
-            gap: GAP,
-            cursor: clickable && !isSpectator ? 'crosshair' : 'default',
-            overflow: 'visible',
-          }}
-        >
+    <div style={{ padding: 8 }}>
+      <div
+        style={{
+          position: 'relative',
+          display: 'grid',
+          gridTemplateColumns: `repeat(10, ${CELL}px)`,
+          gap: GAP,
+          width: GRID_PX,
+          height: GRID_PX,
+          cursor: clickable && !isSpectator ? 'crosshair' : 'default',
+          overflow: 'visible',
+        }}
+      >
           {board.map((row, r) =>
             row.map((cell, c) => {
               const isAnim = anim?.row === r && anim?.col === c && anim?.board === boardSide;
@@ -1003,9 +1006,8 @@ function BattleGrid({
               />
             </>
           ))}
-        </div>
       </div>
-    </OceanPanel>
+    </div>
   );
 }
 
@@ -1027,7 +1029,17 @@ export default function BattleshipPage({
   const store    = useBattleshipStore();
   const t        = useT();
   const [showReadyConfirm, setShowReadyConfirm] = useState(false);
+  /** Side-by-side boards on wide viewports; stacked on narrow — same ocean panel. */
+  const [battleSeaDualColumn, setBattleSeaDualColumn] = useState(true);
   const placementGridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 720px)');
+    const apply = () => setBattleSeaDualColumn(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
 
   useEffect(() => {
     const myUsername = user?.username ?? '';
@@ -1337,7 +1349,18 @@ export default function BattleshipPage({
   };
 
   // ── Battle phase ────────────────────────────────────────────────────────────
-  const renderBattle = () => (
+  const renderBattle = () => {
+    const BATTLE_GAP = 16;
+    const seaPad = 12;
+    const labelBand = 26;
+    const seaW = battleSeaDualColumn
+      ? BATTLE_BOARD_FRAME * 2 + BATTLE_GAP + seaPad * 2
+      : BATTLE_BOARD_FRAME + seaPad * 2 + 8;
+    const seaH = battleSeaDualColumn
+      ? labelBand + BATTLE_BOARD_FRAME + seaPad * 2 + 4
+      : 2 * (labelBand + BATTLE_BOARD_FRAME) + BATTLE_GAP + seaPad * 2;
+
+    return (
     <IonContent style={{ '--background': '#060e1e' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', width: '100%' }}>
         {/* Sticky: turn + timer stay visible while scrolling boards */}
@@ -1377,65 +1400,103 @@ export default function BattleshipPage({
             flexDirection: 'column',
             alignItems: 'center',
             gap: 10,
+            width: '100%',
           }}
         >
-        {/* ── Opponent board ── */}
-        <div style={{ width: GRID_PX + 16 }}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            marginBottom: 5, paddingLeft: 2,
-          }}>
-            <span style={{
-              color: '#e05060', fontSize: 11, fontWeight: 700,
-              letterSpacing: '0.8px', textTransform: 'uppercase',
-            }}>
-              {isSpectator
-                ? `⚡ ${store.spectatorOpponentFleetName || store.opponentName || opponentName}`
-                : `⚡ ${t('bs_enemy_waters')} — ${store.opponentName || opponentName}`}
-            </span>
-            {store.isMyTurn && !isSpectator && (
-              <span style={{ color: '#c9a84c', fontSize: 11, fontWeight: 600 }}>{t('bs_your_turn')}</span>
-            )}
-          </div>
-          <BattleGrid
-            board={store.opponentBoard}
-            ships={[]}
-            showShips={false}
-            sunkEnemyShips={store.sunkEnemyShips}
-            clickable={store.isMyTurn && !isSpectator}
-            isSpectator={isSpectator}
-            boardSide="opponent"
-            onFire={(r, c) => store.fire(roomId, r, c)}
-          />
-        </div>
-
-        {/* ── Player board ── */}
-        <div style={{ width: GRID_PX + 16 }}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            marginBottom: 5, paddingLeft: 2,
-          }}>
-            <span style={{
-              color: '#4a9ec0', fontSize: 11, fontWeight: 700,
-              letterSpacing: '0.8px', textTransform: 'uppercase',
-            }}>
-              {isSpectator
-                ? `⚓ ${store.spectatorFleetOwnerName || store.spectatorBoardOwner}`
-                : `⚓ ${t('bs_your_fleet')}`}
-            </span>
-            {!store.isMyTurn && !isSpectator && (
-              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{t('bs_opponent_turn')}</span>
-            )}
-          </div>
-          <BattleGrid
-            board={store.playerBoard}
-            ships={store.placedShips}
-            showShips={true}
-            clickable={false}
-            isSpectator={isSpectator}
-            boardSide="player"
-            onFire={() => {}}
-          />
+        <div style={{
+          width: '100%',
+          maxWidth: seaW,
+          margin: '0 auto',
+          boxSizing: 'border-box',
+        }}>
+          <OceanPanel width={seaW} height={seaH}>
+            <div style={{
+              display: 'flex',
+              flexDirection: battleSeaDualColumn ? 'row' : 'column',
+              alignItems: 'stretch',
+              justifyContent: 'center',
+              gap: BATTLE_GAP,
+              padding: seaPad,
+              boxSizing: 'border-box',
+            }}
+            >
+              <section style={{
+                minWidth: 0,
+                flex: battleSeaDualColumn ? '1 1 0' : undefined,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+              >
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  width: '100%',
+                  maxWidth: BATTLE_BOARD_FRAME,
+                  marginBottom: 5, paddingLeft: 2,
+                  flexWrap: 'wrap', gap: 4,
+                }}>
+                  <span style={{
+                    color: '#e05060', fontSize: 11, fontWeight: 700,
+                    letterSpacing: '0.8px', textTransform: 'uppercase',
+                  }}>
+                    {isSpectator
+                      ? `⚡ ${store.spectatorOpponentFleetName || store.opponentName || opponentName}`
+                      : `⚡ ${t('bs_enemy_waters')} — ${store.opponentName || opponentName}`}
+                  </span>
+                  {store.isMyTurn && !isSpectator && (
+                    <span style={{ color: '#c9a84c', fontSize: 11, fontWeight: 600 }}>{t('bs_your_turn')}</span>
+                  )}
+                </div>
+                <BattleGridBody
+                  board={store.opponentBoard}
+                  ships={[]}
+                  showShips={false}
+                  sunkEnemyShips={store.sunkEnemyShips}
+                  clickable={store.isMyTurn && !isSpectator}
+                  isSpectator={isSpectator}
+                  boardSide="opponent"
+                  onFire={(r, c) => store.fire(roomId, r, c)}
+                />
+              </section>
+              <section style={{
+                minWidth: 0,
+                flex: battleSeaDualColumn ? '1 1 0' : undefined,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+              >
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  width: '100%',
+                  maxWidth: BATTLE_BOARD_FRAME,
+                  marginBottom: 5, paddingLeft: 2,
+                  flexWrap: 'wrap', gap: 4,
+                }}>
+                  <span style={{
+                    color: '#4a9ec0', fontSize: 11, fontWeight: 700,
+                    letterSpacing: '0.8px', textTransform: 'uppercase',
+                  }}>
+                    {isSpectator
+                      ? `⚓ ${store.spectatorFleetOwnerName || store.spectatorBoardOwner}`
+                      : `⚓ ${t('bs_your_fleet')}`}
+                  </span>
+                  {!store.isMyTurn && !isSpectator && (
+                    <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{t('bs_opponent_turn')}</span>
+                  )}
+                </div>
+                <BattleGridBody
+                  board={store.playerBoard}
+                  ships={store.placedShips}
+                  showShips={true}
+                  clickable={false}
+                  isSpectator={isSpectator}
+                  boardSide="player"
+                  onFire={() => {}}
+                />
+              </section>
+            </div>
+          </OceanPanel>
         </div>
 
         {/* Fleet status detail */}
@@ -1452,7 +1513,8 @@ export default function BattleshipPage({
         </div>
       </div>
     </IonContent>
-  );
+    );
+  };
 
   // ── Root render ─────────────────────────────────────────────────────────────
   return (

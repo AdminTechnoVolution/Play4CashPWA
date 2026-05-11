@@ -35,11 +35,11 @@ export const apiRepository = {
     return apiService.login(googleIdToken);
   },
 
-  async refreshToken(refreshToken: string): Promise<LoginResponse> {
+  async refreshToken(refreshToken?: string): Promise<LoginResponse> {
     return apiService.refreshToken(refreshToken);
   },
 
-  async logout(refreshToken: string): Promise<void> {
+  async logout(refreshToken?: string): Promise<void> {
     return apiService.logout(refreshToken);
   },
 

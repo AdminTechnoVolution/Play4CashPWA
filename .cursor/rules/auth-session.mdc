@@ -1,0 +1,65 @@
+---
+description: Play4Cash PWA — authentication & session architecture (post-hardening)
+alwaysApply: true
+---
+
+# Play4Cash PWA — Session & Auth Contract
+
+This repo is the React + Vite PWA. The session architecture was hardened in a multi-repo
+sweep across `Play4CashPWA`, `Play4CashApi`, and `Play4CashGateway`. Keep these invariants
+when editing auth/session/socket code.
+
+## Tokens
+
+- **Access token**: in-memory only (`accessTokenMem` in `src/data/auth/AuthSessionStore.ts`).
+  Never persisted to `localStorage`. `saveTokens(token)` sets memory and bumps a cross-tab
+  signal; `getAccessToken()` returns the in-memory value; `getRefreshToken()` is a deprecated
+  no-op kept for back-compat.
+- **Refresh token**: lives in an **httpOnly cookie** set by the API. JS can't read it. All
+  Axios clients use `withCredentials: true`. The SPA calls `POST /api/login/refresh` with no
+  body — the cookie travels automatically.
+- **Logout**: calls `apiRepository.logout()` then `requestRefreshCookieCleared()` to invalidate
+  the cookie, plus `clearTokens()` + `clearRoutingContext()`.
+
+## Routing & hydration
+
+- Route protection in `src/auth/RequireAuth.tsx`. `RequireAuth` waits for `authHydrated`
+  (set by `authStore.loadSession`) before redirecting to `/login`.
+- `RootRedirect` handles `/` and `*` based on hydrated user state.
+
+## Cross-tab sync
+
+- Primary: `BroadcastChannel('p4c-auth')` with kinds `login | refresh | logout`. See
+  `onAuthBroadcast` in `AuthSessionStore.ts`.
+- Fallback: a `p4c_session_version` key in `localStorage` is bumped on every auth change so
+  the `storage` event fires in browsers without BroadcastChannel.
+- The listener in `authStore.ts` debounces both sources into a single `loadSession()` call.
+
+## Sockets
+
+- Token still goes in the WS handshake query (`?token=…`) — the Gateway needs it because the
+  browser cannot set `Authorization` on a WebSocket upgrade.
+- All `*SocketManager.ts` files reuse `src/data/network/socketSessionRefresh.ts`:
+  `isSocketUnauthorizedConnectError` + `refreshSocketHandshake` (which calls
+  `refreshAccessTokenWithLock` from `ApiClient.ts`). **Don't duplicate this logic** in new
+  managers.
+
+## Dev proxy
+
+- `vite.config.ts` reads `VITE_DEV_PROXY_TARGET` (+ `VITE_DEV_PROXY_INSECURE`). When set,
+  `/api` and `/socket.io` are proxied to the target so the SPA shares the API's origin in
+  dev. Leave `VITE_API_URL` empty in that case.
+- `BASE_URL` in `src/config/api.config.ts` falls back to `''` in dev (relative) and the prod
+  URL otherwise.
+
+## Forbidden patterns
+
+- ❌ Saving access tokens to `localStorage`/`sessionStorage`.
+- ❌ Reading the refresh token in JS (it's httpOnly).
+- ❌ Per-manager copies of socket-refresh logic.
+- ❌ Removing `withCredentials: true` from any client that hits `/api/login*` or `/api/logout`.
+
+## Reference docs
+
+See `docs/SECURITY-ENV.md` for the cross-repo env matrix (JWT_*, CORS, cookies, gateway
+trust, Redis prefixes).

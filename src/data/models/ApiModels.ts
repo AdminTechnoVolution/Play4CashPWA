@@ -9,7 +9,8 @@ export interface ApiResponse<T> {
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 export interface LoginResponse {
   token: string;
-  refreshToken: string;
+  /** Still returned for native clients; browser PWA uses httpOnly cookie instead of persisting this. */
+  refreshToken?: string;
 }
 
 // ─── Account ──────────────────────────────────────────────────────────────────

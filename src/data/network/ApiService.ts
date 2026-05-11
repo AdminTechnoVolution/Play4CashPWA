@@ -41,17 +41,21 @@ export const apiService = {
     return unwrap(res.data);
   },
 
-  // Android: POST /api/login/refresh with { refreshToken }
-  async refreshToken(refreshToken: string): Promise<LoginResponse> {
-    const res = await bareClient.post<ApiResponse<LoginResponse>>('/api/login/refresh', {
-      refreshToken,
-    });
+  // Android: POST /api/login/refresh — optional body when refresh is only in httpOnly cookie
+  async refreshToken(refreshToken?: string): Promise<LoginResponse> {
+    const res = await bareClient.post<ApiResponse<LoginResponse>>(
+      '/api/login/refresh',
+      refreshToken ? { refreshToken } : {},
+    );
     return unwrap(res.data);
   },
 
-  // Android: POST /api/logout with { refreshToken }
-  async logout(refreshToken: string): Promise<void> {
-    await apiClient.post<ApiResponse<void>>('/api/logout', { refreshToken });
+  // POST /api/logout — refresh from httpOnly cookie and/or body (native)
+  async logout(refreshToken?: string): Promise<void> {
+    await apiClient.post<ApiResponse<void>>(
+      '/api/logout',
+      refreshToken ? { refreshToken } : {},
+    );
   },
 
   // ─── Account ───────────────────────────────────────────────────────────────
