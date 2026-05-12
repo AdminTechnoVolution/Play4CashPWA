@@ -5,6 +5,9 @@ import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
+import { instrumentSocket, releaseSocket } from './socketRegistry';
+
+const NAMESPACE = '/domino';
 
 export class DominoSocketManager {
   private socket: Socket | null = null;
@@ -26,7 +29,7 @@ export class DominoSocketManager {
       return;
     }
 
-    this.socket = io(`${BASE_URL}/domino`, {
+    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
       transports: ['polling'],
       autoConnect: false,
       reconnection: true,
@@ -40,6 +43,8 @@ export class DominoSocketManager {
     });
 
     attachVersionMismatchListener(this.socket);
+    // Phase D: register with global connection store.
+    instrumentSocket(this.socket, NAMESPACE);
 
     this.socket.on('connect', () => {
       this.onConnectedCb?.();
@@ -67,6 +72,7 @@ export class DominoSocketManager {
   disconnect(): void {
     this.socket?.disconnect();
     this.socket = null;
+    releaseSocket(NAMESPACE);
   }
 
   /** Re-emit join to resync state after room becomes started (Android requestSync). */

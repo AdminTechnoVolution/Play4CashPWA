@@ -93,6 +93,11 @@ export const apiRepository = {
     return apiService.getRooms(gameId);
   },
 
+  /** Phase C: returns the user's active room (waiting/started) or `null`. */
+  async getActiveRoom(): Promise<RoomResponse | null> {
+    return apiService.getActiveRoom();
+  },
+
   async createRoom(req: CreateRoomRequest): Promise<string> {
     return apiService.createRoom(req);
   },

@@ -58,6 +58,10 @@ export interface RoomResponse {
   status: string;
   spectatorsCount: number;
   gameId?: string;
+  /** Phase C: socket code of the underlying game (e.g. 'uno', 'chess'). Present
+   *  when the API populates `game_id`, used by the active-room deep-link to
+   *  build `/play/<socketCode>/<roomId>` without an extra lookup. */
+  socketCode?: string;
   playerLimit: number;
 }
 
@@ -258,6 +262,98 @@ export interface HalmaState {
   mustEndTurn?: boolean;
   pendingCaptures?: { row: number; col: number }[];
   gameOver?: GameOverPayload;
+}
+
+// ─── UNO ───────────────────────────────────────────────────────────────────────
+
+/** Card colors in UNO. R=red, G=green, B=blue, Y=yellow. */
+export type UnoColor = 'R' | 'G' | 'B' | 'Y';
+
+/**
+ * Compact card encoding shared with the API:
+ * - Numbered colored: `${Color}${0..9}`         e.g. 'R5', 'G0'
+ * - Action colored:    `${Color}Skip|Reverse|Draw2`  e.g. 'YSkip', 'BReverse', 'GDraw2'
+ * - Wild:              'W'  (choose color)
+ * - Wild +4:           'W4' (choose color, target draws 4)
+ */
+export type UnoCardCode = string;
+
+/** Server payload shape for the UNO `uno` socket event (success branch). */
+export interface UnoGamePayload {
+  hand: UnoCardCode[];
+  handCount: Record<string, number>;
+  topDiscard: UnoCardCode | null;
+  discardCount: number;
+  drawPileCount: number;
+  currentColor: UnoColor;
+  direction: 1 | -1;
+  currentPlayerIndex: number;
+  currentTurnPlayerId: string;
+  currentTurnUsername: string;
+  yourTurn: boolean;
+  turnTimerSeconds: number;
+  drawStackPending: number;
+  playerOrder: string[];
+  usernames: Record<string, string>;
+  waitingForOpponent: boolean;
+  gameStarted: boolean;
+  isSpectator: boolean;
+  eliminatedPlayers: string[];
+  /** Players currently holding a valid UNO declaration (1 card + called). */
+  unoCalled: string[];
+  /** Player who just landed at 1 card without saying UNO. Anyone can challenge them. */
+  pendingUnoOffender: string | null;
+  /** Last player who took an action (play, draw, take stack, pass). */
+  lastActionPlayerId: string | null;
+  lastActionUsername: string | null;
+  /** Set when a `call_uno` event has just been processed. */
+  unoCallerId?: string;
+  unoCallerName?: string;
+  /** Set when a `challenge_uno_miss` succeeded. */
+  unoChallenge?: {
+    accuserId: string;
+    accuserName: string;
+    offenderId: string;
+    offenderName: string;
+    penalty: number;
+  };
+
+  // ── Multi-round (Phase 2) ──────────────────────────────────────────────
+  /** Cumulative score per player across rounds in this match. */
+  matchScores: Record<string, number>;
+  /** 1-indexed round counter. */
+  roundNumber: number;
+  /** Score required to win the match. */
+  matchTargetScore: number;
+  /** Set once a player reaches `matchTargetScore`. */
+  matchWinnerId: string | null;
+  /** True between rounds — clients render the scoreboard with countdown. */
+  betweenRounds: boolean;
+  /** ISO string deadline for auto-starting the next round. */
+  nextRoundStartsAt: string | null;
+  /** Players who tapped "ready" for the next round. */
+  playersReadyForNext: string[];
+  /** Audit log of completed rounds. Used by the scoreboard panel. */
+  roundHistory: { round: number; winnerId: string; scoreDealt: number; endedAt: string | null }[];
+
+  /** Round-end deltas (set when `roundEnded === true`). */
+  roundEnded?: boolean;
+  roundWinnerId?: string;
+  roundWinnerUsername?: string;
+  roundScoreDealt?: number;
+
+  /** Set when a new round just started. */
+  roundStarted?: boolean;
+
+  /** Match-end (overrides round-end). `gameEnded` already true. */
+  matchEnded?: boolean;
+  prize?: number;
+
+  gameEnded?: boolean;
+  winner?: string;
+  reason?: string;
+  outcome?: string;
+  spectatorsCount?: number;
 }
 
 // ─── Chat ──────────────────────────────────────────────────────────────────────

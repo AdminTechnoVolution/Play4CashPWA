@@ -5,8 +5,11 @@ import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
+import { instrumentSocket, releaseSocket } from './socketRegistry';
 import type { ChatMessage } from '../models/ApiModels';
 import { parseChatEnvelope } from '../../util/ChatGreetingModels';
+
+const NAMESPACE = '/chat';
 
 /**
  * Android ChatSocketManager.kt — namespace `/chat`, handshake auth token + accept-language.
@@ -28,7 +31,7 @@ export class ChatSocketManager {
     }
 
     const lang = acceptLanguageTag();
-    this.socket = io(`${BASE_URL}/chat`, {
+    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
       transports: ['polling', 'websocket'],
       autoConnect: false,
       reconnection: true,
@@ -43,6 +46,8 @@ export class ChatSocketManager {
     });
 
     attachVersionMismatchListener(this.socket);
+    // Phase D: register with global connection store.
+    instrumentSocket(this.socket, NAMESPACE);
 
     this.socket.on('connect', () => {
       this.socket?.emit('join', { room_id: roomId, lang: acceptLanguageTag() });
@@ -100,6 +105,7 @@ export class ChatSocketManager {
     this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;
+    releaseSocket(NAMESPACE);
   }
 
   /** Android: JSONObject room_id + greeting_id — lang for server-side translation */

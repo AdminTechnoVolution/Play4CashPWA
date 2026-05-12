@@ -11,6 +11,9 @@ import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
+import { instrumentSocket, releaseSocket } from './socketRegistry';
+
+const NAMESPACE = '/chess';
 
 export class ChessSocketManager {
   private socket: Socket | null = null;
@@ -39,7 +42,7 @@ export class ChessSocketManager {
       return;
     }
 
-    this.socket = io(`${BASE_URL}/chess`, {
+    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
       transports: ['polling', 'websocket'],
       autoConnect: false,
       reconnection: true,
@@ -54,6 +57,8 @@ export class ChessSocketManager {
     });
 
     attachVersionMismatchListener(this.socket);
+    // Phase D: register with global connection store for ReconnectionBanner + visibility hook.
+    instrumentSocket(this.socket, NAMESPACE);
 
     // Android: sock.on(Socket.EVENT_CONNECT) { onConnected?.invoke(); sock.emit("join", ...) }
     this.socket.on('connect', () => {
@@ -122,5 +127,6 @@ export class ChessSocketManager {
     this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;
+    releaseSocket(NAMESPACE);
   }
 }

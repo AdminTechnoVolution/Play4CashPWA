@@ -5,7 +5,10 @@ import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
+import { instrumentSocket, releaseSocket } from './socketRegistry';
 import type { RoomResponse, RoomPlayer } from '../models/ApiModels';
+
+const NAMESPACE = '/rooms';
 
 // Normalize raw backend room payload (snake_case → camelCase RoomResponse)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,7 +44,7 @@ export class LobbySocketManager {
       return;
     }
 
-    this.socket = io(`${BASE_URL}/rooms`, {
+    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
       transports: ['polling'],
       autoConnect: false,
       forceNew: true,
@@ -56,6 +59,8 @@ export class LobbySocketManager {
     });
 
     attachVersionMismatchListener(this.socket);
+    // Phase D: register with global connection store.
+    instrumentSocket(this.socket, NAMESPACE);
 
     this.socket.on('connect', () => {
       // Android: emit "subscribe" with game_id to receive room events for this game
@@ -80,6 +85,7 @@ export class LobbySocketManager {
   disconnect(): void {
     this.socket?.disconnect();
     this.socket = null;
+    releaseSocket(NAMESPACE);
   }
 
   onConnect(cb: () => void): void {

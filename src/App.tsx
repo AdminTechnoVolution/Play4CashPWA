@@ -6,7 +6,10 @@ import { useAuthStore } from './store/authStore';
 import { RequireAuth, RootRedirect } from './auth/RequireAuth';
 import { usePWAInstallStore } from './store/pwaInstallStore';
 import PWAInstallBanner from './ui/components/PWAInstallBanner';
+import ActiveRoomBanner from './ui/components/ActiveRoomBanner';
+import ReconnectionBanner from './ui/components/ReconnectionBanner';
 import AppUpdateModal from './pwa/AppUpdateModal';
+import { useVisibilityReconnect } from './hooks/useVisibilityReconnect';
 
 import LoginPage from './pages/login/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -27,6 +30,10 @@ setupIonicReact({ mode: 'md' });
 export default function App() {
   const { loadSession } = useAuthStore();
   const setDeferredPrompt = usePWAInstallStore((s) => s.setDeferredPrompt);
+
+  // Phase D: forces socket.io to retry connect() the moment the tab regains
+  // visibility/focus so mobile users don't see stale states after backgrounding.
+  useVisibilityReconnect();
 
   useEffect(() => {
     loadSession();
@@ -79,8 +86,12 @@ export default function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<RootRedirect />} />
         </Routes>
+        {/* Phase C: needs useNavigate/useLocation, so it lives inside the router. */}
+        <ActiveRoomBanner />
       </BrowserRouter>
       <PWAInstallBanner />
+      {/* Phase D: surfaces any in-flight socket reconnect attempt globally. */}
+      <ReconnectionBanner />
       <AppUpdateModal />
     </IonApp>
   );

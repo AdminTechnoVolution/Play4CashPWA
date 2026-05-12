@@ -5,7 +5,10 @@ import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
+import { instrumentSocket, releaseSocket } from './socketRegistry';
 import type { HalmaState } from '../models/ApiModels';
+
+const NAMESPACE = '/halma';
 
 export class HalmaSocketManager {
   private socket: Socket | null = null;
@@ -19,7 +22,7 @@ export class HalmaSocketManager {
       return;
     }
 
-    this.socket = io(`${BASE_URL}/halma`, {
+    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
       transports: ['polling'],
       autoConnect: false,
       reconnection: true,
@@ -33,6 +36,8 @@ export class HalmaSocketManager {
     });
 
     attachVersionMismatchListener(this.socket);
+    // Phase D: register with global connection store.
+    instrumentSocket(this.socket, NAMESPACE);
 
     this.socket.on('connect', () => {
       this.socket?.emit('join', { room_id: roomId });
@@ -59,6 +64,7 @@ export class HalmaSocketManager {
   disconnect(): void {
     this.socket?.disconnect();
     this.socket = null;
+    releaseSocket(NAMESPACE);
   }
 
   // Android: flat fields — from_row, from_col, to_row, to_col

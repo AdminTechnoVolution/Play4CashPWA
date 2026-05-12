@@ -5,7 +5,10 @@ import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
+import { instrumentSocket, releaseSocket } from './socketRegistry';
 import type { BattleshipState } from '../models/ApiModels';
+
+const NAMESPACE = '/naval-battle';
 
 export class BattleshipSocketManager {
   private socket: Socket | null = null;
@@ -18,7 +21,7 @@ export class BattleshipSocketManager {
       return;
     }
 
-    this.socket = io(`${BASE_URL}/naval-battle`, {
+    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
       transports: ['polling'],
       autoConnect: false,
       reconnection: true,
@@ -32,6 +35,8 @@ export class BattleshipSocketManager {
     });
 
     attachVersionMismatchListener(this.socket);
+    // Phase D: register with global connection store.
+    instrumentSocket(this.socket, NAMESPACE);
 
     this.socket.on('connect', () => {
       this.socket?.emit('join', { room_id: roomId });
@@ -58,6 +63,7 @@ export class BattleshipSocketManager {
   disconnect(): void {
     this.socket?.disconnect();
     this.socket = null;
+    releaseSocket(NAMESPACE);
   }
 
   fire(roomId: string, row: number, col: number): void {

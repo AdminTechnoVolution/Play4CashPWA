@@ -170,9 +170,19 @@ export const apiService = {
   },
 
   // Android: POST /api/rooms → returns { _id } only
+  // Phase C: sends an `Idempotency-Key` (UUID) so a transparent retry (network
+  // timeout, app backgrounded mid-flight) does NOT create a second room and a
+  // second balance hold. The server caches the first response for ~5 minutes;
+  // identical retries within that window replay the original result.
   async createRoom(req: CreateRoomRequest): Promise<string> {
+    const idempKey =
+      typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await apiClient.post<ApiResponse<any>>('/api/rooms', req);
+    const res = await apiClient.post<ApiResponse<any>>('/api/rooms', req, {
+      headers: { 'Idempotency-Key': idempKey },
+    });
     const data = unwrap(res.data);
     return data._id ?? data.id ?? '';
   },
@@ -180,6 +190,17 @@ export const apiService = {
   // Android: POST /api/rooms/{id}/join
   async joinRoom(roomId: string): Promise<void> {
     await apiClient.post<ApiResponse<void>>(`/api/rooms/${roomId}/join`);
+  },
+
+  // Phase C: returns the room the user is currently participating in (waiting or
+  // started) or `null` if none. Used on app boot to redirect a player back into
+  // their active match without forcing a lobby search.
+  async getActiveRoom(): Promise<RoomResponse | null> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await apiClient.get<ApiResponse<any | null>>('/api/rooms/active');
+    const raw = unwrap(res.data);
+    if (!raw) return null;
+    return normalizeRoom(raw);
   },
 
   // Android: POST /api/rooms/{id}/spectate
@@ -343,6 +364,9 @@ function normalizeRoom(raw: any): RoomResponse {
     status: (raw.status ?? raw.roomStatus ?? raw.room_status ?? '').toLowerCase(),
     spectatorsCount: raw.spectatorsCount ?? raw.spectators_count ?? 0,
     gameId: raw.game_id?._id ?? raw.game_id ?? undefined,
+    // Phase C: populated game lets the PWA build the play URL on its own — needed
+    // by the "active room" deep-link on app boot to know which `/play/<code>` to open.
+    socketCode: raw.game_id?.socket_code ?? raw.socketCode ?? undefined,
     playerLimit: raw.player_limit ?? raw.playerLimit ?? raw.maxPlayers ?? 2,
   };
 }

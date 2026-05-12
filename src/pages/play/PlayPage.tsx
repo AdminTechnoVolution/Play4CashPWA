@@ -8,12 +8,14 @@ import { useBattleshipStore } from '../../store/battleshipStore';
 import { useChessStore, ChessPhase } from '../../store/chessStore';
 import { useDominoStore, DominoPhase } from '../../store/dominoStore';
 import { useHalmaStore, HalmaPhase } from '../../store/halmaStore';
+import { useUnoStore, UnoPhase } from '../../store/unoStore';
 import type { RoomStatusResponse } from '../../data/models/ApiModels';
 import { buildFinishedLeaveDialogText, isRoomTerminalWithWinner } from '../../util/roomLeavePrecheck';
 import BattleshipPage from './battleship/BattleshipPage';
 import ChessPage from './chess/ChessPage';
 import DominoPage from './domino/DominoPage';
 import HalmaPage from './halma/HalmaPage';
+import UnoPage from './uno/UnoPage';
 import { getPlayContext, clearPlayContext } from '../../util/routingStorage';
 import { formatUSD } from '../../util/formatCurrency';
 import { useAuthStore } from '../../store/authStore';
@@ -62,6 +64,14 @@ function getLeaveContext(gameSocketCode: string): {
         opponentConfirmed: s.opponentConfirmed,
       };
     }
+    case 'uno': {
+      const s = useUnoStore.getState();
+      return {
+        gameIsOver: s.phase === UnoPhase.GAME_OVER || !!s.gameOver,
+        isPastPlacement: s.phase === UnoPhase.WAITING || s.phase === UnoPhase.PLAY,
+        opponentConfirmed: s.opponentConfirmed,
+      };
+    }
     default: { // battleship / naval-battle (and any unknown code)
       const s = useBattleshipStore.getState();
       // Same idea as Android: warn once the match is "live" — placement with both players,
@@ -91,6 +101,8 @@ function subscribeActiveGameStore(gameSocketCode: string, onChange: () => void) 
       return useDominoStore.subscribe(onChange);
     case 'halma':
       return useHalmaStore.subscribe(onChange);
+    case 'uno':
+      return useUnoStore.subscribe(onChange);
     default:
       return useBattleshipStore.subscribe(onChange);
   }
@@ -129,6 +141,11 @@ export default function PlayPage() {
   const [showForfeit,      setShowForfeit]      = useState(false);
   const [showFinished,     setShowFinished]     = useState(false);
   const [finishedStatus,   setFinishedStatus]   = useState<RoomStatusResponse | null>(null);
+  // Phase D: gate the Leave confirmation button while leaveRoom() is in flight to
+  // defeat double-tap (two POST /leave → double forfeit-payout race on the server).
+  const [leavingInFlight,  setLeavingInFlight]  = useState(false);
+  const leavingInFlightRef = useRef(false);
+  leavingInFlightRef.current = leavingInFlight;
 
   const showForfeitRef = useRef(false);
   showForfeitRef.current = showForfeit;
@@ -137,8 +154,16 @@ export default function PlayPage() {
   const trapInstalledRef = useRef(false);
 
   // ── Best-effort leave API + navigate back ───────────────────────────────────
+  // Phase D: refuse to fire a second leave while a previous one is still in flight.
+  // Without this guard, fast double-taps on the "Confirm forfeit" button send two
+  // POST /leave calls that race in the API and previously caused the winner to be
+  // paid twice. The flag is set BEFORE the await and only cleared after navigation,
+  // which is acceptable because we always navigate away on a successful leave.
   const doLeave = async (silent = false) => {
     if (!roomId) return;
+    if (leavingInFlightRef.current) return;
+    leavingInFlightRef.current = true;
+    setLeavingInFlight(true);
     try {
       const status = await apiRepository.leaveRoom(roomId);
       const serverSettled = isRoomTerminalWithWinner(status);
@@ -151,6 +176,9 @@ export default function PlayPage() {
       }
     } catch (e) {
       console.error('[PlayPage] Error during leaveRoom:', e);
+      // Reset the flag on failure so the user can retry — they're still on the page.
+      leavingInFlightRef.current = false;
+      setLeavingInFlight(false);
     }
     consumePlayBackTrapThenNavigate(() => {
       navigate(-1);
@@ -285,7 +313,8 @@ export default function PlayPage() {
       {gameSocketCode === 'chess'  && <ChessPage  {...gameProps} />}
       {gameSocketCode === 'halma'  && <HalmaPage  {...gameProps} />}
       {gameSocketCode === 'domino' && <DominoPage {...gameProps} />}
-      {!['chess', 'halma', 'domino'].includes(gameSocketCode) && <BattleshipPage {...gameProps} />}
+      {gameSocketCode === 'uno'    && <UnoPage    {...gameProps} />}
+      {!['chess', 'halma', 'domino', 'uno'].includes(gameSocketCode) && <BattleshipPage {...gameProps} />}
 
       {/* Checking server status */}
       <IonLoading isOpen={checkingLeave} message="Checking game status…" />
@@ -316,14 +345,21 @@ export default function PlayPage() {
           </IonText>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <SovereignPrimaryButton onClick={() => setShowForfeit(false)}>
+            <SovereignPrimaryButton
+              onClick={() => setShowForfeit(false)}
+              disabled={leavingInFlight}
+            >
               {t('bs_leave_confirm_stay')}
             </SovereignPrimaryButton>
             <SovereignDangerButton
+              disabled={leavingInFlight}
+              loading={leavingInFlight}
               onClick={() => {
-                setShowForfeit(false);
+                if (leavingInFlightRef.current) return;
+                // Keep the modal up while we wait so users see the spinner instead
+                // of an empty screen; doLeave will navigate away on success.
                 // User already accepted forfeit — do not show a second "result" alert after POST /leave
-                void doLeave(true);
+                void doLeave(true).then(() => setShowForfeit(false));
               }}
             >
               {t('bs_leave_confirm_leave')}
