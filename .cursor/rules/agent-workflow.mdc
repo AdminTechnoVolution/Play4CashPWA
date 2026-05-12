@@ -38,10 +38,12 @@ Ejecuta estos comandos y resuelve cualquier error antes de responder al usuario:
 npx tsc --noEmit
 ```
 
-Si tocaste tests:
+Después, **siempre** corre el helper de tests; detecta solo los repos modificados y
+ejecuta unit + integration de cada uno (ver `.cursor/skills/run-tests/SKILL.md` para
+detalle, flags y modos de fallo conocidos):
 
 ```bash
-npm run test --silent
+.cursor/hooks/run-tests.sh
 ```
 
 Si el cambio afecta build:
@@ -50,8 +52,9 @@ Si el cambio afecta build:
 npm run build --silent
 ```
 
-El hook `stop` (en `.cursor/hooks.json`) corre `tsc --noEmit` automáticamente. Si falla,
-**no cierres la respuesta** sin arreglarlo.
+Los hooks `stop` (en `.cursor/hooks.json`) corren `tsc --noEmit` y luego
+`run-tests.sh` automáticamente. Si cualquiera de los dos falla, **no cierres la respuesta**
+sin arreglarlo — la salida se inyecta en el siguiente turno como `additional_context`.
 
 ## 4. Guardar memoria de los ajustes
 

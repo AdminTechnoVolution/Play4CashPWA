@@ -861,5 +861,18 @@
   "current_address": "Adresse actuelle",
   "wallet_network_warning": "Assurez-vous que l'adresse correspond au réseau sélectionné. Envoyer au mauvais réseau peut entraîner la perte permanente des fonds.",
   "save_language": "Enregistrer",
-  "label_version": "Play4Cash v1.0"
+  "label_version": "Play4Cash v1.0",
+  "update_available_title": "Nouvelle version disponible",
+  "update_available_body": "Une nouvelle version de l'application est prête. Le rechargement ne prendra que quelques secondes.",
+  "update_required_title": "Mise à jour requise",
+  "update_required_body": "Votre version est obsolète et n'est plus prise en charge par le serveur. Vous devez mettre à jour pour continuer.",
+  "update_now": "Mettre à jour",
+  "update_later": "Plus tard",
+  "update_loading": "Mise à jour…",
+  "update_standalone_hint": "Si l'application ne se met pas à jour après le rechargement, fermez-la complètement puis rouvrez-la.",
+  "update_offline_ready_title": "Application prête hors ligne",
+  "update_offline_ready_body": "Vous pouvez désormais utiliser Play4Cash même sans connexion.",
+  "update_offline_ready_dismiss": "Compris",
+  "current_version": "Version actuelle",
+  "required_version": "Version requise"
 }

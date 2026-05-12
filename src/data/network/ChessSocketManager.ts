@@ -10,6 +10,7 @@ import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
+import { attachVersionMismatchListener } from './socketVersionListener';
 
 export class ChessSocketManager {
   private socket: Socket | null = null;
@@ -47,9 +48,12 @@ export class ChessSocketManager {
       reconnectionDelayMax: 5000,
       timeout: SOCKET_TIMEOUT_MS,
       forceNew: true,
-      query: { token },
+      query: { token, appVersion: __APP_VERSION__ },
+      auth: { token, appVersion: __APP_VERSION__ },
       extraHeaders: socketIoExtraHeaders(token),
     });
+
+    attachVersionMismatchListener(this.socket);
 
     // Android: sock.on(Socket.EVENT_CONNECT) { onConnected?.invoke(); sock.emit("join", ...) }
     this.socket.on('connect', () => {

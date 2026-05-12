@@ -289,7 +289,7 @@ const SettingsPage: React.FC = () => {
                   lineHeight: '1.8',
                 }}
               >
-                {t('label_version')}
+                {t('label_version')} v{__APP_FULL_VERSION__}
                 <br />
                 <Link to="/terms" style={linkStyle}>
                   Terms &amp; Conditions

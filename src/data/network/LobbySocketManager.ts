@@ -4,6 +4,7 @@ import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
+import { attachVersionMismatchListener } from './socketVersionListener';
 import type { RoomResponse, RoomPlayer } from '../models/ApiModels';
 
 // Normalize raw backend room payload (snake_case → camelCase RoomResponse)
@@ -49,10 +50,12 @@ export class LobbySocketManager {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: SOCKET_TIMEOUT_MS,
-      auth: { token },
-      query: { token },
+      auth: { token, appVersion: __APP_VERSION__ },
+      query: { token, appVersion: __APP_VERSION__ },
       extraHeaders: socketIoExtraHeaders(token),
     });
+
+    attachVersionMismatchListener(this.socket);
 
     this.socket.on('connect', () => {
       // Android: emit "subscribe" with game_id to receive room events for this game

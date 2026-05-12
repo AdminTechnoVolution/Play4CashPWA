@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { BASE_URL, REQUEST_TIMEOUT_MS } from '../../config/api.config';
 import {
   getAccessToken,
@@ -6,6 +6,7 @@ import {
   getLanguage,
 } from '../auth/AuthSessionStore';
 import type { ApiResponse, LoginResponse } from '../models/ApiModels';
+import { checkAppMinVersion } from '../../pwa/versionContract';
 
 // ─── Bare client (no interceptors) — used for auth calls ─────────────────────
 
@@ -77,6 +78,7 @@ function extractErrorMessage(error: AxiosError): string {
 
 bareClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   config.headers.set('accept-language', getLanguage());
+  config.headers.set('X-App-Version', __APP_VERSION__);
   return config;
 });
 
@@ -86,14 +88,38 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
   config.headers.set('accept-language', getLanguage());
+  config.headers.set('X-App-Version', __APP_VERSION__);
   return config;
 });
 
 // ─── Response interceptor ─────────────────────────────────────────────────────
 
+/** Reads the X-App-Min-Version header off any response (success or error) and forwards
+ *  it to the version contract checker so a forced-update modal can fire. */
+function inspectMinVersionHeader(response: AxiosResponse | undefined): void {
+  if (!response?.headers) return;
+  const value = (response.headers as Record<string, unknown>)['x-app-min-version'];
+  if (typeof value === 'string') checkAppMinVersion(value);
+}
+
+bareClient.interceptors.response.use(
+  (response) => {
+    inspectMinVersionHeader(response);
+    return response;
+  },
+  (error: AxiosError) => {
+    inspectMinVersionHeader(error.response);
+    throw error;
+  },
+);
+
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    inspectMinVersionHeader(response);
+    return response;
+  },
   async (error: AxiosError) => {
+    inspectMinVersionHeader(error.response);
     const originalRequest = error.config as AxiosRequestConfig & { _retried?: boolean };
 
     // Network error (no response from server)

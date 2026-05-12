@@ -1,9 +1,9 @@
 import ReactDOM from 'react-dom/client';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { registerSW } from 'virtual:pwa-register';
 import App from './App';
+import { installChunkErrorRecovery } from './pwa/chunkErrorRecovery';
 
-registerSW({ immediate: true });
+installChunkErrorRecovery();
 
 // Ionic CSS
 import '@ionic/react/css/core.css';

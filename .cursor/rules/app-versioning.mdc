@@ -1,0 +1,82 @@
+---
+description: Play4Cash PWA — contrato de versionado y actualización (SW + min-version)
+alwaysApply: true
+---
+
+# PWA Versioning Contract
+
+## Identidad de versión
+
+Inyectada en build-time por `vite.config.ts`:
+
+- `__APP_VERSION__` — semver de `package.json` (p. ej. `1.2.0`).
+- `__APP_GIT_SHA__` — short SHA del commit (p. ej. `abc1234`).
+- `__APP_FULL_VERSION__` — `1.2.0+abc1234`. Es lo que se muestra en `SettingsPage` y se usa
+  para diagnóstico/soporte.
+- `__APP_BUILD_TIME__` — ISO timestamp del build.
+
+Tipos declarados en `src/vite-env.d.ts`. **No las uses como `import.meta.env.*`** — son
+constantes globales (`define` de Vite), no env vars.
+
+## Service Worker — modo prompt
+
+`vite-plugin-pwa` está en `registerType: 'prompt'`. Esto significa:
+
+- El SW descarga la nueva versión en background.
+- **No se activa automáticamente** — esperamos confirmación del usuario.
+- `cleanupOutdatedCaches: true` para purgar chunks viejos.
+
+El usuario ve el modal `AppUpdateModal` (centrado, no descartable cuando es forzado).
+La activación + reload se dispara por `useAppUpdate.applyUpdate()`.
+
+**Polling**:
+- Tab regular: `swRegistration.update()` cada 60 min.
+- PWA standalone (iOS/Android home screen): cada 15 min.
+  Detección: `window.matchMedia('(display-mode: standalone)').matches` o
+  `navigator.standalone`.
+
+## Forced upgrade (X-App-Min-Version)
+
+El API puede forzar a re-cargar enviando el header `X-App-Min-Version: 1.2.0`. La PWA:
+
+1. Lo lee en cada response (`ApiClient.ts` → `inspectMinVersionHeader`).
+2. `pwa/versionContract.ts#checkAppMinVersion` compara con `__APP_VERSION__` (semver).
+3. Si está atrás, dispara `CustomEvent('p4c:force-update', { detail: { requiredVersion } })`.
+4. `useAppUpdate` lo escucha y pasa el modal a modo **forzado** (sin botón "Después").
+
+CORS: el API tiene `exposedHeaders: ['X-App-Min-Version']` para que la PWA pueda leer el
+header. Si moves el API/Gateway a otro CORS setup, mantén esto.
+
+## Recuperación de chunks rotos
+
+`pwa/chunkErrorRecovery.ts` se instala en `main.tsx`. Detecta:
+- `ChunkLoadError`
+- `Loading chunk N failed`
+- `Failed to fetch dynamically imported module`
+
+Comportamiento:
+- Primer error → `window.location.reload()` (un solo retry, marcado en `sessionStorage`).
+- Segundo error en <60s → muestra una pantalla nativa con botón "Reintentar".
+
+## Header de telemetría
+
+Todo request del SPA carga `X-App-Version: <__APP_VERSION__>`. El API la stashea en
+`req.clientAppVersion` (middleware `app-version-headers`). Útil para sampling de logs y
+métricas de adopción de versión.
+
+## Cómo publicar una versión nueva
+
+1. Bump `package.json#version` (semver real, no solo SHA).
+2. Commit + merge.
+3. Pipeline corre `npm run build` → `__APP_VERSION__` y `__APP_GIT_SHA__` quedan inyectados.
+4. Deploy del `dist/` al CDN/Static Web App.
+5. (Opcional) Si la versión nueva tiene cambios incompatibles con builds anteriores, setea
+   `PWA_MIN_VERSION=<nueva-version>` en el API antes/durante el deploy. Esto fuerza el modal.
+
+## Forbidden patterns
+
+- ❌ `registerType: 'autoUpdate'` (rompe UX en partidas activas).
+- ❌ Skip-waiting global desde `main.tsx` u otros lugares.
+- ❌ Leer el access token desde el SW.
+- ❌ Cachear endpoints `/api/login*` con NetworkFirst/CacheFirst.
+- ❌ Mostrar versión sin el `+<sha>` en Settings (perdés la info de build para soporte).

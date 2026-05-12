@@ -1,0 +1,123 @@
+import { useEffect, useState } from 'react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
+
+/** Minutes between background `swRegistration.update()` polls. iOS standalone uses /4. */
+const UPDATE_CHECK_INTERVAL_MIN = 60;
+const UPDATE_CHECK_INTERVAL_MIN_STANDALONE = 15;
+
+function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
+  // iOS Safari legacy.
+  return Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+}
+
+/** localStorage flag so the offline-ready toast only fires once per browser/install. */
+const OFFLINE_READY_SEEN_KEY = 'p4c_offline_ready_seen';
+
+export interface AppUpdateState {
+  /** A new SW has finished installing in the background. Show the prompt. */
+  needRefresh: boolean;
+  /** App is ready for offline use (first install). */
+  offlineReady: boolean;
+  /** Set to true when the API forces an upgrade via X-App-Min-Version header. */
+  forced: boolean;
+  /** Optional version pushed by the API as required minimum. */
+  requiredVersion: string | null;
+  appVersion: string;
+  appFullVersion: string;
+  buildTime: string;
+  isStandalone: boolean;
+  /** True when offlineReady fires AND we haven't shown the toast yet on this device. */
+  showOfflineReady: boolean;
+  /** Apply the new SW and reload. Resolves after reload is triggered. */
+  applyUpdate: () => Promise<void>;
+  /** Hide the update prompt for this session (does NOT install the update). */
+  dismiss: () => void;
+  /** Mark the offline-ready toast as seen so it never fires again on this device. */
+  dismissOfflineReady: () => void;
+}
+
+/**
+ * Glue between vite-plugin-pwa's SW lifecycle and a UI prompt.
+ * Listens for forced-update events emitted by ApiClient when the API responds with
+ * `X-App-Min-Version` greater than the running app's version.
+ */
+export function useAppUpdate(): AppUpdateState {
+  const standalone = isStandalone();
+  const [forced, setForced] = useState(false);
+  const [requiredVersion, setRequiredVersion] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  const [offlineReadyDismissed, setOfflineReadyDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(OFFLINE_READY_SEEN_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const intervalMin = standalone ? UPDATE_CHECK_INTERVAL_MIN_STANDALONE : UPDATE_CHECK_INTERVAL_MIN;
+
+  const {
+    needRefresh: [needRefreshRaw, setNeedRefresh],
+    offlineReady: [offlineReady],
+    updateServiceWorker,
+  } = useRegisterSW({
+    immediate: true,
+    onRegisteredSW(_swUrl, registration) {
+      if (!registration) return;
+      // Periodic background check so long-lived sessions detect deploys.
+      window.setInterval(() => {
+        registration.update().catch(() => { /* network errors are fine */ });
+      }, intervalMin * 60 * 1000);
+    },
+  });
+
+  useEffect(() => {
+    function onForce(e: Event) {
+      const detail = (e as CustomEvent<{ requiredVersion?: string }>).detail;
+      setRequiredVersion(detail?.requiredVersion ?? null);
+      setForced(true);
+      setDismissed(false);
+    }
+    window.addEventListener('p4c:force-update', onForce as EventListener);
+    return () => window.removeEventListener('p4c:force-update', onForce as EventListener);
+  }, []);
+
+  const applyUpdate = async (): Promise<void> => {
+    try {
+      await updateServiceWorker(true);
+    } catch {
+      // Even if SW update fails (e.g. no SW because forced via API), still reload to fetch latest HTML.
+    }
+    // Hard reload bypasses HTTP cache to force the new index.html and chunk hashes.
+    window.location.reload();
+  };
+
+  return {
+    needRefresh: !dismissed && (needRefreshRaw || forced),
+    offlineReady,
+    forced,
+    requiredVersion,
+    appVersion: __APP_VERSION__,
+    appFullVersion: __APP_FULL_VERSION__,
+    buildTime: __APP_BUILD_TIME__,
+    isStandalone: standalone,
+    showOfflineReady: offlineReady && !offlineReadyDismissed,
+    applyUpdate,
+    dismiss: () => {
+      // Forced updates can't be dismissed.
+      if (forced) return;
+      setDismissed(true);
+      setNeedRefresh(false);
+    },
+    dismissOfflineReady: () => {
+      setOfflineReadyDismissed(true);
+      try {
+        localStorage.setItem(OFFLINE_READY_SEEN_KEY, '1');
+      } catch {
+        /* ignore quota/private mode */
+      }
+    },
+  };
+}

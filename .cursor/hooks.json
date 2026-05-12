@@ -6,6 +6,11 @@
         "command": ".cursor/hooks/verify-typecheck.sh",
         "timeout": 90,
         "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/run-tests.sh",
+        "timeout": 600,
+        "failClosed": false
       }
     ]
   }

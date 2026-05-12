@@ -6,6 +6,7 @@ import { useAuthStore } from './store/authStore';
 import { RequireAuth, RootRedirect } from './auth/RequireAuth';
 import { usePWAInstallStore } from './store/pwaInstallStore';
 import PWAInstallBanner from './ui/components/PWAInstallBanner';
+import AppUpdateModal from './pwa/AppUpdateModal';
 
 import LoginPage from './pages/login/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -80,6 +81,7 @@ export default function App() {
         </Routes>
       </BrowserRouter>
       <PWAInstallBanner />
+      <AppUpdateModal />
     </IonApp>
   );
 }

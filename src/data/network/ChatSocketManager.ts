@@ -4,6 +4,7 @@ import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
+import { attachVersionMismatchListener } from './socketVersionListener';
 import type { ChatMessage } from '../models/ApiModels';
 import { parseChatEnvelope } from '../../util/ChatGreetingModels';
 
@@ -36,10 +37,12 @@ export class ChatSocketManager {
       reconnectionDelayMax: 5000,
       timeout: SOCKET_TIMEOUT_MS,
       forceNew: true,
-      query: { token, lang },
-      auth: { token, lang },
+      query: { token, lang, appVersion: __APP_VERSION__ },
+      auth: { token, lang, appVersion: __APP_VERSION__ },
       extraHeaders: socketIoExtraHeaders(token),
     });
+
+    attachVersionMismatchListener(this.socket);
 
     this.socket.on('connect', () => {
       this.socket?.emit('join', { room_id: roomId, lang: acceptLanguageTag() });

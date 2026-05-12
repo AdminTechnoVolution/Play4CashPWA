@@ -4,6 +4,7 @@ import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
+import { attachVersionMismatchListener } from './socketVersionListener';
 import type { HalmaState } from '../models/ApiModels';
 
 export class HalmaSocketManager {
@@ -26,9 +27,12 @@ export class HalmaSocketManager {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: SOCKET_TIMEOUT_MS,
-      query: { token },
+      query: { token, appVersion: __APP_VERSION__ },
+      auth: { token, appVersion: __APP_VERSION__ },
       extraHeaders: socketIoExtraHeaders(token),
     });
+
+    attachVersionMismatchListener(this.socket);
 
     this.socket.on('connect', () => {
       this.socket?.emit('join', { room_id: roomId });
