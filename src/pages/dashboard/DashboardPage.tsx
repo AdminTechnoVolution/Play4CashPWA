@@ -349,8 +349,9 @@ const DashboardPage: React.FC = () => {
               </IonItem>
             </IonMenuToggle>
             {/* App version — surfaces the running PWA build so support can correlate
-                user-reported issues with a specific deploy. Sourced from the build-time
-                `__APP_VERSION__` constant injected by vite.config.ts (package.json). */}
+                user-reported issues with a specific deploy. Uses `__APP_FULL_VERSION__`
+                (semver+gitSha, e.g. "1.0.1+abc1234") so every deploy is distinguishable
+                even when package.json.version isn't bumped between pushes. */}
             <div
               style={{
                 textAlign: 'center',
@@ -360,9 +361,9 @@ const DashboardPage: React.FC = () => {
                 letterSpacing: '0.5px',
                 userSelect: 'text',
               }}
-              aria-label={`App version v${__APP_VERSION__}`}
+              aria-label={`App version v${__APP_FULL_VERSION__}`}
             >
-              v{__APP_VERSION__}
+              v{__APP_FULL_VERSION__}
             </div>
           </div>
         </IonContent>
