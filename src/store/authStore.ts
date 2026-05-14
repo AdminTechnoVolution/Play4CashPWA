@@ -104,6 +104,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     loadSession: async () => {
+      // Always start from a clean slate on the API repo cache so we never hand a stale
+      // account back to a request that has no live token behind it.
+      apiRepository.invalidateAccountCache();
+
       if (!hasValidSession()) {
         // We can't see the httpOnly refresh cookie in JS, so we always try one refresh on cold
         // start. The API responds 401 if there is no cookie (or it's invalid), and we treat that
@@ -112,39 +116,39 @@ export const useAuthStore = create<AuthState>((set, get) => {
         try {
           await refreshAccessTokenWithLock();
         } catch {
+          // Refresh failed: wipe any stale cached account so a leftover `p4c_user_account`
+          // in localStorage cannot bypass the auth guard on the next render. Mark hydration
+          // done immediately so the RequireAuth can redirect without waiting for the async
+          // auth-failure listener to finish.
+          clearTokens();
+          set({ user: null, isLoading: false, authHydrated: true });
           if (likelyHadSession) {
             emitAuthFailureEvent();
-          } else {
-            set({ user: null, isLoading: false, authHydrated: true, error: null });
           }
           return;
         }
       }
 
       if (!hasValidSession()) {
+        clearTokens();
         set({ user: null, isLoading: false, authHydrated: true });
         return;
       }
 
       set({ isLoading: true });
-      // Load cached account immediately for fast rendering
-      const cached = getUserAccount();
-      if (cached) {
-        set({ user: cached });
-      }
       try {
         const account = await apiRepository.getUserAccount();
         saveUserAccount(account);
-        set({ user: account, error: null });
+        set({ user: account, isLoading: false, authHydrated: true, error: null });
       } catch {
-        // If API fails, use cached account if available
-        if (cached) {
-          set({ user: cached });
-        } else {
-          set({ user: null });
-        }
-      } finally {
-        set({ isLoading: false, authHydrated: true });
+        // Account fetch failed (token revoked, 401, network blip).
+        // Do NOT fall back to the cached account: that would let the user navigate
+        // into protected pages without a real session behind them. Hydrate first so
+        // RequireAuth redirects right away.
+        const hadSession = !!getAccessToken();
+        clearTokens();
+        set({ user: null, isLoading: false, authHydrated: true });
+        if (hadSession) emitAuthFailureEvent();
       }
     },
 

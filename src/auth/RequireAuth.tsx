@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { IonContent, IonPage, IonSpinner } from '@ionic/react';
 import { useAuthStore } from '../store/authStore';
+import { hasValidSession } from '../data/auth/AuthSessionStore';
 
 function AuthLoadingScreen() {
   return (
@@ -27,11 +28,14 @@ export function RequireAuth() {
   const { user, authHydrated, isLoading } = useAuthStore();
   const location = useLocation();
 
-  if (!authHydrated || (isLoading && !user)) {
+  if (!authHydrated || isLoading) {
     return <AuthLoadingScreen />;
   }
 
-  if (!user) {
+  // Defense-in-depth: a stale `user` in the store (e.g. cached account from a previous
+  // session) must not unlock protected routes. Require both an account AND a live
+  // access token. `hasValidSession()` checks the in-memory token's `exp` claim.
+  if (!user || !hasValidSession()) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -46,5 +50,6 @@ export function RootRedirect() {
     return <AuthLoadingScreen />;
   }
 
-  return <Navigate to={user ? '/dashboard' : '/login'} replace />;
+  const authed = !!user && hasValidSession();
+  return <Navigate to={authed ? '/dashboard' : '/login'} replace />;
 }

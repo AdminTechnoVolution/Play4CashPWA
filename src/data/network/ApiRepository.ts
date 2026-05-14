@@ -1,4 +1,5 @@
 import { apiService } from './ApiService';
+import { getAccessToken } from '../auth/AuthSessionStore';
 import type {
   LoginResponse,
   UserAccountResponse,
@@ -46,6 +47,12 @@ export const apiRepository = {
   // ─── Account ───────────────────────────────────────────────────────────────
 
   async getUserAccount(): Promise<UserAccountResponse> {
+    // Never serve a cached account when there is no in-memory access token: that would
+    // make protected pages render with a "fantom" user after logout / token expiry.
+    if (!getAccessToken()) {
+      accountCache = null;
+      return apiService.getUserAccount();
+    }
     if (accountCache && accountCache.expiresAt > Date.now()) {
       return accountCache.data;
     }
@@ -55,6 +62,7 @@ export const apiRepository = {
   },
 
   getCachedUserAccount(): UserAccountResponse | null {
+    if (!getAccessToken()) return null;
     if (accountCache && accountCache.expiresAt > Date.now()) {
       return accountCache.data;
     }
