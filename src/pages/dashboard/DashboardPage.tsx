@@ -335,7 +335,7 @@ const DashboardPage: React.FC = () => {
             ))}
           </IonList>
 
-          {/* Logout */}
+          {/* Logout + footer with app version */}
           <div style={{ padding: '12px', marginTop: 'auto' }}>
             <IonMenuToggle autoHide={false}>
               <IonItem
@@ -348,6 +348,22 @@ const DashboardPage: React.FC = () => {
                 <IonLabel style={{ color: 'var(--sovereign-error)', fontWeight: '500' }}>{t('log_out')}</IonLabel>
               </IonItem>
             </IonMenuToggle>
+            {/* App version — surfaces the running PWA build so support can correlate
+                user-reported issues with a specific deploy. Sourced from the build-time
+                `__APP_VERSION__` constant injected by vite.config.ts (package.json). */}
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '14px 12px 8px',
+                color: 'var(--sovereign-text-muted)',
+                fontSize: '11px',
+                letterSpacing: '0.5px',
+                userSelect: 'text',
+              }}
+              aria-label={`App version v${__APP_VERSION__}`}
+            >
+              v{__APP_VERSION__}
+            </div>
           </div>
         </IonContent>
       </IonMenu>

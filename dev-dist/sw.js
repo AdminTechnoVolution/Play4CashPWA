@@ -67,10 +67,14 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-c5fd805d'], (function (workbox) { 'use strict';
+define(['./workbox-4b8746c7'], (function (workbox) { 'use strict';
 
-  self.skipWaiting();
-  workbox.clientsClaim();
+  workbox.enable();
+  self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+      self.skipWaiting();
+    }
+  });
 
   /**
    * The precacheAndRoute() method efficiently caches and responds to
@@ -81,11 +85,11 @@ define(['./workbox-c5fd805d'], (function (workbox) { 'use strict';
     "url": "registerSW.js",
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
-    "url": "index.html",
-    "revision": "0.09pnrmbuf4o"
+    "url": "/index.html",
+    "revision": "0.25pm3ckc31c"
   }], {});
   workbox.cleanupOutdatedCaches();
-  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
+  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
     allowlist: [/^\/$/]
   }));
   workbox.registerRoute(/^https:\/\/p4c-api/, new workbox.NetworkFirst({
