@@ -1,21 +1,46 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { IonPage, IonContent, IonText, IonSpinner } from '@ionic/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { useAuthStore } from '../../store/authStore';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { useT } from '../../i18n/translations';
+import { useLanguageStore } from '../../i18n/languageStore';
+import { normaliseLang } from '../../i18n/languageUtils';
+import { apiRepository } from '../../data/network/ApiRepository';
 import '../../ui/theme/variables.css';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { isLoading, error, signInWithGoogle, clearError, user, authHydrated } = useAuthStore();
   const t = useT();
+  const lang = normaliseLang(useLanguageStore((s) => s.lang));
+  const [registeredCount, setRegisteredCount] = useState<number | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     if (!authHydrated || isLoading) return;
     if (user) navigate('/dashboard', { replace: true });
   }, [user, authHydrated, isLoading, navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatsLoading(true);
+    void apiRepository
+      .getPublicUserStats()
+      .then((s) => {
+        if (!cancelled) setRegisteredCount(Math.max(0, s.registeredUsers));
+      })
+      .catch(() => {
+        if (!cancelled) setRegisteredCount(null);
+      })
+      .finally(() => {
+        if (!cancelled) setStatsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     const { credential } = credentialResponse;
@@ -191,6 +216,76 @@ const LoginPage: React.FC = () => {
                 By Techno Volution
               </p>
             </IonText>
+            {(statsLoading || registeredCount !== null) && (
+              <div
+                style={{
+                  marginTop: 14,
+                  marginLeft: 'auto',
+                  marginRight: 'auto',
+                  maxWidth: 320,
+                  width: '100%',
+                  borderRadius: 16,
+                  padding: '18px 20px',
+                  background: 'linear-gradient(145deg, rgba(201,168,76,0.12) 0%, rgba(19,31,53,0.85) 45%, rgba(19,31,53,0.92) 100%)',
+                  border: '1px solid rgba(201,168,76,0.35)',
+                  boxShadow: '0 8px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)',
+                  backdropFilter: 'blur(10px)',
+                }}
+                aria-live="polite"
+                aria-busy={statsLoading}
+              >
+                <div
+                  style={{
+                    textAlign: 'center',
+                    fontSize: 10,
+                    letterSpacing: '0.28em',
+                    textTransform: 'uppercase',
+                    color: 'var(--sovereign-gold)',
+                    fontWeight: 600,
+                    marginBottom: 8,
+                    opacity: 0.95,
+                  }}
+                >
+                  {t('login_footer_players_title')}
+                </div>
+                {statsLoading ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+                    <IonSpinner name="crescent" style={{ color: 'var(--sovereign-gold)', width: 28, height: 28 }} />
+                  </div>
+                ) : registeredCount != null ? (
+                  <>
+                    <div
+                      style={{
+                        fontVariantNumeric: 'tabular-nums',
+                        fontSize: 34,
+                        fontWeight: 800,
+                        lineHeight: 1.1,
+                        textAlign: 'center',
+                        background: 'linear-gradient(180deg, #f0dfa0 0%, #c9a84c 45%, #9a7a32 100%)',
+                        WebkitBackgroundClip: 'text',
+                        backgroundClip: 'text',
+                        color: 'transparent',
+                        textShadow: '0 2px 16px rgba(201,168,76,0.25)',
+                      }}
+                    >
+                      {registeredCount.toLocaleString(lang)}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 6,
+                        textAlign: 'center',
+                        fontSize: 13,
+                        color: 'var(--sovereign-text-muted)',
+                        lineHeight: 1.35,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {t('login_footer_players_subtitle')}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            )}
             <div
               style={{
                 marginTop: 8,

@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   LoginResponse,
   UserAccountResponse,
+  PublicUserStatsResponse,
   GameResponse,
   GreetingResponse,
   WalletResponse,
@@ -47,6 +48,12 @@ export const apiService = {
       '/api/login/refresh',
       refreshToken ? { refreshToken } : {},
     );
+    return unwrap(res.data);
+  },
+
+  /** Public — login page community counter */
+  async getPublicUserStats(): Promise<PublicUserStatsResponse> {
+    const res = await bareClient.get<ApiResponse<PublicUserStatsResponse>>('/api/user/public/stats');
     return unwrap(res.data);
   },
 

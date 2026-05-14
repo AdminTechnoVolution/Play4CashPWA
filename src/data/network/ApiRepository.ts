@@ -9,6 +9,7 @@ import type {
   RoomStatsResponse,
   RoomResponse,
   RoomStatusResponse,
+  PublicUserStatsResponse,
   CreateRoomRequest,
   BattleshipPlacementRequest,
   RegisterWalletRequest,
@@ -42,6 +43,10 @@ export const apiRepository = {
 
   async logout(refreshToken?: string): Promise<void> {
     return apiService.logout(refreshToken);
+  },
+
+  async getPublicUserStats(): Promise<PublicUserStatsResponse> {
+    return apiService.getPublicUserStats();
   },
 
   // ─── Account ───────────────────────────────────────────────────────────────

@@ -26,6 +26,11 @@ export interface UserAccountResponse {
   limits?: { dailyWithdrawal?: number };
 }
 
+/** `GET /api/user/public/stats` — no auth */
+export interface PublicUserStatsResponse {
+  registeredUsers: number;
+}
+
 // ─── Games ─────────────────────────────────────────────────────────────────────
 // Normalized — ApiService maps _id→id, min_bet→minBet, socket_code→socketCode, etc.
 export interface GameResponse {
