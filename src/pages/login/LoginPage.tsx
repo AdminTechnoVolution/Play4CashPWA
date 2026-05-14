@@ -191,6 +191,19 @@ const LoginPage: React.FC = () => {
                 By Techno Volution
               </p>
             </IonText>
+            <div
+              style={{
+                marginTop: 8,
+                color: 'var(--sovereign-text-muted)',
+                fontSize: 11,
+                letterSpacing: '0.5px',
+                userSelect: 'text',
+                opacity: 0.8,
+              }}
+              aria-label={`App version v${__APP_FULL_VERSION__}`}
+            >
+              v{__APP_FULL_VERSION__}
+            </div>
           </div>
         </div>
 
