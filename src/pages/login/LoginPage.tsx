@@ -1,5 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { IonPage, IonContent, IonText, IonSpinner } from '@ionic/react';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  IonPage,
+  IonContent,
+  IonText,
+  IonSpinner,
+  IonRefresher,
+  IonRefresherContent,
+  RefresherEventDetail,
+} from '@ionic/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { useAuthStore } from '../../store/authStore';
@@ -8,6 +16,7 @@ import { useT } from '../../i18n/translations';
 import { useLanguageStore } from '../../i18n/languageStore';
 import { normaliseLang } from '../../i18n/languageUtils';
 import { apiRepository } from '../../data/network/ApiRepository';
+import { checkServiceWorkerForUpdate } from '../../pwa/useAppUpdate';
 import '../../ui/theme/variables.css';
 
 const LoginPage: React.FC = () => {
@@ -23,24 +32,29 @@ const LoginPage: React.FC = () => {
     if (user) navigate('/dashboard', { replace: true });
   }, [user, authHydrated, isLoading, navigate]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const refreshPublicStats = useCallback(async () => {
     setStatsLoading(true);
-    void apiRepository
-      .getPublicUserStats()
-      .then((s) => {
-        if (!cancelled) setRegisteredCount(Math.max(0, s.registeredUsers));
-      })
-      .catch(() => {
-        if (!cancelled) setRegisteredCount(null);
-      })
-      .finally(() => {
-        if (!cancelled) setStatsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const s = await apiRepository.getPublicUserStats();
+      setRegisteredCount(Math.max(0, s.registeredUsers));
+    } catch {
+      setRegisteredCount(null);
+    } finally {
+      setStatsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshPublicStats();
+  }, [refreshPublicStats]);
+
+  const handleRefresh = async (event: CustomEvent<RefresherEventDetail>) => {
+    try {
+      await Promise.all([refreshPublicStats(), checkServiceWorkerForUpdate()]);
+    } finally {
+      event.detail.complete();
+    }
+  };
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     const { credential } = credentialResponse;
@@ -59,7 +73,14 @@ const LoginPage: React.FC = () => {
 
   return (
     <IonPage>
-      <IonContent fullscreen style={{ '--background': 'transparent', '--overflow': 'hidden' } as React.CSSProperties}>
+      <IonContent fullscreen scrollY style={{ '--background': 'transparent' } as React.CSSProperties}>
+        <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
+          <IonRefresherContent
+            pullingText={t('login_refresher_pulling')}
+            refreshingSpinner="crescent"
+            refreshingText={t('login_refresher_refreshing')}
+          />
+        </IonRefresher>
 
         {/* Background image */}
         <div style={{
@@ -87,8 +108,9 @@ const LoginPage: React.FC = () => {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: '100vh',
+          minHeight: 'calc(100vh + 64px)',
           padding: '40px 32px',
+          paddingBottom: 'max(48px, calc(40px + env(safe-area-inset-bottom, 0px)))',
         }}>
 
           {/* Logo */}

@@ -5,6 +5,21 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 const UPDATE_CHECK_INTERVAL_MIN = 60;
 const UPDATE_CHECK_INTERVAL_MIN_STANDALONE = 15;
 
+/**
+ * Manual SW update check (same as the periodic poll in `useRegisterSW`).
+ * Safe from pull-to-refresh; does not reload. If a new worker is waiting,
+ * `useAppUpdate` / `AppUpdateModal` will surface `needRefresh`.
+ */
+export async function checkServiceWorkerForUpdate(): Promise<void> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    await reg?.update();
+  } catch {
+    /* ignore network / unsupported */
+  }
+}
+
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   if (window.matchMedia?.('(display-mode: standalone)').matches) return true;

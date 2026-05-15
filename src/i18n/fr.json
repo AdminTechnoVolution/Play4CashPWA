@@ -670,6 +670,8 @@
   "login_welcome_title": "Bienvenue sur Play4Cash",
   "login_footer_players_title": "Notre communauté",
   "login_footer_players_subtitle": "Joueurs inscrits sur Play4Cash",
+  "login_refresher_pulling": "Tirez vers le bas pour actualiser les stats et vérifier les mises à jour",
+  "login_refresher_refreshing": "Vérification…",
   "network_value_tron": "Tron (TRC20)",
   "new_room": "Nouvelle salle",
   "ok": "OK",
