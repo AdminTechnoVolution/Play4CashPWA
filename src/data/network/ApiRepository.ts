@@ -12,7 +12,8 @@ import type {
   PublicUserStatsResponse,
   CreateRoomRequest,
   BattleshipPlacementRequest,
-  RegisterWalletRequest,
+  RequestWalletChangePayload,
+  ConfirmWalletChangeRequest,
   RechargeRequest,
   WithdrawalRequest,
   VerifyWithdrawalRequest,
@@ -151,8 +152,16 @@ export const apiRepository = {
 
   // ─── Wallet / Finance ──────────────────────────────────────────────────────
 
-  async registerWallet(req: RegisterWalletRequest): Promise<void> {
-    return apiService.registerWallet(req);
+  async requestWalletChange(req: RequestWalletChangePayload): Promise<void> {
+    return apiService.requestWalletChange(req);
+  },
+
+  async confirmWalletChange(req: ConfirmWalletChangeRequest): Promise<void> {
+    try {
+      await apiService.confirmWalletChange(req);
+    } finally {
+      accountCache = null;
+    }
   },
 
   async recharge(req: RechargeRequest): Promise<void> {

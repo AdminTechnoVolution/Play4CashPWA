@@ -92,8 +92,10 @@ export default defineConfig(({ mode }) => {
           // SPA fallback so deep links work offline / cached.
           navigationPreload: true,
           navigateFallback: '/index.html',
-          // Don't claim clients on activate — we want the user to opt in via the modal.
-          clientsClaim: false,
+          // Claim clients when a worker **activates**. Updates still wait in `waiting` until the user
+          // confirms (`skipWaiting: false` + modal); without claim, `controllerchange` may never fire
+          // on the open tab and eager reload can race activation (stale chunks until another tap).
+          clientsClaim: true,
           skipWaiting: false,
           runtimeCaching: [
             {

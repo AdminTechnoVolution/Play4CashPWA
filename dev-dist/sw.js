@@ -67,7 +67,7 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-4b8746c7'], (function (workbox) { 'use strict';
+define(['./workbox-f6478a00'], (function (workbox) { 'use strict';
 
   workbox.enable();
   self.addEventListener('message', event => {
@@ -75,7 +75,7 @@ define(['./workbox-4b8746c7'], (function (workbox) { 'use strict';
       self.skipWaiting();
     }
   });
-
+  workbox.clientsClaim();
   /**
    * The precacheAndRoute() method efficiently caches and responds to
    * requests for URLs in the manifest.
@@ -86,7 +86,7 @@ define(['./workbox-4b8746c7'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "/index.html",
-    "revision": "0.rknq7c6e9pc"
+    "revision": "0.3pjcthbp9p"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {

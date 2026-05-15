@@ -85,12 +85,40 @@ export function useAppUpdate(): AppUpdateState {
   }, []);
 
   const applyUpdate = async (): Promise<void> => {
+    const reg =
+      typeof navigator !== 'undefined' && 'serviceWorker' in navigator
+        ? await navigator.serviceWorker.getRegistration()
+        : undefined;
+    const hadWaitingWorker = Boolean(reg?.waiting);
+
     try {
       await updateServiceWorker(true);
     } catch {
-      // Even if SW update fails (e.g. no SW because forced via API), still reload to fetch latest HTML.
+      window.location.reload();
+      return;
     }
-    // Hard reload bypasses HTTP cache to force the new index.html and chunk hashes.
+
+    // Forced API upgrade / no pending SW: `messageSkipWaiting` is a no-op — reload to fetch new HTML.
+    if (!hadWaitingWorker) {
+      window.location.reload();
+      return;
+    }
+
+    // Prompt-mode SW update: reload immediately races activation (`skipWaiting` is async; optional
+    // claim may lag). Wait for controller swap or fall back so one tap reliably picks up the build.
+    await new Promise<void>((resolve) => {
+      const ms = 12_000;
+      const timer = window.setTimeout(resolve, ms);
+      navigator.serviceWorker.addEventListener(
+        'controllerchange',
+        () => {
+          window.clearTimeout(timer);
+          resolve();
+        },
+        { once: true },
+      );
+    });
+
     window.location.reload();
   };
 

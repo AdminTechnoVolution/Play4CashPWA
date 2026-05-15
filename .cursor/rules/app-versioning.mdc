@@ -25,6 +25,12 @@ constantes globales (`define` de Vite), no env vars.
 - El SW descarga la nueva versión en background.
 - **No se activa automáticamente** — esperamos confirmación del usuario.
 - `cleanupOutdatedCaches: true` para purgar chunks viejos.
+- Workbox usa `clientsClaim: true`: la nueva versión solo **activa** tras `skipWaiting` (confirmación
+  en el modal); al activarse puede reclamar la pestaña y disparar `controllerchange`. Sin `claim`,
+  un `reload()` inmediato a menudo corre antes de que el nuevo SW controle la página → mismo bundle
+  hasta otro intento.
+- `useAppUpdate.applyUpdate()` espera `controllerchange` (o timeout) cuando había worker en `waiting`,
+  y recarga después; si no había worker pendiente (p. ej. sólo `X-App-Min-Version`), recarga enseguida.
 
 El usuario ve el modal `AppUpdateModal` (centrado, no descartable cuando es forzado).
 La activación + reload se dispara por `useAppUpdate.applyUpdate()`.

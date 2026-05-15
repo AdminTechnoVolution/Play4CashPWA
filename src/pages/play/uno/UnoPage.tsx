@@ -1,15 +1,37 @@
-import { useEffect, useMemo } from 'react';
-import { IonAlert, IonContent, IonPage, IonToast } from '@ionic/react';
-import { useT } from '../../../i18n/translations';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  IonAlert,
+  IonButton,
+  IonCard,
+  IonCardContent,
+  IonContent,
+  IonHeader,
+  IonIcon,
+  IonPage,
+  IonSpinner,
+  IonText,
+  IonTitle,
+  IonToast,
+  IonToolbar,
+  IonButtons,
+  useIonToast,
+} from '@ionic/react';
+import { arrowBackOutline } from 'ionicons/icons';
+import { useT, hasKey } from '../../../i18n/translations';
 import { useAuthStore } from '../../../store/authStore';
 import { useUnoStore, UnoPhase } from '../../../store/unoStore';
-import type { UnoColor } from '../../../data/models/ApiModels';
+import type { UnoColor, ChatMessage } from '../../../data/models/ApiModels';
+import { ChatSocketManager } from '../../../data/network/ChatSocketManager';
 import UnoHand from './UnoHand';
 import UnoTable from './UnoTable';
 import UnoSeats from './UnoSeats';
 import UnoColorPicker from './UnoColorPicker';
 import UnoScoreboard from './UnoScoreboard';
 import UnoMatchWinnerModal from './UnoMatchWinnerModal';
+import ChatGreetingChips from '../components/ChatGreetingChips';
+import SpectatorBadge from '../components/SpectatorBadge';
+import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
+import { formatApiMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
 import { SovereignSecondaryButton } from '../../../ui/components/SovereignButton';
 import './uno.css';
 
@@ -24,19 +46,12 @@ interface UnoPageProps {
   onLeaveRequest: () => void;
 }
 
-/**
- * Single-screen UNO game UI. Layout (top → bottom):
- *   1. Header (title, bet, leave)
- *   2. Opponents row (UnoSeats with hand counts + UNO/challenge badges)
- *   3. Felt table with central piles (UnoTable: discard, draw, direction, +N badge)
- *   4. Action area (turn timer, take-stack / pass / draw context buttons)
- *   5. Player's own fanned hand (UnoHand)
- *   + Floating "¡UNO!" call button when self is in the miss-window
- *   + Color picker overlay when a Wild needs a color
- */
 export default function UnoPage(props: UnoPageProps) {
   const t = useT();
   const me = useAuthStore((s) => s.user);
+  const [present] = useIonToast();
+  const chatRef = useRef(new ChatSocketManager());
+  const [lastMsg, setLastMsg] = useState<ChatMessage | null>(null);
 
   const initGame = useUnoStore((s) => s.initGame);
   const cleanup = useUnoStore((s) => s.cleanup);
@@ -71,6 +86,11 @@ export default function UnoPage(props: UnoPageProps) {
   const lastRoundWinnerUsername = useUnoStore((s) => s.lastRoundWinnerUsername);
   const lastRoundScoreDealt = useUnoStore((s) => s.lastRoundScoreDealt);
   const matchPrize = useUnoStore((s) => s.matchPrize);
+  const chatGreetingOverlay = useUnoStore((s) => s.chatGreetingOverlay);
+  const chatErrorToast = useUnoStore((s) => s.chatErrorToast);
+  const greetings = useUnoStore((s) => s.greetings);
+  const spectatorsCount = useUnoStore((s) => s.spectatorsCount);
+  const statusMessage = useUnoStore((s) => s.statusMessage);
 
   const selectCardForPlay = useUnoStore((s) => s.selectCardForPlay);
   const confirmWildColor = useUnoStore((s) => s.confirmWildColor);
@@ -83,8 +103,8 @@ export default function UnoPage(props: UnoPageProps) {
   const startNextRound = useUnoStore((s) => s.startNextRound);
   const clearToast = useUnoStore((s) => s.clearToast);
   const clearError = useUnoStore((s) => s.clearError);
+  const clearChatErrorToast = useUnoStore((s) => s.clearChatErrorToast);
 
-  // Init / cleanup mirrors the pattern of other game pages — connect on mount, hard-disconnect on unmount.
   useEffect(() => {
     initGame(props.roomId, me?.username ?? '', {
       isSpectator: props.isSpectator,
@@ -93,12 +113,39 @@ export default function UnoPage(props: UnoPageProps) {
       betAmount: props.betAmount,
       isPlayer1: props.isPlayer1,
     });
-    return () => cleanup();
+
+    const chat = chatRef.current;
+    chat.onChatEnvelope = (json) => useUnoStore.getState().handleChatEnvelope(json);
+    chat.onMessage(setLastMsg);
+    chat.connect(props.roomId);
+    (window as unknown as { unoChatSocket?: ChatSocketManager }).unoChatSocket = chat;
+
+    return () => {
+      cleanup();
+      chat.disconnect();
+      delete (window as unknown as { unoChatSocket?: ChatSocketManager }).unoChatSocket;
+    };
   }, [initGame, cleanup, props.roomId, props.isSpectator, props.hasOpponent, props.opponentName, props.betAmount, props.isPlayer1, me?.username]);
+
+  useEffect(() => {
+    if (phase === UnoPhase.PLAY && !props.isSpectator) {
+      useUnoStore.getState().loadGreetings();
+    }
+  }, [phase, props.isSpectator]);
+
+  useEffect(() => {
+    if (!chatErrorToast) return;
+    present({
+      message: chatErrorToast,
+      duration: 2500,
+      position: 'bottom',
+      color: 'warning',
+      onDidDismiss: () => clearChatErrorToast(),
+    });
+  }, [chatErrorToast, present, clearChatErrorToast]);
 
   const canTakeStack = isPlayerTurn && drawStackPending > 0 && !props.isSpectator;
   const canDraw = isPlayerTurn && drawStackPending === 0 && !props.isSpectator;
-  // No legal move + no stack pending → "pass" allowed (server validates, this is a hint).
   const showPass = isPlayerTurn && drawStackPending === 0 && hand.length > 0 && !props.isSpectator;
 
   const colorLabels: Record<UnoColor, string> = useMemo(
@@ -125,25 +172,155 @@ export default function UnoPage(props: UnoPageProps) {
 
   const timerLow = turnTimeLeft > 0 && turnTimeLeft <= 10;
 
+  const waitingBody = statusMessage
+    ? hasKey(statusMessage)
+      ? t(statusMessage)
+      : statusMessage
+    : '';
+
   return (
-    <IonPage>
-      <IonContent fullscreen>
-        <div className="uno-page">
-          {/* Header */}
-          <div className="uno-header">
-            <button className="uno-header__leave" onClick={props.onLeaveRequest} type="button">
-              {t('bs_leave')}
-            </button>
-            <div>
-              <div className="uno-header__title">UNO</div>
-              <div className="uno-header__bet">
-                {props.roomName} · ${props.betAmount}
+    <IonPage style={{ '--background': '#0a1628' }}>
+      <IonHeader>
+        <IonToolbar style={{ '--background': '#0a1628', '--border-color': 'rgba(201,168,76,0.2)' }}>
+          <IonButtons slot="start">
+            <IonButton onClick={props.onLeaveRequest} aria-label={t('bs_leave_room')}>
+              <IonIcon icon={arrowBackOutline} style={{ color: '#c9a84c' }} />
+            </IonButton>
+          </IonButtons>
+          <IonTitle style={{ color: '#fff', fontSize: 16 }}>
+            <span style={{ display: 'block', lineHeight: 1.15 }}>{props.roomName}</span>
+            <span style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#8a9bbf', letterSpacing: 2 }}>
+              UNO
+            </span>
+          </IonTitle>
+          <IonButtons slot="end">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 12 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 28,
+                  padding: '0 6px',
+                  background: 'rgba(201,168,76,0.08)',
+                  border: '1px solid var(--sovereign-border)',
+                  borderRadius: 8,
+                }}
+              >
+                <ConnectionStrengthIndicator />
               </div>
+              <IonText style={{ color: '#c9a84c', fontSize: 14 }}>${props.betAmount}</IonText>
             </div>
-            <div style={{ width: 60 }} />
+          </IonButtons>
+        </IonToolbar>
+
+        {chatGreetingOverlay && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              background: 'rgba(201,168,76,0.95)',
+              color: '#000',
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              textAlign: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            }}
+          >
+            {chatGreetingOverlay.type === 'FromOpponent'
+              ? `${chatGreetingOverlay.from}: ${chatGreetingOverlay.text}`
+              : `${t('you')}: ${chatGreetingOverlay.text}`}
+          </div>
+        )}
+      </IonHeader>
+
+      <IonContent style={{ '--background': '#0a1628' }}>
+        {phase === UnoPhase.WAITING && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0,0,0,0.5)',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 30,
+            }}
+          >
+            <IonCard
+              style={{
+                width: '85%',
+                maxWidth: 340,
+                '--background': '#1a2940',
+                borderRadius: 24,
+                textAlign: 'center',
+                border: '2px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <IonCardContent style={{ padding: '32px 24px' }}>
+                <IonText
+                  style={{
+                    color: '#fff',
+                    fontSize: 20,
+                    fontWeight: 800,
+                    display: 'block',
+                    marginBottom: 16,
+                    letterSpacing: 2,
+                  }}
+                >
+                  {t('bs_waiting_title').toUpperCase()}
+                </IonText>
+                <IonSpinner name="crescent" style={{ color: '#c9a84c', marginBottom: 24, width: 48, height: 48 }} />
+                <IonText
+                  style={{
+                    color: '#8a9bbf',
+                    fontSize: 15,
+                    display: 'block',
+                    marginBottom: 32,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {waitingBody}
+                </IonText>
+                <IonButton
+                  expand="block"
+                  onClick={props.onLeaveRequest}
+                  style={{
+                    '--background': 'transparent',
+                    '--color': '#8a9bbf',
+                    '--border-radius': '12px',
+                    border: '1px solid rgba(138,155,191,0.3)',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {t('bs_leave_room')}
+                </IonButton>
+              </IonCardContent>
+            </IonCard>
+          </div>
+        )}
+
+        <div className="uno-page">
+          <div className="uno-chat-strip">
+            {props.isSpectator && <SpectatorBadge count={spectatorsCount} />}
+            {phase === UnoPhase.PLAY && !props.isSpectator && greetings.length > 0 && (
+              <ChatGreetingChips
+                greetings={greetings}
+                onSend={(id) => useUnoStore.getState().sendGreeting(props.roomId, id)}
+                lastReceivedMessage={lastMsg}
+              />
+            )}
           </div>
 
-          {/* Felt + opponents + table */}
           <div className="uno-table" />
           <UnoSeats
             playerOrder={playerOrder}
@@ -159,7 +336,7 @@ export default function UnoPage(props: UnoPageProps) {
             unoLabel={t('uno_label_uno')}
           />
 
-          <div className="uno-banner">{turnLabel}</div>
+          <div className="uno-banner">{phase !== UnoPhase.WAITING ? turnLabel : ''}</div>
 
           <UnoTable
             topDiscard={topDiscard}
@@ -173,14 +350,12 @@ export default function UnoPage(props: UnoPageProps) {
             discardCountLabel={t('uno_discard_pile')}
           />
 
-          {/* Turn timer */}
           {phase === UnoPhase.PLAY && turnTimeLeft > 0 && (
             <div className={`uno-timer ${timerLow ? 'uno-timer--low' : ''}`} aria-label="turn timer">
               {turnTimeLeft}s
             </div>
           )}
 
-          {/* Action bar (take-stack / pass) */}
           <div className="uno-actions">
             {canTakeStack && (
               <SovereignSecondaryButton onClick={takeDrawStack}>
@@ -192,14 +367,12 @@ export default function UnoPage(props: UnoPageProps) {
             )}
           </div>
 
-          {/* Big "¡UNO!" call button — visible only when YOU forgot UNO */}
           {showCallUnoBtn && (
             <button className="uno-call-btn" type="button" onClick={callUno} aria-label={t('uno_call_button')}>
               ¡UNO!
             </button>
           )}
 
-          {/* Player hand */}
           {!props.isSpectator && (
             <UnoHand
               hand={hand}
@@ -211,7 +384,6 @@ export default function UnoPage(props: UnoPageProps) {
             />
           )}
 
-          {/* Color picker for Wild plays */}
           <UnoColorPicker
             open={pendingWildIndex !== null}
             title={t('uno_choose_color')}
@@ -221,7 +393,6 @@ export default function UnoPage(props: UnoPageProps) {
             labels={colorLabels}
           />
 
-          {/* Between-rounds scoreboard */}
           {phase === UnoPhase.BETWEEN_ROUNDS && (
             <UnoScoreboard
               playerOrder={playerOrder}
@@ -246,13 +417,10 @@ export default function UnoPage(props: UnoPageProps) {
             />
           )}
 
-          {/* Match-end modal (replaces the Phase 1 generic alert) */}
           <UnoMatchWinnerModal
             open={phase === UnoPhase.GAME_OVER && !!gameOver && !!matchWinnerId}
             isWinner={!!gameOver?.youWon}
-            winnerUsername={
-              matchWinnerId ? usernames[matchWinnerId] || '' : ''
-            }
+            winnerUsername={matchWinnerId ? usernames[matchWinnerId] || '' : ''}
             prize={matchPrize}
             finalScores={matchScores}
             usernames={usernames}
@@ -265,16 +433,16 @@ export default function UnoPage(props: UnoPageProps) {
             onClose={props.onLeaveRequest}
           />
 
-          {/* Generic alert for non-match game-over (e.g. draws / forfeit) */}
           <IonAlert
             isOpen={phase === UnoPhase.GAME_OVER && !!gameOver && !matchWinnerId}
             backdropDismiss={false}
             header={gameOver?.youWon ? t('bs_you_won') : gameOver?.isDraw ? t('bs_draw') : t('bs_you_lost')}
-            message={gameOver?.reason ? t(gameOver.reason) : ''}
+            message={
+              gameOver?.reason ? formatApiMessageForDisplay(gameOver.reason, '') : ''
+            }
             buttons={[{ text: t('ok'), handler: () => props.onLeaveRequest() }]}
           />
 
-          {/* Toasts */}
           <IonToast
             isOpen={!!toast}
             message={toast || ''}
@@ -284,7 +452,7 @@ export default function UnoPage(props: UnoPageProps) {
           />
           <IonToast
             isOpen={!!apiErrorRawMessage}
-            message={apiErrorRawMessage || ''}
+            message={formatApiMessageForDisplay(apiErrorRawMessage, '')}
             duration={2500}
             color="danger"
             onDidDismiss={clearError}

@@ -128,11 +128,16 @@ export interface RechargeRequest {
   coin: string;
 }
 
-// POST /api/user/register-wallet — Android: { wallet, coin, network }
-export interface RegisterWalletRequest {
+// POST /api/user/request-wallet-change — { wallet, coin, network }; OTP emailed.
+export interface RequestWalletChangePayload {
   wallet: string;
   coin: string;
   network: string;
+}
+
+// POST /api/user/confirm-wallet-change
+export interface ConfirmWalletChangeRequest {
+  verification_code: string;
 }
 
 // ─── Wallets ───────────────────────────────────────────────────────────────────

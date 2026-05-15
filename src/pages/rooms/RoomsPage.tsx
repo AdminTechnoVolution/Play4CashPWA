@@ -103,8 +103,8 @@ const RoomsPage: React.FC = () => {
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [spectatingId, setSpectatingId] = useState<string | null>(null);
 
-  /** Matches PlayPage routing: chess / halma / domino use upfront stake; naval-battle uses ship-placement flow. */
-  const showJoinStakeConfirm = ['chess', 'halma', 'domino'].includes(
+  /** Matches PlayPage routing: upfront stake + join confirm for chess / halma / domino / uno. */
+  const showJoinStakeConfirm = ['chess', 'halma', 'domino', 'uno'].includes(
     (gameSocketCode || '').toLowerCase(),
   );
   const [joinConfirmRoom, setJoinConfirmRoom] = useState<{
@@ -711,7 +711,7 @@ const RoomsPage: React.FC = () => {
                 </div>
               )}
 
-              {['chess', 'halma', 'domino'].includes(gameSocketCode) && (
+              {['chess', 'halma', 'domino', 'uno'].includes(gameSocketCode) && (
                 <div style={{
                   background: 'rgba(255,107,53,0.10)',
                   border: '1px solid rgba(255,107,53,0.30)',
@@ -747,7 +747,7 @@ const RoomsPage: React.FC = () => {
           </IonContent>
         </IonModal>
 
-        {/* Join confirmation (Android JoinConfirmDialog) — chess / halma / domino only */}
+        {/* Join confirmation (Android JoinConfirmDialog) — chess / halma / domino / uno */}
         <IonModal
           isOpen={!!joinConfirmRoom}
           onDidDismiss={() => setJoinConfirmRoom(null)}

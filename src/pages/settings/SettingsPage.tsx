@@ -31,7 +31,7 @@ import {
   saveLanguage,
   getUserAccount,
 } from '../../data/auth/AuthSessionStore';
-import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
+import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
@@ -65,6 +65,8 @@ const SettingsPage: React.FC = () => {
   const [languageExpanded, setLanguageExpanded] = useState(false);
   const [walletsLoading, setWalletsLoading] = useState(true);
   const [walletSaving, setWalletSaving] = useState(false);
+  const [walletOtpPending, setWalletOtpPending] = useState(false);
+  const [walletOtpCode, setWalletOtpCode] = useState('');
   const [error, setError] = useState('');
 
   const [alertOpen, setAlertOpen] = useState(false);
@@ -101,17 +103,43 @@ const SettingsPage: React.FC = () => {
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSaveWallet = async () => {
+  const walletFieldsLocked = walletOtpPending;
+
+  const handleRequestWalletCode = async () => {
     if (!walletAddress.trim()) return;
     setWalletSaving(true);
     try {
       const network = selectedWallet?.network ?? 'TRX Tron(TRC20)';
-      await apiRepository.registerWallet({
+      await apiRepository.requestWalletChange({
         wallet: walletAddress.trim(),
         coin: 'USDT',
         network,
       });
+      setWalletOtpPending(true);
+      setWalletOtpCode('');
+      setAlertMessage(t('wallet_otp_email_notice'));
+      setAlertOpen(true);
+    } catch (err) {
+      const msg = formatApiMessageForDisplay(
+        err instanceof Error ? err.message : null,
+        'error_try_later_message',
+      );
+      setAlertMessage(msg);
+      setAlertOpen(true);
+    } finally {
+      setWalletSaving(false);
+    }
+  };
+
+  const handleConfirmWallet = async () => {
+    const code = walletOtpCode.replace(/\D/g, '').trim();
+    if (!code) return;
+    setWalletSaving(true);
+    try {
+      await apiRepository.confirmWalletChange({ verification_code: code });
       saveWalletAddress(walletAddress.trim());
+      setWalletOtpPending(false);
+      setWalletOtpCode('');
       setAlertMessage(t('wallet_saved_success'));
       setAlertOpen(true);
     } catch (err) {
@@ -124,6 +152,11 @@ const SettingsPage: React.FC = () => {
     } finally {
       setWalletSaving(false);
     }
+  };
+
+  const handleCancelWalletVerification = () => {
+    setWalletOtpPending(false);
+    setWalletOtpCode('');
   };
 
   const handleSaveLanguage = () => {
@@ -181,7 +214,7 @@ const SettingsPage: React.FC = () => {
                   onIonChange={(e) => setSelectedWalletIndex(e.detail.value)}
                   interface="action-sheet"
                   placeholder="—"
-                  disabled={wallets.length === 0}
+                  disabled={wallets.length === 0 || walletFieldsLocked}
                   style={selectStyle as React.CSSProperties}
                 >
                   {wallets.map((w, i) => (
@@ -199,6 +232,7 @@ const SettingsPage: React.FC = () => {
                 value={walletAddress}
                 onIonInput={(e) => setWalletAddress(e.detail.value ?? '')}
                 placeholder="TRC20, ERC20..."
+                readonly={walletFieldsLocked}
                 style={inputStyle as React.CSSProperties}
               />
             </FieldGroup>
@@ -246,9 +280,64 @@ const SettingsPage: React.FC = () => {
               </IonText>
             </div>
 
-            <SovereignPrimaryButton onClick={handleSaveWallet} loading={walletSaving} expand="block">
-              {t('save_wallet')}
-            </SovereignPrimaryButton>
+            {walletOtpPending && (
+              <FieldGroup label={t('withdrawal_verify_otp_label')}>
+                <IonInput
+                  type="tel"
+                  inputMode="numeric"
+                  value={walletOtpCode}
+                  onIonInput={(e) => setWalletOtpCode((e.detail.value ?? '').replace(/\D/g, ''))}
+                  placeholder="______"
+                  maxlength={8}
+                  style={{
+                    ...inputStyle,
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    letterSpacing: '6px',
+                    textAlign: 'center',
+                  } as React.CSSProperties}
+                />
+              </FieldGroup>
+            )}
+
+            {!walletOtpPending ? (
+              <SovereignPrimaryButton
+                onClick={handleRequestWalletCode}
+                loading={walletSaving}
+                expand="block"
+                disabled={!walletAddress.trim() || walletsLoading || wallets.length === 0}
+              >
+                {t('wallet_send_code')}
+              </SovereignPrimaryButton>
+            ) : (
+              <>
+                <SovereignPrimaryButton
+                  onClick={handleConfirmWallet}
+                  loading={walletSaving}
+                  expand="block"
+                  disabled={!walletOtpCode.trim() || walletSaving}
+                >
+                  {t('wallet_confirm_update')}
+                </SovereignPrimaryButton>
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <SovereignSecondaryButton
+                    onClick={handleRequestWalletCode}
+                    loading={walletSaving}
+                    expand="block"
+                    disabled={walletSaving}
+                  >
+                    {t('wallet_resend_code')}
+                  </SovereignSecondaryButton>
+                  <SovereignSecondaryButton
+                    onClick={handleCancelWalletVerification}
+                    expand="block"
+                    disabled={walletSaving}
+                  >
+                    {t('wallet_cancel_verification')}
+                  </SovereignSecondaryButton>
+                </div>
+              </>
+            )}
           </CollapsibleCard>
 
           {/* ── Language Section ── */}

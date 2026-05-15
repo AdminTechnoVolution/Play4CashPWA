@@ -73,7 +73,52 @@ describe('useAppUpdate', () => {
     });
 
     expect(updateServiceWorker).toHaveBeenCalledWith(true);
-    expect(window.location.reload).toHaveBeenCalled();
+    expect(window.location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('when a waiting worker exists, applyUpdate waits for controllerchange before reload', async () => {
+    const swListeners = new Map<string, EventListener>();
+    const reg = { waiting: {} as ServiceWorker };
+
+    const swMock = {
+      getRegistration: vi.fn().mockResolvedValue(reg as ServiceWorkerRegistration),
+      addEventListener: vi.fn((type: string, listener: EventListener) => {
+        swListeners.set(type, listener);
+      }),
+      removeEventListener: vi.fn(),
+    };
+
+    const prevSw = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      writable: true,
+      value: swMock as unknown as ServiceWorkerContainer,
+    });
+
+    try {
+      const { result } = renderHook(() => useAppUpdate());
+
+      await act(async () => {
+        const p = result.current.applyUpdate();
+        for (let i = 0; i < 15; i++) {
+          if (swListeners.has('controllerchange')) break;
+          await Promise.resolve();
+        }
+        expect(swMock.addEventListener).toHaveBeenCalledWith(
+          'controllerchange',
+          expect.any(Function),
+          expect.objectContaining({ once: true }),
+        );
+        swListeners.get('controllerchange')?.(new Event('controllerchange'));
+        await p;
+      });
+
+      expect(updateServiceWorker).toHaveBeenCalledWith(true);
+      expect(window.location.reload).toHaveBeenCalledTimes(1);
+    } finally {
+      if (prevSw) Object.defineProperty(navigator, 'serviceWorker', prevSw);
+      else Reflect.deleteProperty(navigator, 'serviceWorker');
+    }
   });
 
   it('still reloads when updateServiceWorker rejects', async () => {

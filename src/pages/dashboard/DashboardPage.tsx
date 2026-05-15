@@ -586,60 +586,6 @@ const DashboardPage: React.FC = () => {
               </div>
             )}
 
-            {/* Quick actions */}
-            <div style={{ marginTop: '32px', animation: 'fadeInUp 0.9s ease' }}>
-              <IonText>
-                <h3 style={{ color: 'var(--sovereign-text)', fontSize: '17px', fontWeight: '700', margin: '0 0 14px 0' }}>
-                  {t('dashboard_quick_actions')}
-                </h3>
-              </IonText>
-              <IonList style={{ background: 'transparent', padding: 0 }}>
-                {[
-                  { icon: walletOutline, label: t('dashboard_item_add_funds'), sub: t('dashboard_item_add_funds_subtitle'), path: '/add-funds' },
-                  { icon: arrowDownOutline, label: t('dashboard_item_withdrawal'), sub: t('dashboard_item_withdrawal_subtitle'), path: '/withdrawal' },
-                  { icon: timeOutline, label: t('history_hub_title'), sub: t('history_hub_title'), path: '/history' },
-                  { icon: settingsOutline, label: t('settings_title'), sub: t('settings_title'), path: '/settings' },
-                ].map((item) => (
-                  <IonItem
-                    key={item.path}
-                    button
-                    detail={false}
-                    onClick={() => navigate(item.path)}
-                    style={{
-                      '--background': 'var(--sovereign-surface)',
-                      '--background-hover': 'var(--sovereign-surface-high)',
-                      '--border-color': 'var(--sovereign-border)',
-                      '--inner-border-width': '0',
-                      '--border-radius': '12px',
-                      marginBottom: '8px',
-                      borderRadius: '12px',
-                      border: '1px solid var(--sovereign-border)',
-                    } as React.CSSProperties}
-                  >
-                    <div
-                      slot="start"
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '10px',
-                        background: 'rgba(201,168,76,0.12)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <IonIcon icon={item.icon} style={{ color: 'var(--sovereign-gold)', fontSize: '20px' }} />
-                    </div>
-                    <IonLabel>
-                      <h3 style={{ color: 'var(--sovereign-text)', fontWeight: '600', fontSize: '15px' }}>{item.label}</h3>
-                      <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>{item.sub}</p>
-                    </IonLabel>
-                    <IonIcon icon={chevronForwardOutline} slot="end" style={{ color: 'var(--sovereign-text-muted)', fontSize: '18px' }} />
-                  </IonItem>
-                ))}
-              </IonList>
-            </div>
-
             <div style={{ height: '40px' }} />
           </div>
         </IonContent>

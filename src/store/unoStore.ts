@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { UnoSocketManager } from '../data/network/UnoSocketManager';
 import { apiRepository } from '../data/network/ApiRepository';
-import type { GameOverPayload, UnoCardCode, UnoColor, UnoGamePayload } from '../data/models/ApiModels';
+import type { GameOverPayload, UnoCardCode, UnoColor, UnoGamePayload, GreetingResponse } from '../data/models/ApiModels';
+import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
+import { hasKey, t } from '../i18n/translations';
 
 export enum UnoPhase {
   WAITING = 'WAITING',
@@ -26,6 +28,18 @@ function stopStatusPolling() {
     clearInterval(statusPollTimer);
     statusPollTimer = null;
   }
+}
+
+let chatOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
+let lastGreetingSentAtMs = 0;
+
+function scheduleUnoChatOverlay(set: (partial: Partial<UnoStoreState>) => void, overlay: ChatGreetingOverlay) {
+  if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
+  set({ chatGreetingOverlay: overlay });
+  chatOverlayTimeout = setTimeout(() => {
+    set({ chatGreetingOverlay: null });
+    chatOverlayTimeout = null;
+  }, 3000);
 }
 
 function startStatusPolling(roomId: string, get: () => UnoStore) {
@@ -90,6 +104,11 @@ interface UnoStoreState {
   navigateBack: boolean;
   spectatorsCount: number;
 
+  /** Quick greetings (/chat) — same pattern as chess/domino. */
+  greetings: GreetingResponse[];
+  chatGreetingOverlay: ChatGreetingOverlay | null;
+  chatErrorToast: string | null;
+
   // End of round
   gameOver: GameOverPayload | null;
   statusMessage: string;
@@ -134,6 +153,10 @@ interface UnoStoreActions {
   startNextRound: () => void;
   clearToast: () => void;
   clearError: () => void;
+  handleChatEnvelope: (json: unknown) => void;
+  clearChatErrorToast: () => void;
+  loadGreetings: () => void;
+  sendGreeting: (roomId: string, greetingId: string) => void;
 }
 
 type UnoStore = UnoStoreState & UnoStoreActions;
@@ -175,6 +198,9 @@ const initialState: UnoStoreState = {
   isMovePending: false,
   navigateBack: false,
   spectatorsCount: 0,
+  greetings: [],
+  chatGreetingOverlay: null,
+  chatErrorToast: null,
   gameOver: null,
   statusMessage: 'uno_status_waiting_opponent',
   matchScores: {},
@@ -251,6 +277,10 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
   },
 
   cleanup() {
+    if (chatOverlayTimeout) {
+      clearTimeout(chatOverlayTimeout);
+      chatOverlayTimeout = null;
+    }
     stopStatusPolling();
     stopUnoTurnTimer();
     stopNextRoundCountdown();
@@ -476,5 +506,42 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
   },
   clearError() {
     set({ apiErrorRawMessage: null });
+  },
+
+  handleChatEnvelope(json) {
+    const ev = parseChatEnvelope(json);
+    if (ev.type === 'Incoming') {
+      scheduleUnoChatOverlay(set, { type: 'FromOpponent', from: ev.from, text: ev.text });
+      return;
+    }
+    if (ev.type === 'Sent') {
+      scheduleUnoChatOverlay(set, { type: 'YouSent', text: ev.text });
+      return;
+    }
+    if (ev.type === 'Failure') {
+      const raw = ev.message;
+      const msg = hasKey(raw) ? t(raw) : raw;
+      set({ chatErrorToast: msg });
+      if (ev.refreshGreetings) get().loadGreetings();
+    }
+  },
+
+  clearChatErrorToast: () => set({ chatErrorToast: null }),
+
+  loadGreetings: () => {
+    if (get().isSpectator) return;
+    apiRepository.getGreetings().then((list) => set({ greetings: list })).catch(() => {});
+  },
+
+  sendGreeting: (roomId, greetingId) => {
+    const st = get();
+    if (st.isSpectator || !greetingId?.trim()) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (now - lastGreetingSentAtMs < 5000) return;
+    lastGreetingSentAtMs = now;
+    (window as unknown as { unoChatSocket?: { sendGreeting: (r: string, id: string) => void } }).unoChatSocket?.sendGreeting(
+      roomId,
+      greetingId,
+    );
   },
 }));

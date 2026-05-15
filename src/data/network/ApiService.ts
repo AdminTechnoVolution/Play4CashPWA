@@ -12,7 +12,8 @@ import type {
   RoomStatusResponse,
   CreateRoomRequest,
   BattleshipPlacementRequest,
-  RegisterWalletRequest,
+  RequestWalletChangePayload,
+  ConfirmWalletChangeRequest,
   RechargeRequest,
   WithdrawalRequest,
   VerifyWithdrawalRequest,
@@ -273,10 +274,20 @@ export const apiService = {
   },
 
   // ─── Wallet / Finance ──────────────────────────────────────────────────────
-  // Android: POST /api/user/register-wallet with { wallet, coin, network }
+  // POST /api/user/request-wallet-change then POST /api/user/confirm-wallet-change (OTP by email)
 
-  async registerWallet(req: RegisterWalletRequest): Promise<void> {
-    await apiClient.post<ApiResponse<void>>('/api/user/register-wallet', req);
+  async requestWalletChange(req: RequestWalletChangePayload): Promise<void> {
+    const res = await apiClient.post<ApiResponse<void>>('/api/user/request-wallet-change', req);
+    if (!res.data?.success) {
+      throw new Error(res.data?.messages?.[0] ?? res.data?.message ?? 'error_try_later_message');
+    }
+  },
+
+  async confirmWalletChange(req: ConfirmWalletChangeRequest): Promise<void> {
+    const res = await apiClient.post<ApiResponse<void>>('/api/user/confirm-wallet-change', req);
+    if (!res.data?.success) {
+      throw new Error(res.data?.messages?.[0] ?? res.data?.message ?? 'error_try_later_message');
+    }
   },
 
   // Android: POST /api/transactions/recharge with { txId, amount, coin }
