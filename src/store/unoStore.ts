@@ -313,7 +313,10 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     if (data?.gameEnded || data?.matchEnded) {
       stopUnoTurnTimer();
       stopNextRoundCountdown();
-      const winner = String(data?.winner || '').trim();
+      /** Prefer explicit `winner`; fall back to `matchWinnerId` from synced payloads (some emits omit `winner`). */
+      const winnerFromField = String(data?.winner ?? '').trim();
+      const winnerFromMatch = String(data?.matchWinnerId ?? '').trim();
+      const winner = winnerFromField || winnerFromMatch;
       const myUserId = get().myUserId;
       const youWon = winner === myUserId;
       set({

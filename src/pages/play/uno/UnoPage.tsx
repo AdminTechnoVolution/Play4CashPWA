@@ -159,6 +159,16 @@ export default function UnoPage(props: UnoPageProps) {
   );
 
   const showCallUnoBtn = !props.isSpectator && pendingUnoOffender === myUserId;
+
+  const waitingBody = statusMessage
+    ? hasKey(statusMessage)
+      ? t(statusMessage)
+      : statusMessage
+    : '';
+
+  const bannerFromStatus =
+    statusMessage && (hasKey(statusMessage) ? t(statusMessage) : statusMessage);
+
   const turnLabel =
     phase === UnoPhase.PLAY
       ? isPlayerTurn
@@ -168,15 +178,11 @@ export default function UnoPage(props: UnoPageProps) {
           : ''
       : phase === UnoPhase.WAITING
         ? t('uno_status_waiting_opponent')
-        : '';
+        : phase === UnoPhase.GAME_OVER
+          ? bannerFromStatus || ''
+          : '';
 
   const timerLow = turnTimeLeft > 0 && turnTimeLeft <= 10;
-
-  const waitingBody = statusMessage
-    ? hasKey(statusMessage)
-      ? t(statusMessage)
-      : statusMessage
-    : '';
 
   return (
     <IonPage style={{ '--background': '#0a1628' }}>
