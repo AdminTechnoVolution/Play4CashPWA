@@ -64,14 +64,27 @@ Todo request del SPA carga `X-App-Version: <__APP_VERSION__>`. El API la stashea
 `req.clientAppVersion` (middleware `app-version-headers`). Útil para sampling de logs y
 métricas de adopción de versión.
 
+## CI/CD (GitHub Actions)
+
+En cada ejecución exitosa del workflow `.github/workflows/main_p4c-web.yml` sobre `main`:
+
+1. Se ejecuta `npm version patch --no-git-tag-version` **antes** de `npm run build`.
+2. El artefacto desplegado lleva el nuevo semver en `__APP_VERSION__`.
+3. Se hace commit + push de `package.json` y `package-lock.json` con mensaje que incluye
+   `[skip ci]` para no reencadenar el pipeline.
+
+Si `main` está protegido, la cuenta **github-actions\[bot]** debe poder hacer push a esa rama
+(ruleset / bypass para el actor del workflow).
+
 ## Cómo publicar una versión nueva
 
-1. Bump `package.json#version` (semver real, no solo SHA).
-2. Commit + merge.
+1. Merge a `main` (el pipeline sube el patch automáticamente en cada deploy).
+2. Para un salto **minor/major** antes de mergear, corre localmente
+   `npm run version:bump:minor` o `npm run version:bump:major`, commita y luego el siguiente
+   deploy seguirá incrementando patch desde esa base.
 3. Pipeline corre `npm run build` → `__APP_VERSION__` y `__APP_GIT_SHA__` quedan inyectados.
-4. Deploy del `dist/` al CDN/Static Web App.
-5. (Opcional) Si la versión nueva tiene cambios incompatibles con builds anteriores, setea
-   `PWA_MIN_VERSION=<nueva-version>` en el API antes/durante el deploy. Esto fuerza el modal.
+4. Deploy del `dist/` a Azure Web App.
+5. (Opcional) Si la versión nueva rompe clientes viejos, setea `PWA_MIN_VERSION` en API/Gateway.
 
 ## Forbidden patterns
 

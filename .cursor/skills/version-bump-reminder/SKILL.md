@@ -1,52 +1,49 @@
 ---
 name: version-bump-reminder
-description: At the end of every code change in this PWA repository, remind the user to bump the app version before pushing to GitHub. Use after any modification to files under /Users/darricordoba/Documents/GitHub/Play4CashPWA (source, tests, configs, docs, assets), including refactors, bug fixes, new features, and dependency updates. Trigger whenever the conversation is about to wrap up a PWA edit and before the user might run git push, git commit, or deploy.
+description: After PWA edits, remind about semver when a manual bump matters — CI auto-increments patch on production deploy from main; minor/major still need local bumps before merge.
 ---
 
 # Version Bump Reminder (Play4CashPWA)
 
 ## When to apply
 
-After completing any change to files inside the `Play4CashPWA` repository, append a reminder block to the final assistant message **before** the user is likely to push to GitHub or deploy to Azure App Service. Apply even when the change is small (typo, single-line edit, CSS tweak).
+After completing substantive changes inside `Play4CashPWA`, append the reminder block below **when** the user is likely to care about semver before the next production deploy — for example breaking UX/API assumptions, coordinated releases with `PWA_MIN_VERSION`, or shipping a **minor/major** jump.
 
 Do **not** apply when:
-- The change is purely in `Play4CashApi` or `Play4CashGateway` (different repos, different version policy).
+
+- The change is purely in `Play4CashApi` or `Play4CashGateway`.
 - The user is only asking questions / reading code without editing the PWA.
-- The user has already run a `version:bump` command in the same turn.
+- The user already ran the appropriate `version:bump:*` in the same turn.
+
+**Routine merges to `main`:** do **not** insist on a manual **patch** bump — the GitHub Actions workflow runs `npm version patch --no-git-tag-version` before `npm run build` and pushes `[skip ci]` so each Azure deploy gets a fresh patch.
 
 ## What to output
 
-Append exactly this block to the end of the final assistant message that wraps up a PWA change. Keep it verbatim so the cadence is recognizable across sessions:
+Append exactly this block when the reminder applies (no nested fences):
 
 ```
 ---
 
-**Reminder — before pushing to GitHub, bump the PWA version:**
+**Versión del PWA**
 
-```bash
-npm run version:bump:patch   # 1.0.1 → 1.0.2
-npm run version:bump:minor   # 1.0.1 → 1.1.0
-npm run version:bump:major   # 1.0.1 → 2.0.0
-```
-
-Then commit `package.json` + `package-lock.json` and push.
+- Cada deploy desde `main` sube el **patch** automáticamente en CI (`main_p4c-web.yml`).
+- Para **minor** o **major** antes del merge, en la repo: `npm run version:bump:minor` o `npm run version:bump:major`, luego commit de `package.json` + `package-lock.json`.
 ```
 
 ## Rationale (context for the agent)
 
-- The PWA build reads `package.json.version` at build time via `vite.config.ts` and injects it as `__APP_VERSION__` / `__APP_FULL_VERSION__` for the menu footer label and version-gate handshake.
-- The GitHub Actions workflow (`.github/workflows/main_p4c-web.yml`) does **not** auto-bump the version. Without a manual bump, two consecutive deploys can ship with the same semver, making it harder to correlate user-reported issues with a specific release.
-- The git SHA still distinguishes builds visually (`v1.0.1+abc1234`), but the semver is what `PWA_MIN_VERSION` on the API / Gateway compares against for forced updates.
+- `vite.config.ts` injects `package.json.version` as `__APP_VERSION__` / `__APP_FULL_VERSION__`.
+- CI bumps **patch** per successful deploy on `main`, then commits `package.json` + `package-lock.json` with `[skip ci]` (needs branch-rule allowance for `github-actions[bot]` if `main` is protected).
+- `PWA_MIN_VERSION` on API/Gateway compares against that semver; git SHA still appears as `+<sha>` in the UI.
 
 ## Examples
 
 **Triggers the reminder:**
-- "Fix the typo in DashboardPage"
-- "Add a new icon to the side menu"
-- "Update package.json to add a dependency"
-- "Bump the i18n labels for the new screen"
 
-**Does NOT trigger the reminder:**
-- "Explain how the auth refresh works"
-- "Add a new field to the API user schema" (different repo)
-- The user already ran `npm run version:bump:patch` earlier in this conversation
+- Breaking change that should coordinate with `PWA_MIN_VERSION`.
+- User asks what version to ship or explicitly wants minor/major.
+
+**Does NOT trigger (routine):**
+
+- Small UI fix merged via PR to `main` — CI handles patch.
+- Explain-only questions.
