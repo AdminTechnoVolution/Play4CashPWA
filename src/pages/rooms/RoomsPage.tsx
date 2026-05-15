@@ -69,6 +69,11 @@ const STATUS_COLORS: Record<RoomStatus, string> = {
   finished: 'var(--sovereign-text-muted)',
 };
 
+/** Create-room modal: Domino seats */
+const DOMINO_CREATE_PLAYER_OPTIONS = [2, 4] as const;
+/** Create-room modal: UNO seats (must match API `UNO_ALLOWED_PLAYER_COUNTS`) */
+const UNO_CREATE_PLAYER_OPTIONS = [2, 4, 6, 8, 10] as const;
+
 const RoomsPage: React.FC = () => {
   const { gameSocketCode = '' } = useParams<{ gameSocketCode: string }>();
   const navigate = useNavigate();
@@ -122,7 +127,22 @@ const RoomsPage: React.FC = () => {
       setCreateLimit(2);
       setCreateError('');
     }
-  }, [showCreateDialog, minBetNum]);
+  }, [showCreateDialog, minBetNum, gameSocketCode]);
+
+  const createRoomPlayerOptions =
+    gameSocketCode === 'domino'
+      ? DOMINO_CREATE_PLAYER_OPTIONS
+      : gameSocketCode === 'uno'
+        ? UNO_CREATE_PLAYER_OPTIONS
+        : null;
+
+  useEffect(() => {
+    if (!showCreateDialog || !createRoomPlayerOptions) return;
+    const allowed = createRoomPlayerOptions as readonly number[];
+    if (!allowed.includes(createLimit)) {
+      setCreateLimit(createRoomPlayerOptions[0]);
+    }
+  }, [showCreateDialog, createRoomPlayerOptions, createLimit]);
 
   useEffect(() => {
     if (!gameId || !gameSocketCode) {
@@ -668,8 +688,8 @@ const RoomsPage: React.FC = () => {
                 </IonText>
               </div>
 
-              {/* Player Limit — only Domino supports 2 or 4 players */}
-              {gameSocketCode === 'domino' && (
+              {/* Player limit — Domino (2/4) and UNO (2–10 even); backend validates */}
+              {createRoomPlayerOptions && (
                 <div style={{ marginBottom: '28px' }}>
                   <IonText>
                     <label style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px', letterSpacing: '0.5px' }}>
@@ -689,8 +709,11 @@ const RoomsPage: React.FC = () => {
                       width: '100%',
                     } as React.CSSProperties}
                   >
-                    <IonSelectOption value={2}>{t('domino_player_count_short').replace('%d', '2')}</IonSelectOption>
-                    <IonSelectOption value={4}>{t('domino_player_count_short').replace('%d', '4')}</IonSelectOption>
+                    {createRoomPlayerOptions.map((n) => (
+                      <IonSelectOption key={n} value={n}>
+                        {t('room_player_limit_option').replace('%d', String(n))}
+                      </IonSelectOption>
+                    ))}
                   </IonSelect>
                 </div>
               )}

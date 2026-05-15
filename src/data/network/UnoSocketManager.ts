@@ -16,7 +16,7 @@ const NAMESPACE = '/uno';
  * gateway/auth-refresh wiring is identical.
  *
  * Server emits the `uno` event for every state change (success or failure). Outgoing
- * events: `join`, `play_card`, `draw_card`, `pass_turn`, `take_draw_stack`, `call_uno`,
+ * events: `join`, `play_card`, `draw_one`, `pass`, `take_draw_stack`, `call_uno`,
  * `challenge_uno_miss`.
  */
 export class UnoSocketManager {
@@ -108,11 +108,11 @@ export class UnoSocketManager {
   }
 
   drawCard(roomId: string): void {
-    this.socket?.emit('draw_card', { room_id: roomId });
+    this.socket?.emit('draw_one', { room_id: roomId });
   }
 
   passTurn(roomId: string): void {
-    this.socket?.emit('pass_turn', { room_id: roomId });
+    this.socket?.emit('pass', { room_id: roomId });
   }
 
   takeDrawStack(roomId: string): void {

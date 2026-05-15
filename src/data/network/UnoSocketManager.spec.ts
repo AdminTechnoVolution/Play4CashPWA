@@ -72,13 +72,13 @@ describe('UnoSocketManager', () => {
     });
   });
 
-  it('emits draw_card / pass_turn / take_draw_stack with room_id', () => {
+  it('emits draw_one / pass / take_draw_stack with room_id', () => {
     const mgr = connected();
     mgr.drawCard('r1');
     mgr.passTurn('r1');
     mgr.takeDrawStack('r1');
-    expect(fakeSocket.emit).toHaveBeenCalledWith('draw_card', { room_id: 'r1' });
-    expect(fakeSocket.emit).toHaveBeenCalledWith('pass_turn', { room_id: 'r1' });
+    expect(fakeSocket.emit).toHaveBeenCalledWith('draw_one', { room_id: 'r1' });
+    expect(fakeSocket.emit).toHaveBeenCalledWith('pass', { room_id: 'r1' });
     expect(fakeSocket.emit).toHaveBeenCalledWith('take_draw_stack', { room_id: 'r1' });
   });
 

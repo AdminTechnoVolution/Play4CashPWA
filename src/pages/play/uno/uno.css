@@ -30,6 +30,7 @@
   flex-direction: column;
   gap: 8px;
   pointer-events: auto;
+  min-width: 0;
 }
 
 /* Felt table */
@@ -428,7 +429,7 @@
 }
 .uno-actions > * { pointer-events: auto; }
 
-/* The "¡UNO!" big self-call button — only when you're the offender */
+/* Prominent self-call — enabled whenever you hold exactly one card and have not declared */
 .uno-call-btn {
   position: absolute;
   bottom: 220px;
@@ -447,8 +448,13 @@
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
   animation: uno-pulse 1s ease-in-out infinite;
 }
-.uno-call-btn:hover { transform: translateY(-2px); }
-.uno-call-btn:active { transform: translateY(2px); box-shadow: 0 4px 8px rgba(245, 127, 23, 0.4); }
+.uno-call-btn:hover:not(:disabled) { transform: translateY(-2px); }
+.uno-call-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 4px 8px rgba(245, 127, 23, 0.4); }
+.uno-call-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  animation: none;
+}
 
 /* Top-of-screen banner */
 .uno-banner {

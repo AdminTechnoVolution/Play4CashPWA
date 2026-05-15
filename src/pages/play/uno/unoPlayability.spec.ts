@@ -2,9 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { isCardPlayableClient } from './unoPlayability';
 
 describe('isCardPlayableClient', () => {
-  it('blocks every card when a draw stack is pending', () => {
-    expect(isCardPlayableClient('R5', 'R7', 'R', ['R5', 'W4'], 2)).toBe(false);
-    expect(isCardPlayableClient('W4', 'R7', 'R', ['W4'], 2)).toBe(false);
+  it('with pending stack: +2 only if top discard is +2; W4 stacks after +2 or +4 top', () => {
+    expect(isCardPlayableClient('RDraw2', 'GDraw2', 'R', ['RDraw2'], 4)).toBe(true);
+    expect(isCardPlayableClient('RDraw2', 'W4', 'R', ['RDraw2'], 4)).toBe(false);
+    expect(isCardPlayableClient('W4', 'W4', 'R', ['W4', 'G3'], 8)).toBe(true);
+    expect(isCardPlayableClient('W4', 'RDraw2', 'R', ['W4', 'G3'], 2)).toBe(true);
+    expect(isCardPlayableClient('R5', 'R7', 'R', ['R5', 'RDraw2'], 2)).toBe(false);
+    expect(isCardPlayableClient('W', 'R7', 'R', ['W'], 2)).toBe(false);
+  });
+
+  it('blocks W4 on pending stack when hand has current color', () => {
+    expect(isCardPlayableClient('W4', 'B7', 'B', ['W4', 'B3'], 2)).toBe(false);
   });
 
   it('allows match by current color', () => {
@@ -20,12 +28,12 @@ describe('isCardPlayableClient', () => {
     expect(isCardPlayableClient('GReverse', 'YReverse', 'Y', ['GReverse'], 0)).toBe(true);
   });
 
-  it('always allows plain Wild', () => {
+  it('always allows plain Wild when no stack', () => {
     expect(isCardPlayableClient('W', 'R7', 'R', ['W'], 0)).toBe(true);
     expect(isCardPlayableClient('W', 'R7', 'R', ['W', 'B3'], 0)).toBe(true);
   });
 
-  it('blocks W4 when the player has any card matching the current color', () => {
+  it('blocks W4 when the player has any card matching the current color (no stack)', () => {
     expect(isCardPlayableClient('W4', 'B7', 'B', ['W4', 'B3'], 0)).toBe(false);
   });
 

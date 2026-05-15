@@ -487,7 +487,9 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
 
   callUno() {
     const st = get();
-    if (st.isSpectator || st.pendingUnoOffender !== st.myUserId) return;
+    if (st.isSpectator || st.phase !== UnoPhase.PLAY) return;
+    if (st.hand.length !== 1 || st.unoCalled.includes(st.myUserId)) return;
+    set({ isMovePending: true });
     st.socket?.callUno(st.roomId);
   },
 

@@ -91,6 +91,7 @@ export default function UnoPage(props: UnoPageProps) {
   const greetings = useUnoStore((s) => s.greetings);
   const spectatorsCount = useUnoStore((s) => s.spectatorsCount);
   const statusMessage = useUnoStore((s) => s.statusMessage);
+  const isMovePending = useUnoStore((s) => s.isMovePending);
 
   const selectCardForPlay = useUnoStore((s) => s.selectCardForPlay);
   const confirmWildColor = useUnoStore((s) => s.confirmWildColor);
@@ -158,7 +159,12 @@ export default function UnoPage(props: UnoPageProps) {
     [t],
   );
 
-  const showCallUnoBtn = !props.isSpectator && pendingUnoOffender === myUserId;
+  const showCallUnoBtn =
+    !props.isSpectator &&
+    phase === UnoPhase.PLAY &&
+    pendingWildIndex === null &&
+    hand.length === 1 &&
+    !unoCalled.includes(myUserId);
 
   const waitingBody = statusMessage
     ? hasKey(statusMessage)
@@ -374,8 +380,14 @@ export default function UnoPage(props: UnoPageProps) {
           </div>
 
           {showCallUnoBtn && (
-            <button className="uno-call-btn" type="button" onClick={callUno} aria-label={t('uno_call_button')}>
-              ¡UNO!
+            <button
+              className="uno-call-btn"
+              type="button"
+              onClick={callUno}
+              disabled={isMovePending}
+              aria-label={t('uno_call_button')}
+            >
+              {t('uno_call_button')}
             </button>
           )}
 
@@ -452,9 +464,10 @@ export default function UnoPage(props: UnoPageProps) {
           <IonToast
             isOpen={!!toast}
             message={toast || ''}
-            duration={2000}
+            duration={3500}
             onDidDismiss={clearToast}
             position="top"
+            color="dark"
           />
           <IonToast
             isOpen={!!apiErrorRawMessage}
