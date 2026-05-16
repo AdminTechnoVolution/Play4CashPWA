@@ -915,6 +915,7 @@
   "uno_round_label": "Manche {{round}}",
   "uno_points_label": "Points",
   "uno_target_label": "Objectif",
+  "uno_lobby_match_target": "Objectif du match : {{points}} points",
   "uno_ready_btn": "Je suis prêt",
   "uno_ready_confirmed": "En attente des autres…",
   "uno_next_round_in": "Prochaine manche dans {{seconds}}s",

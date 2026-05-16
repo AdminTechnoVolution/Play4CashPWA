@@ -98,6 +98,9 @@ export const apiService = {
       const he = g.house_edge ?? g.houseEdge;
       const houseEdge =
         typeof he === 'number' && Number.isFinite(he) ? he : undefined;
+      const um = g.unoMatchTarget ?? g.uno_match_target;
+      const unoMatchTarget =
+        typeof um === 'number' && Number.isFinite(um) ? um : undefined;
       return {
         id: g._id ?? g.id ?? '',
         name: g.name ?? '',
@@ -110,6 +113,7 @@ export const apiService = {
         maxPlayers: g.max_players ?? g.maxPlayers ?? 2,
         activeRooms: g.activeRooms ?? g.active_rooms ?? 0,
         houseEdge,
+        unoMatchTarget,
       };
     });
   },

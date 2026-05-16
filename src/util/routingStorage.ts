@@ -11,6 +11,8 @@ export interface PlayContext {
   hasOpponent: boolean;
   isSpectator: boolean;
   isPlayer1: boolean;
+  /** UNO: catalog match target passed from lobby (server state still wins after deal). */
+  unoMatchTarget?: number;
 }
 
 const GAME_CTX_KEY = 'p4c_game_context';

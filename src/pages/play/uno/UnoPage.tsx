@@ -45,6 +45,8 @@ interface UnoPageProps {
   isSpectator: boolean;
   isPlayer1: boolean;
   onLeaveRequest: () => void;
+  /** From lobby catalog; until the first WS payload, shows correct match target in the header. */
+  catalogUnoMatchTarget?: number;
 }
 
 export default function UnoPage(props: UnoPageProps) {
@@ -214,6 +216,11 @@ export default function UnoPage(props: UnoPageProps) {
 
   const timerLow = turnTimeLeft > 0 && turnTimeLeft <= 10;
 
+  const displayMatchTarget =
+    phase === UnoPhase.WAITING && props.catalogUnoMatchTarget != null
+      ? props.catalogUnoMatchTarget
+      : matchTargetScore;
+
   return (
     <IonPage style={{ '--background': '#0a1628' }}>
       <IonHeader>
@@ -227,6 +234,9 @@ export default function UnoPage(props: UnoPageProps) {
             <span style={{ display: 'block', lineHeight: 1.15 }}>{props.roomName}</span>
             <span style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#8a9bbf', letterSpacing: 2 }}>
               UNO
+            </span>
+            <span style={{ display: 'block', fontSize: 10, fontWeight: 600, color: '#6b7a99', marginTop: 2 }}>
+              {t('uno_target_label')}: {displayMatchTarget}
             </span>
           </IonTitle>
           <IonButtons slot="end">

@@ -915,6 +915,7 @@
   "uno_round_label": "Mano {{round}}",
   "uno_points_label": "Punti",
   "uno_target_label": "Obiettivo",
+  "uno_lobby_match_target": "Obiettivo partita: {{points}} punti",
   "uno_ready_btn": "Pronto",
   "uno_ready_confirmed": "In attesa degli altri…",
   "uno_next_round_in": "Prossima mano tra {{seconds}}s",

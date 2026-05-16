@@ -46,6 +46,8 @@ export interface GameResponse {
   activeRooms: number;
   /** Commission (%) in UI. Percentage points (e.g. 5 = 5%). From API `house_edge`. */
   houseEdge?: number;
+  /** UNO: points to win the match (from catalog `uno_match_target` / `unoMatchTarget`). */
+  unoMatchTarget?: number;
 }
 
 // ─── Rooms ─────────────────────────────────────────────────────────────────────

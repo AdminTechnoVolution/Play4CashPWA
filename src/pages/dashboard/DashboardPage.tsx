@@ -237,6 +237,14 @@ const DashboardPage: React.FC = () => {
               <IonIcon icon={timeOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '14px' }} />
               <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>{game.turnTimerSeconds}s</span>
             </div>
+            {game.socketCode === 'uno' && typeof game.unoMatchTarget === 'number' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <IonIcon icon={trophyOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '14px' }} />
+                <span style={{ color: 'var(--sovereign-text)', fontSize: '12px', fontWeight: '600' }}>
+                  {t('uno_lobby_match_target').replace('{{points}}', String(game.unoMatchTarget))}
+                </span>
+              </div>
+            )}
             {formatHouseEdgePercent(game.houseEdge) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>{t('game_commission')}</span>
@@ -635,6 +643,17 @@ const DashboardPage: React.FC = () => {
             </h2>
             <div style={{ lineHeight: '1.6', fontSize: '15px' }}>
               {selectedGame?.description || t('dashboard_no_games_subtitle')}
+
+              {selectedGame?.socketCode === 'uno' && typeof selectedGame?.unoMatchTarget === 'number' && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--sovereign-gold)', marginBottom: '8px' }}>
+                    {t('uno_target_label')}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'var(--sovereign-text)' }}>
+                    {t('uno_lobby_match_target').replace('{{points}}', String(selectedGame.unoMatchTarget))}
+                  </p>
+                </div>
+              )}
 
               {formatHouseEdgePercent(selectedGame?.houseEdge) && (
                 <div style={{ marginTop: '20px' }}>

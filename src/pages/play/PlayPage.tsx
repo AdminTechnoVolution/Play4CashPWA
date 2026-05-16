@@ -159,7 +159,10 @@ export default function PlayPage() {
   // POST /leave calls that race in the API and previously caused the winner to be
   // paid twice. The flag is set BEFORE the await and only cleared after navigation,
   // which is acceptable because we always navigate away on a successful leave.
-  const doLeave = async (silent = false) => {
+  const doLeave = async (
+    silent = false,
+    opts?: { explicitPath?: string },
+  ) => {
     if (!roomId) return;
     if (leavingInFlightRef.current) return;
     leavingInFlightRef.current = true;
@@ -172,6 +175,8 @@ export default function PlayPage() {
         // If the game ended because we left (or just now), show the result alert
         setFinishedStatus(status);
         setShowFinished(true);
+        leavingInFlightRef.current = false;
+        setLeavingInFlight(false);
         return;
       }
     } catch (e) {
@@ -179,9 +184,15 @@ export default function PlayPage() {
       // Reset the flag on failure so the user can retry — they're still on the page.
       leavingInFlightRef.current = false;
       setLeavingInFlight(false);
+      return;
     }
+    const dest = opts?.explicitPath;
     consumePlayBackTrapThenNavigate(() => {
-      navigate(-1);
+      if (dest) {
+        navigate(dest, { replace: true });
+      } else {
+        navigate(-1);
+      }
       scheduleClearPlayContext();
     });
   };
@@ -196,9 +207,11 @@ export default function PlayPage() {
   const handleLeaveRequest = async () => {
     const { gameIsOver, isPastPlacement, opponentConfirmed: liveOpponentConfirmed } = getLeaveContext(gameSocketCode);
 
-    // Rule 1: game already over locally → leave with no warning, and no redundant alert
+    // Rule 1: game already over locally → leave with no warning, and no redundant alert.
+    // Use an explicit rooms route instead of history.back() so we never land on an empty
+    // stack / odd back-trap state after UNO (and other games) dismiss their end modal.
     if (gameIsOver) {
-      await doLeave(true);
+      await doLeave(true, { explicitPath: `/rooms/${encodeURIComponent(gameSocketCode)}` });
       return;
     }
 
@@ -292,6 +305,7 @@ export default function PlayPage() {
     opponentName: opponent,
     hasOpponent,
     isPlayer1,
+    unoMatchTarget: catalogUnoMatchTarget,
   } = playCtx;
 
   const finishedDialogCopy = finishedStatus ? buildFinishedLeaveDialogText(finishedStatus, me, t) : null;
@@ -313,7 +327,9 @@ export default function PlayPage() {
       {gameSocketCode === 'chess'  && <ChessPage  {...gameProps} />}
       {gameSocketCode === 'halma'  && <HalmaPage  {...gameProps} />}
       {gameSocketCode === 'domino' && <DominoPage {...gameProps} />}
-      {gameSocketCode === 'uno'    && <UnoPage    {...gameProps} />}
+      {gameSocketCode === 'uno'    && (
+        <UnoPage {...gameProps} catalogUnoMatchTarget={catalogUnoMatchTarget} />
+      )}
       {!['chess', 'halma', 'domino', 'uno'].includes(gameSocketCode) && <BattleshipPage {...gameProps} />}
 
       {/* Checking server status */}
@@ -379,7 +395,7 @@ export default function PlayPage() {
             text: t('ok'),
             handler: () => {
               setShowFinished(false);
-              void doLeave(true);
+              void doLeave(true, { explicitPath: `/rooms/${encodeURIComponent(gameSocketCode)}` });
             },
           },
         ]}

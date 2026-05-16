@@ -942,6 +942,7 @@
   "uno_round_label": "Ronda {{round}}",
   "uno_points_label": "Puntos",
   "uno_target_label": "Meta",
+  "uno_lobby_match_target": "Objetivo de la partida: {{points}} puntos",
   "uno_ready_btn": "Listo",
   "uno_ready_confirmed": "Esperando al resto…",
   "uno_next_round_in": "Próxima ronda en {{seconds}}s",

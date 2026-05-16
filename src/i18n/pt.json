@@ -915,6 +915,7 @@
   "uno_round_label": "Rodada {{round}}",
   "uno_points_label": "Pontos",
   "uno_target_label": "Meta",
+  "uno_lobby_match_target": "Meta da partida: {{points}} pontos",
   "uno_ready_btn": "Pronto",
   "uno_ready_confirmed": "Aguardando os demais…",
   "uno_next_round_in": "Próxima rodada em {{seconds}}s",

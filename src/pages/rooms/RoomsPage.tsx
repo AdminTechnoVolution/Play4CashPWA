@@ -86,9 +86,19 @@ const RoomsPage: React.FC = () => {
   const decodedGameName = decodeURIComponent(gameName);
 
   // Read balance and minBet from local store — no need to pass through URL
-  const { account, games, refreshAccount } = useDashboardStore();
+  const { account, games, refreshAccount, loadDashboard } = useDashboardStore();
   const userBalanceNum = account?.balance ?? 0;
   const minBetNum = games.find((g) => g.id === gameId)?.minBet ?? 0;
+  const catalogGame = games.find((g) => g.id === gameId);
+  const unoMatchTargetCatalog =
+    gameSocketCode === 'uno' && typeof catalogGame?.unoMatchTarget === 'number'
+      ? catalogGame.unoMatchTarget
+      : undefined;
+
+  const playCtxExtras =
+    gameSocketCode === 'uno' && unoMatchTargetCatalog != null
+      ? { unoMatchTarget: unoMatchTargetCatalog }
+      : {};
 
   const { rooms, isLoading, error, showCreateDialog, loadRooms, createRoom, joinRoom, spectateRoom, setShowCreateDialog, addOrUpdateRoom, updateRoom, removeRoom, clearError } = useRoomsStore();
   const lobbySocketRef = useRef<LobbySocketManager | null>(null);
@@ -97,6 +107,11 @@ const RoomsPage: React.FC = () => {
     refreshAccount();
     if (gameId) loadRooms(gameId);
   }, [gameId]);
+
+  useEffect(() => {
+    if (!gameId || games.length > 0) return;
+    void loadDashboard();
+  }, [gameId, games.length, loadDashboard]);
 
   const [filter, setFilter] = useState<'all' | 'waiting' | 'started'>('all');
   const [createName, setCreateName] = useState('');
@@ -197,6 +212,7 @@ const RoomsPage: React.FC = () => {
         hasOpponent: true,
         isSpectator: false,
         isPlayer1: false,
+        ...playCtxExtras,
       });
       navigate(`/play/${gameSocketCode}`);
     } catch (err) {
@@ -223,6 +239,7 @@ const RoomsPage: React.FC = () => {
         hasOpponent: true,
         isSpectator: true,
         isPlayer1: false,
+        ...playCtxExtras,
       });
       navigate(`/play/${gameSocketCode}`);
     } catch (err) {
@@ -271,6 +288,7 @@ const RoomsPage: React.FC = () => {
         hasOpponent: false,
         isSpectator: false,
         isPlayer1: true,
+        ...playCtxExtras,
       });
       
       setCreateName('');
@@ -324,7 +342,20 @@ const RoomsPage: React.FC = () => {
             <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
           </IonButtons>
           <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '17px' }}>
-            {decodedGameName}
+            <span style={{ display: 'block', lineHeight: 1.15 }}>{decodedGameName}</span>
+            {unoMatchTargetCatalog != null && (
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--sovereign-text-muted)',
+                  marginTop: 2,
+                }}
+              >
+                {t('uno_lobby_match_target').replace('{{points}}', String(unoMatchTargetCatalog))}
+              </span>
+            )}
           </IonTitle>
           <IonButtons slot="end">
             <div
@@ -734,6 +765,24 @@ const RoomsPage: React.FC = () => {
                 </div>
               )}
 
+              {gameSocketCode === 'uno' && unoMatchTargetCatalog != null && (
+                <div
+                  style={{
+                    background: 'rgba(201,168,76,0.10)',
+                    border: '1px solid rgba(201,168,76,0.25)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <IonText>
+                    <p style={{ color: 'var(--sovereign-gold)', fontSize: '13px', margin: 0, lineHeight: 1.45, fontWeight: 600 }}>
+                      {t('uno_lobby_match_target').replace('{{points}}', String(unoMatchTargetCatalog))}
+                    </p>
+                  </IonText>
+                </div>
+              )}
+
               {['chess', 'halma', 'domino', 'uno'].includes(gameSocketCode) && (
                 <div style={{
                   background: 'rgba(255,107,53,0.10)',
@@ -845,6 +894,21 @@ const RoomsPage: React.FC = () => {
               </IonText>
             )}
             {joinConfirmRoom && joinConfirmRoom.betAmount <= 0 && <div style={{ height: 8 }} />}
+            {gameSocketCode === 'uno' && unoMatchTargetCatalog != null && (
+              <IonText>
+                <p
+                  style={{
+                    color: 'var(--sovereign-text-muted)',
+                    fontSize: 14,
+                    lineHeight: 1.45,
+                    margin: '0 0 14px 0',
+                    fontWeight: 600,
+                  }}
+                >
+                  {t('uno_lobby_match_target').replace('{{points}}', String(unoMatchTargetCatalog))}
+                </p>
+              </IonText>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <SovereignPrimaryButton
                 onClick={() => {
