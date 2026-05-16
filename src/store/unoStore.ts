@@ -78,6 +78,8 @@ interface UnoStoreState {
   // Game state
   hand: UnoCardCode[];
   topDiscard: UnoCardCode | null;
+  /** Discard pile length — increments when a card is played (SFX). */
+  discardCount: number;
   drawPileCount: number;
   currentColor: UnoColor;
   direction: 1 | -1;
@@ -135,8 +137,18 @@ interface UnoStoreActions {
   initGame: (
     roomId: string,
     myUsername: string,
-    opts: { isSpectator?: boolean; hasOpponent?: boolean; initialOpponentName?: string; betAmount?: number; isPlayer1?: boolean },
+    opts: {
+      isSpectator?: boolean;
+      hasOpponent?: boolean;
+      initialOpponentName?: string;
+      betAmount?: number;
+      isPlayer1?: boolean;
+      /** Prefer auth user id — `getCachedUserAccount()` is often null on first paint. */
+      myUserId?: string;
+    },
   ) => void;
+  /** Patch viewer id after auth hydrates (fixes UNO / ready / seats when cache is cold). */
+  syncMyUserId: (userId: string) => void;
   cleanup: () => void;
   handleUnoPayload: (raw: unknown) => void;
   /** Tap a card. If it's a Wild, parks it and opens the color picker. */
@@ -175,6 +187,7 @@ const initialState: UnoStoreState = {
   opponentConfirmed: false,
   hand: [],
   topDiscard: null,
+  discardCount: 0,
   drawPileCount: 0,
   currentColor: 'R',
   direction: 1,
@@ -225,6 +238,21 @@ function stopNextRoundCountdown() {
   }
 }
 
+/** Pull fresh state if the next-round socket broadcast is missed (mobile background, flaky WS). */
+let betweenRoundResyncTimer: ReturnType<typeof setInterval> | null = null;
+function stopBetweenRoundResync() {
+  if (betweenRoundResyncTimer) {
+    clearInterval(betweenRoundResyncTimer);
+    betweenRoundResyncTimer = null;
+  }
+}
+
+function viewerHasUnoDeclared(unoCalled: string[], myUserId: string): boolean {
+  const me = String(myUserId ?? '').trim();
+  if (!me) return false;
+  return unoCalled.some((id) => String(id) === me);
+}
+
 function isWildCode(code: UnoCardCode): boolean {
   return code === 'W' || code === 'W4';
 }
@@ -239,8 +267,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     const initialOpponentName = opts.initialOpponentName ?? '';
     const betAmount = opts.betAmount ?? 0;
     const isPlayer1 = !!opts.isPlayer1;
-    const acc = apiRepository.getCachedUserAccount();
-    const myUserId = acc?.id ?? '';
+    const myUserId = String(opts.myUserId ?? apiRepository.getCachedUserAccount()?.id ?? '').trim();
 
     stopStatusPolling();
     get().socket?.disconnect();
@@ -276,6 +303,12 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     if (!isSpectator) startStatusPolling(roomId, get);
   },
 
+  syncMyUserId(userId) {
+    const id = String(userId ?? '').trim();
+    if (!id) return;
+    set({ myUserId: id });
+  },
+
   cleanup() {
     if (chatOverlayTimeout) {
       clearTimeout(chatOverlayTimeout);
@@ -284,6 +317,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     stopStatusPolling();
     stopUnoTurnTimer();
     stopNextRoundCountdown();
+    stopBetweenRoundResync();
     get().socket?.disconnect();
     set({ ...initialState });
   },
@@ -313,6 +347,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     if (data?.gameEnded || data?.matchEnded) {
       stopUnoTurnTimer();
       stopNextRoundCountdown();
+      stopBetweenRoundResync();
       /** Prefer explicit `winner`; fall back to `matchWinnerId` from synced payloads (some emits omit `winner`). */
       const winnerFromField = String(data?.winner ?? '').trim();
       const winnerFromMatch = String(data?.matchWinnerId ?? '').trim();
@@ -339,9 +374,18 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
       return;
     }
 
-    // Round ended but match continues → BETWEEN_ROUNDS scoreboard
-    if (data?.roundEnded) {
+    // Round ended but match continues → BETWEEN_ROUNDS scoreboard.
+    // Ignore stale `roundEnded` when `roundStarted` is present (next-hand broadcast may merge keys).
+    const showBetweenRoundsScoreboard =
+      !!data?.roundEnded &&
+      !data?.roundStarted &&
+      !data?.gameEnded &&
+      !data?.matchEnded &&
+      (data?.betweenRounds ?? true);
+
+    if (showBetweenRoundsScoreboard) {
       stopUnoTurnTimer();
+      stopBetweenRoundResync();
       const winnerId = String(data?.roundWinnerId || '').trim();
       const winnerName = String(data?.roundWinnerUsername || '').trim();
       const dealt = Number(data?.roundScoreDealt || 0);
@@ -371,14 +415,27 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
         const diffMs = new Date(startsAtIso).getTime() - Date.now();
         const sec = Math.max(0, Math.ceil(diffMs / 1000));
         set({ nextRoundCountdownSec: sec });
-        if (sec === 0) stopNextRoundCountdown();
+        if (sec === 0) {
+          stopNextRoundCountdown();
+          get().socket?.requestSync(get().roomId);
+        }
       };
       updateCountdown();
       nextRoundCountdownInterval = setInterval(updateCountdown, 1000);
+
+      betweenRoundResyncTimer = setInterval(() => {
+        const st = get();
+        if (st.phase !== UnoPhase.BETWEEN_ROUNDS || !st.roomId) {
+          stopBetweenRoundResync();
+          return;
+        }
+        st.socket?.requestSync(st.roomId);
+      }, 4000);
       return;
     }
 
     if (waitingForOpponent) {
+      stopBetweenRoundResync();
       set({ phase: UnoPhase.WAITING, statusMessage: primaryMsg || 'uno_status_waiting_opponent' });
       return;
     }
@@ -388,11 +445,13 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
 
     // PLAY state (also entered when a new round just started — `roundStarted` flag)
     if (data?.roundStarted) stopNextRoundCountdown();
+    stopBetweenRoundResync();
     set({
       phase: UnoPhase.PLAY,
       apiErrorRawMessage: null,
       hand: data?.hand ?? get().hand,
       topDiscard: data?.topDiscard ?? get().topDiscard,
+      discardCount: typeof data?.discardCount === 'number' ? data.discardCount : get().discardCount,
       drawPileCount: data?.drawPileCount ?? get().drawPileCount,
       currentColor: (data?.currentColor as UnoColor) ?? get().currentColor,
       direction: (data?.direction as 1 | -1) ?? get().direction,
@@ -488,7 +547,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
   callUno() {
     const st = get();
     if (st.isSpectator || st.phase !== UnoPhase.PLAY) return;
-    if (st.hand.length !== 1 || st.unoCalled.includes(st.myUserId)) return;
+    if (st.hand.length !== 1 || viewerHasUnoDeclared(st.unoCalled, st.myUserId)) return;
     set({ isMovePending: true });
     st.socket?.callUno(st.roomId);
   },

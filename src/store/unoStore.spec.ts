@@ -6,6 +6,7 @@ vi.mock('../data/network/UnoSocketManager', () => {
     UnoSocketManager: vi.fn().mockImplementation(() => ({
       connect: vi.fn(),
       disconnect: vi.fn(),
+      requestSync: vi.fn(),
       playCard: vi.fn(),
       drawCard: vi.fn(),
       passTurn: vi.fn(),
@@ -94,5 +95,54 @@ describe('useUnoStore — multi-round transitions (Phase 2)', () => {
     } as never);
     useUnoStore.getState().startNextRound();
     expect(stub.startNextRound).toHaveBeenCalledWith('room-x');
+  });
+
+  it('advances to PLAY when roundStarted is set even if roundEnded is still true (stale merge)', () => {
+    useUnoStore.setState({
+      phase: UnoPhase.BETWEEN_ROUNDS,
+      roomId: 'room-x',
+      myUserId: 'u1',
+      hand: [],
+      isSpectator: false,
+      socket: { requestSync: vi.fn() } as unknown as ReturnType<typeof useUnoStore.getState>['socket'],
+    });
+    useUnoStore.getState().handleUnoPayload({
+      success: true,
+      data: {
+        roundEnded: true,
+        roundStarted: true,
+        betweenRounds: false,
+        gameStarted: true,
+        hand: ['R1', 'R2'],
+        yourTurn: true,
+        roundNumber: 2,
+        playerOrder: ['u1', 'u2'],
+        handCount: { u1: 2, u2: 7 },
+        usernames: { u1: 'a', u2: 'b' },
+        matchScores: { u1: 10, u2: 0 },
+        matchTargetScore: 200,
+        matchWinnerId: null,
+        roundHistory: [{ round: 1, winnerId: 'u1', scoreDealt: 35, endedAt: null }],
+        playersReadyForNext: [],
+        currentTurnPlayerId: 'u1',
+        currentTurnUsername: 'a',
+        turnTimerSeconds: 45,
+        drawStackPending: 0,
+        eliminatedPlayers: [],
+        unoCalled: [],
+        pendingUnoOffender: null,
+        topDiscard: 'R5',
+        drawPileCount: 40,
+        currentColor: 'R',
+        direction: 1,
+        currentPlayerIndex: 0,
+        discardCount: 1,
+        waitingForOpponent: false,
+        isSpectator: false,
+      },
+      messages: ['next'],
+    });
+    expect(useUnoStore.getState().phase).toBe(UnoPhase.PLAY);
+    expect(useUnoStore.getState().hand.length).toBe(2);
   });
 });

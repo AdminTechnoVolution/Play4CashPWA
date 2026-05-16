@@ -33,6 +33,7 @@ import SpectatorBadge from '../components/SpectatorBadge';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import { formatApiMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
 import { SovereignSecondaryButton } from '../../../ui/components/SovereignButton';
+import GameSound from '../../../ui/game/GameSound';
 import './uno.css';
 
 interface UnoPageProps {
@@ -59,6 +60,7 @@ export default function UnoPage(props: UnoPageProps) {
   const hand = useUnoStore((s) => s.hand);
   const topDiscard = useUnoStore((s) => s.topDiscard);
   const drawPileCount = useUnoStore((s) => s.drawPileCount);
+  const discardCount = useUnoStore((s) => s.discardCount);
   const currentColor = useUnoStore((s) => s.currentColor);
   const direction = useUnoStore((s) => s.direction);
   const drawStackPending = useUnoStore((s) => s.drawStackPending);
@@ -113,6 +115,7 @@ export default function UnoPage(props: UnoPageProps) {
       initialOpponentName: props.opponentName,
       betAmount: props.betAmount,
       isPlayer1: props.isPlayer1,
+      myUserId: me?.id ?? '',
     });
 
     const chat = chatRef.current;
@@ -127,6 +130,25 @@ export default function UnoPage(props: UnoPageProps) {
       delete (window as unknown as { unoChatSocket?: ChatSocketManager }).unoChatSocket;
     };
   }, [initGame, cleanup, props.roomId, props.isSpectator, props.hasOpponent, props.opponentName, props.betAmount, props.isPlayer1, me?.username]);
+
+  useEffect(() => {
+    if (me?.id) useUnoStore.getState().syncMyUserId(me.id);
+  }, [me?.id]);
+
+  const prevDiscardCountRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (phase !== UnoPhase.PLAY) {
+      prevDiscardCountRef.current = undefined;
+      return;
+    }
+    const dc = discardCount;
+    const prev = prevDiscardCountRef.current;
+    prevDiscardCountRef.current = dc;
+    if (prev === undefined) return;
+    if (dc > prev) {
+      GameSound.unoCardPlay();
+    }
+  }, [phase, discardCount]);
 
   useEffect(() => {
     if (phase === UnoPhase.PLAY && !props.isSpectator) {
@@ -159,12 +181,14 @@ export default function UnoPage(props: UnoPageProps) {
     [t],
   );
 
+  const unoDeclared =
+    myUserId.trim() !== '' && unoCalled.some((id) => String(id) === String(myUserId));
   const showCallUnoBtn =
     !props.isSpectator &&
     phase === UnoPhase.PLAY &&
     pendingWildIndex === null &&
     hand.length === 1 &&
-    !unoCalled.includes(myUserId);
+    !unoDeclared;
 
   const waitingBody = statusMessage
     ? hasKey(statusMessage)

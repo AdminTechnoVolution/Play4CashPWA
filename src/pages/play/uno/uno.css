@@ -204,17 +204,41 @@
   left: 0;
   right: 0;
   height: 180px;
-  display: flex;
+  perspective: 900px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201, 168, 76, 0.45) rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+.uno-hand::-webkit-scrollbar {
+  height: 5px;
+}
+.uno-hand::-webkit-scrollbar-thumb {
+  background: rgba(201, 168, 76, 0.45);
+  border-radius: 4px;
+}
+.uno-hand::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+/* Centers a narrow hand; grows wider than 100% when many cards so only this element scrolls. */
+.uno-hand__scroll {
+  display: inline-flex;
+  min-width: 100%;
   justify-content: center;
   align-items: flex-end;
-  perspective: 900px;
-  pointer-events: none;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 0 10px 2px;
 }
 .uno-hand__inner {
   display: flex;
   align-items: flex-end;
-  pointer-events: auto;
   transform-style: preserve-3d;
+  flex-shrink: 0;
 }
 .uno-hand__slot {
   margin-left: -28px;

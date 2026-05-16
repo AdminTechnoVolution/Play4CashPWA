@@ -145,6 +145,28 @@ function buildBigExplosion(): Float32Array {
   return buf;
 }
 
+function buildCardSlap(): Float32Array {
+  const len = msToSamples(130);
+  const buf = new Float32Array(len);
+  let seed = 0xf157ac;
+  const nextRand = () => {
+    seed ^= seed << 13;
+    seed ^= seed >> 17;
+    seed ^= seed << 5;
+    return (seed & 0xffff) / 0x8000 - 1;
+  };
+  for (let i = 0; i < len; i++) {
+    const t = i / SAMPLE_RATE;
+    const progress = i / len;
+    const env = Math.exp(-18 * progress);
+    const crisp = Math.sin(2 * Math.PI * 380 * t) * Math.exp(-55 * progress);
+    const flap = Math.sin(2 * Math.PI * 900 * t) * Math.exp(-90 * progress) * 0.35;
+    const body = Math.sin(2 * Math.PI * 165 * t) * env * 0.4;
+    buf[i] = (crisp * 0.5 + flap + body + nextRand() * 0.12 * env) * 0.62;
+  }
+  return buf;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /** Short explosion burst — Battleship hit. */
@@ -162,6 +184,11 @@ export function splash(): void {
   playBuffer(buildSplash());
 }
 
+/** Playing card slapped on discard pile — UNO. */
+export function unoCardPlay(): void {
+  playBuffer(buildCardSlap());
+}
+
 /** Soft wooden click — Chess / Halma piece move. */
 export function pieceMove(): void {
   playBuffer(buildClick());
@@ -177,5 +204,13 @@ export function turnTimeoutWarning(): void {
   playBuffer(buildSecurityAlarm());
 }
 
-const GameSound = { explosion, bigExplosion, splash, pieceMove, tilePlace, turnTimeoutWarning };
+const GameSound = {
+  explosion,
+  bigExplosion,
+  splash,
+  pieceMove,
+  tilePlace,
+  unoCardPlay,
+  turnTimeoutWarning,
+};
 export default GameSound;
