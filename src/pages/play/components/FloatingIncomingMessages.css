@@ -1,0 +1,52 @@
+.floating-incoming-messages {
+  position: fixed;
+  left: 50%;
+  bottom: 128px;
+  transform: translateX(-50%);
+  z-index: 24;
+  pointer-events: none;
+  width: min(92vw, 420px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.floating-incoming-messages__line {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #e9c349;
+  text-align: center;
+  text-shadow:
+    0 0 8px rgba(0, 0, 0, 0.95),
+    0 2px 6px rgba(0, 0, 0, 0.85),
+    0 0 20px rgba(201, 168, 76, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  animation: floating-incoming-rise 3.4s ease-out forwards;
+}
+
+@keyframes floating-incoming-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.92);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-72px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-160px) scale(0.98);
+  }
+}

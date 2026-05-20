@@ -31,6 +31,7 @@ import UnoScoreboard from './UnoScoreboard';
 import UnoMatchWinnerModal from './UnoMatchWinnerModal';
 import { hasPlayableCardInHand } from './unoPlayability';
 import ChatGreetingChips from '../components/ChatGreetingChips';
+import FloatingIncomingMessages from '../components/FloatingIncomingMessages';
 import SpectatorBadge from '../components/SpectatorBadge';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import { formatApiMessageForDisplay, formatSocketMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
@@ -57,8 +58,6 @@ export default function UnoPage(props: UnoPageProps) {
   const [present] = useIonToast();
   const chatRef = useRef(new ChatSocketManager());
   const [lastMsg, setLastMsg] = useState<ChatMessage | null>(null);
-  const [incomingGreetingVisible, setIncomingGreetingVisible] = useState(false);
-
   const initGame = useUnoStore((s) => s.initGame);
   const cleanup = useUnoStore((s) => s.cleanup);
   const phase = useUnoStore((s) => s.phase);
@@ -158,15 +157,6 @@ export default function UnoPage(props: UnoPageProps) {
       useUnoStore.getState().loadGreetings();
     }
   }, [phase, props.isSpectator]);
-
-  useEffect(() => {
-    const hasIncoming =
-      chatGreetingOverlay?.type === 'FromOpponent' || Boolean(lastMsg?.text?.trim());
-    if (!hasIncoming) return;
-    setIncomingGreetingVisible(true);
-    const hide = setTimeout(() => setIncomingGreetingVisible(false), 3000);
-    return () => clearTimeout(hide);
-  }, [chatGreetingOverlay, lastMsg]);
 
   useEffect(() => {
     if (!chatErrorToast) return;
@@ -272,6 +262,10 @@ export default function UnoPage(props: UnoPageProps) {
       </IonHeader>
 
       <IonContent style={{ '--background': '#0a1628' }}>
+        <FloatingIncomingMessages
+          message={incomingGreetingMessage}
+          active={phase === UnoPhase.PLAY && !props.isSpectator}
+        />
         {phase === UnoPhase.WAITING && (
           <div
             style={{
@@ -481,19 +475,6 @@ export default function UnoPage(props: UnoPageProps) {
             buttons={[{ text: t('ok'), handler: () => props.onLeaveRequest() }]}
           />
 
-          <IonToast
-            isOpen={
-              incomingGreetingVisible &&
-              !!incomingGreetingMessage &&
-              phase === UnoPhase.PLAY &&
-              !props.isSpectator
-            }
-            message={incomingGreetingMessage}
-            duration={3000}
-            position="bottom"
-            color="warning"
-            onDidDismiss={() => setIncomingGreetingVisible(false)}
-          />
           <IonToast
             isOpen={!!apiErrorRawMessage}
             message={formatSocketMessageForDisplay(apiErrorRawMessage, {
