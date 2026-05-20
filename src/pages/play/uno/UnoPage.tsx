@@ -31,7 +31,7 @@ import UnoMatchWinnerModal from './UnoMatchWinnerModal';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
-import { formatApiMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
+import { formatApiMessageForDisplay, formatSocketMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
 import { SovereignSecondaryButton } from '../../../ui/components/SovereignButton';
 import GameSound from '../../../ui/game/GameSound';
 import './uno.css';
@@ -55,6 +55,7 @@ export default function UnoPage(props: UnoPageProps) {
   const [present] = useIonToast();
   const chatRef = useRef(new ChatSocketManager());
   const [lastMsg, setLastMsg] = useState<ChatMessage | null>(null);
+  const [incomingGreetingVisible, setIncomingGreetingVisible] = useState(false);
 
   const initGame = useUnoStore((s) => s.initGame);
   const cleanup = useUnoStore((s) => s.cleanup);
@@ -74,10 +75,8 @@ export default function UnoPage(props: UnoPageProps) {
   const unoCalled = useUnoStore((s) => s.unoCalled);
   const pendingUnoOffender = useUnoStore((s) => s.pendingUnoOffender);
   const currentTurnPlayerId = useUnoStore((s) => s.currentTurnPlayerId);
-  const currentTurnUsername = useUnoStore((s) => s.currentTurnUsername);
   const turnTimeLeft = useUnoStore((s) => s.turnTimeLeft);
   const pendingWildIndex = useUnoStore((s) => s.pendingWildIndex);
-  const toast = useUnoStore((s) => s.toast);
   const apiErrorRawMessage = useUnoStore((s) => s.apiErrorRawMessage);
   const myUserId = useUnoStore((s) => s.myUserId);
   const gameOver = useUnoStore((s) => s.gameOver);
@@ -89,6 +88,7 @@ export default function UnoPage(props: UnoPageProps) {
   const playersReadyForNext = useUnoStore((s) => s.playersReadyForNext);
   const lastRoundWinnerUsername = useUnoStore((s) => s.lastRoundWinnerUsername);
   const lastRoundScoreDealt = useUnoStore((s) => s.lastRoundScoreDealt);
+  const lastActionUsername = useUnoStore((s) => s.lastActionUsername);
   const matchPrize = useUnoStore((s) => s.matchPrize);
   const chatGreetingOverlay = useUnoStore((s) => s.chatGreetingOverlay);
   const chatErrorToast = useUnoStore((s) => s.chatErrorToast);
@@ -106,7 +106,6 @@ export default function UnoPage(props: UnoPageProps) {
   const callUno = useUnoStore((s) => s.callUno);
   const challengeUnoMiss = useUnoStore((s) => s.challengeUnoMiss);
   const startNextRound = useUnoStore((s) => s.startNextRound);
-  const clearToast = useUnoStore((s) => s.clearToast);
   const clearError = useUnoStore((s) => s.clearError);
   const clearChatErrorToast = useUnoStore((s) => s.clearChatErrorToast);
 
@@ -159,6 +158,15 @@ export default function UnoPage(props: UnoPageProps) {
   }, [phase, props.isSpectator]);
 
   useEffect(() => {
+    const hasIncoming =
+      chatGreetingOverlay?.type === 'FromOpponent' || Boolean(lastMsg?.text?.trim());
+    if (!hasIncoming) return;
+    setIncomingGreetingVisible(true);
+    const hide = setTimeout(() => setIncomingGreetingVisible(false), 3000);
+    return () => clearTimeout(hide);
+  }, [chatGreetingOverlay, lastMsg]);
+
+  useEffect(() => {
     if (!chatErrorToast) return;
     present({
       message: chatErrorToast,
@@ -198,23 +206,17 @@ export default function UnoPage(props: UnoPageProps) {
       : statusMessage
     : '';
 
-  const bannerFromStatus =
-    statusMessage && (hasKey(statusMessage) ? t(statusMessage) : statusMessage);
-
-  const turnLabel =
-    phase === UnoPhase.PLAY
-      ? isPlayerTurn
-        ? t('uno_your_turn')
-        : currentTurnUsername
-          ? t('uno_player_turn').replace('{{username}}', currentTurnUsername)
-          : ''
-      : phase === UnoPhase.WAITING
-        ? t('uno_status_waiting_opponent')
-        : phase === UnoPhase.GAME_OVER
-          ? bannerFromStatus || ''
-          : '';
-
   const timerLow = turnTimeLeft > 0 && turnTimeLeft <= 10;
+
+  const incomingGreetingMessage = useMemo(() => {
+    if (chatGreetingOverlay?.type === 'FromOpponent') {
+      return `${chatGreetingOverlay.from}: ${chatGreetingOverlay.text}`;
+    }
+    const text = lastMsg?.text?.trim();
+    if (!text) return '';
+    const from = (lastMsg?.from ?? '').trim();
+    return from ? `${from}: ${text}` : text;
+  }, [chatGreetingOverlay, lastMsg]);
 
   const displayMatchTarget =
     phase === UnoPhase.WAITING && props.catalogUnoMatchTarget != null
@@ -260,28 +262,6 @@ export default function UnoPage(props: UnoPageProps) {
           </IonButtons>
         </IonToolbar>
 
-        {chatGreetingOverlay && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              zIndex: 10,
-              background: 'rgba(201,168,76,0.95)',
-              color: '#000',
-              padding: '8px 16px',
-              fontSize: 13,
-              fontWeight: 600,
-              textAlign: 'center',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            }}
-          >
-            {chatGreetingOverlay.type === 'FromOpponent'
-              ? `${chatGreetingOverlay.from}: ${chatGreetingOverlay.text}`
-              : `${t('you')}: ${chatGreetingOverlay.text}`}
-          </div>
-        )}
       </IonHeader>
 
       <IonContent style={{ '--background': '#0a1628' }}>
@@ -363,6 +343,7 @@ export default function UnoPage(props: UnoPageProps) {
                 greetings={greetings}
                 onSend={(id) => useUnoStore.getState().sendGreeting(props.roomId, id)}
                 lastReceivedMessage={lastMsg}
+                showIncomingBanner={false}
               />
             )}
           </div>
@@ -381,8 +362,6 @@ export default function UnoPage(props: UnoPageProps) {
             challengeLabel={t('uno_challenge_button')}
             unoLabel={t('uno_label_uno')}
           />
-
-          <div className="uno-banner">{phase !== UnoPhase.WAITING ? turnLabel : ''}</div>
 
           <UnoTable
             topDiscard={topDiscard}
@@ -496,16 +475,26 @@ export default function UnoPage(props: UnoPageProps) {
           />
 
           <IonToast
-            isOpen={!!toast}
-            message={toast || ''}
-            duration={3500}
-            onDidDismiss={clearToast}
-            position="top"
-            color="dark"
+            isOpen={
+              incomingGreetingVisible &&
+              !!incomingGreetingMessage &&
+              phase === UnoPhase.PLAY &&
+              !props.isSpectator
+            }
+            message={incomingGreetingMessage}
+            duration={3000}
+            position="bottom"
+            color="warning"
+            onDidDismiss={() => setIncomingGreetingVisible(false)}
           />
           <IonToast
             isOpen={!!apiErrorRawMessage}
-            message={formatApiMessageForDisplay(apiErrorRawMessage, '')}
+            message={formatSocketMessageForDisplay(apiErrorRawMessage, {
+              roundWinnerUsername: lastRoundWinnerUsername,
+              lastActionUsername,
+              roundNumber,
+              roundScoreDealt: lastRoundScoreDealt,
+            }, '')}
             duration={2500}
             color="danger"
             onDidDismiss={clearError}

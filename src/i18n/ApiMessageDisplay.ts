@@ -42,6 +42,48 @@ const englishApiLiteralToKey: Record<string, string> = {
   [normalizeEnglishApiLiteral("Room already finished")]: "room_finished",
   [normalizeEnglishApiLiteral("Match finished")]: "room_finished",
   [normalizeEnglishApiLiteral("bet_amount must not be less than 1")]: "room_bet_min_error",
+  // UNO — API may still send English prose from older builds
+  [normalizeEnglishApiLiteral("This room is not an UNO game. Connect using the correct game namespace.")]: "ws.uno.wrongGame",
+  [normalizeEnglishApiLiteral("That card cannot be played on the current discard.")]: "ws.uno.noMatch",
+  [normalizeEnglishApiLiteral("You must play a +2 or Wild +4, or take the accumulated draw.")]: "ws.uno.mustRespondDrawStack",
+  [normalizeEnglishApiLiteral("You cannot play +2 after a Wild +4 — play Wild +4 or take the draw.")]: "ws.uno.stackDraw2NotAllowed",
+  [normalizeEnglishApiLiteral("You cannot play Wild +4 while you hold a card of the current color.")]: "ws.uno.wild4Illegal",
+  [normalizeEnglishApiLiteral("Choose a color (R, G, B, or Y) when playing a wild card.")]: "ws.uno.chosenColorRequired",
+  [normalizeEnglishApiLiteral("Invalid card index.")]: "ws.uno.invalidCard",
+  [normalizeEnglishApiLiteral("You are eliminated from this hand.")]: "ws.uno.eliminated",
+  [normalizeEnglishApiLiteral("There is no draw stack to take.")]: "ws.uno.noDrawStack",
+  [normalizeEnglishApiLiteral("You must play a +2 or Wild +4 from your hand — you cannot take the stack while you can respond.")]: "ws.uno.mustPlayStackCard",
+  [normalizeEnglishApiLiteral("You cannot draw from the deck while a +2/+4 stack is pending.")]: "ws.uno.cannotDrawStack",
+  [normalizeEnglishApiLiteral("No cards left to draw.")]: "ws.uno.deckEmpty",
+  [normalizeEnglishApiLiteral("Resolve the draw stack before passing.")]: "ws.uno.mustResolveStack",
+  [normalizeEnglishApiLiteral("You have a legal card to play; you cannot pass.")]: "ws.uno.hasLegalPlay",
+  [normalizeEnglishApiLiteral("Game state updated.")]: "ws.uno.stateUpdated",
+  [normalizeEnglishApiLiteral("You must take the pending +2/+4 (stacking is disabled).")]: "ws.uno.mustTakeStack",
+  [normalizeEnglishApiLiteral("You cannot say UNO right now.")]: "ws.uno.callNotAllowed",
+  [normalizeEnglishApiLiteral("You can't challenge: you are not part of this room.")]: "ws.uno.invalidAccuser",
+  [normalizeEnglishApiLiteral("UNO!")]: "ws.uno.youCalledUno",
+  [normalizeEnglishApiLiteral("There is no one to challenge.")]: "ws.uno.challengeFail",
+  // UNO — legacy API responses already translated to Spanish
+  [normalizeEnglishApiLiteral("Esta sala no es de UNO. Conéctate con el namespace del juego correcto.")]: "ws.uno.wrongGame",
+  [normalizeEnglishApiLiteral("Esa carta no se puede jugar sobre el descarte actual.")]: "ws.uno.noMatch",
+  [normalizeEnglishApiLiteral("Debes jugar un +2 o comodín +4, o robar el acumulado.")]: "ws.uno.mustRespondDrawStack",
+  [normalizeEnglishApiLiteral("No puedes jugar +2 después de un +4 — juega un +4 o toma el acumulado.")]: "ws.uno.stackDraw2NotAllowed",
+  [normalizeEnglishApiLiteral("No puedes jugar comodín +4 si tienes una carta del color actual.")]: "ws.uno.wild4Illegal",
+  [normalizeEnglishApiLiteral("Elige un color (R, G, B o Y) al jugar un comodín.")]: "ws.uno.chosenColorRequired",
+  [normalizeEnglishApiLiteral("Índice de carta no válido.")]: "ws.uno.invalidCard",
+  [normalizeEnglishApiLiteral("Has sido eliminado de esta mano.")]: "ws.uno.eliminated",
+  [normalizeEnglishApiLiteral("No hay acumulado para robar.")]: "ws.uno.noDrawStack",
+  [normalizeEnglishApiLiteral("Debes jugar un +2 o comodín +4 de tu mano; no puedes tomar el mazo si puedes responder.")]: "ws.uno.mustPlayStackCard",
+  [normalizeEnglishApiLiteral("No puedes robar del mazo mientras hay acumulado de +2/+4.")]: "ws.uno.cannotDrawStack",
+  [normalizeEnglishApiLiteral("No quedan cartas para robar.")]: "ws.uno.deckEmpty",
+  [normalizeEnglishApiLiteral("Resuelve el acumulado antes de pasar.")]: "ws.uno.mustResolveStack",
+  [normalizeEnglishApiLiteral("Tienes una jugada legal; no puedes pasar.")]: "ws.uno.hasLegalPlay",
+  [normalizeEnglishApiLiteral("Estado del juego actualizado.")]: "ws.uno.stateUpdated",
+  [normalizeEnglishApiLiteral("Debes tomar el acumulado de +2/+4 (no se permite encadenar).")]: "ws.uno.mustTakeStack",
+  [normalizeEnglishApiLiteral("No puedes decir UNO en este momento.")]: "ws.uno.callNotAllowed",
+  [normalizeEnglishApiLiteral("No puedes acusar: no eres parte de la sala.")]: "ws.uno.invalidAccuser",
+  [normalizeEnglishApiLiteral("¡Dijiste UNO!")]: "ws.uno.youCalledUno",
+  [normalizeEnglishApiLiteral("No hay nadie a quien acusar.")]: "ws.uno.challengeFail",
 };
 
 /** Parses minimum bet from API English e.g. `bet_amount must not be less than 5`. */
@@ -207,6 +249,44 @@ export const applyWsMessagePlaceholders = (template: string, data: any): string 
  * - Otherwise → the API text as-is.
  * @param opts.minBet Optional game minimum when the API sends only `room_bet_min_error` or an unparseable line.
  */
+/** Pull WS payload fields into {{username}}, {{score}}, {{round}}, etc. */
+export function socketPlaceholdersFromData(data?: Record<string, unknown> | null): Record<string, string> {
+  if (!data) return {};
+  const uc = data.unoChallenge as Record<string, string> | undefined;
+  return {
+    username: String(
+      data.roundWinnerUsername ??
+        data.unoCallerName ??
+        data.lastActionUsername ??
+        data.username ??
+        '',
+    ).trim(),
+    score: String(data.roundScoreDealt ?? data.lastRoundScoreDealt ?? data.score ?? '').trim(),
+    round: String(data.roundNumber ?? data.round ?? '').trim(),
+    accuser: String(uc?.accuserName ?? data.accuser ?? '').trim(),
+    offender: String(uc?.offenderName ?? data.offender ?? '').trim(),
+  };
+}
+
+/**
+ * Resolves a socket message line (catalog key or legacy English) and applies payload placeholders.
+ */
+export function formatSocketMessageForDisplay(
+  raw: string | null | undefined,
+  data?: Record<string, unknown> | null,
+  emptyFallbackKey: string = 'error_try_later_message',
+  opts?: { minBet?: number },
+): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return emptyFallbackKey ? t(emptyFallbackKey) : '';
+  const key = rawLineToMessageKey(trimmed);
+  if (key && hasKey(key)) {
+    return applyWsMessagePlaceholders(t(key), socketPlaceholdersFromData(data));
+  }
+  const resolved = resolveApiMessageLine(trimmed, opts);
+  return applyWsMessagePlaceholders(resolved, socketPlaceholdersFromData(data));
+}
+
 export function formatApiMessageForDisplay(
   raw: string | null | undefined,
   emptyFallbackKey: string = 'error_try_later_message',

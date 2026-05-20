@@ -6,9 +6,16 @@ interface Props {
   greetings: GreetingResponse[];
   onSend: (greetingId: string) => void;
   lastReceivedMessage: ChatMessage | null;
+  /** When false, only the send chips are shown (incoming banner rendered elsewhere). */
+  showIncomingBanner?: boolean;
 }
 
-export default function ChatGreetingChips({ greetings, onSend, lastReceivedMessage }: Props) {
+export default function ChatGreetingChips({
+  greetings,
+  onSend,
+  lastReceivedMessage,
+  showIncomingBanner = true,
+}: Props) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -36,7 +43,7 @@ export default function ChatGreetingChips({ greetings, onSend, lastReceivedMessa
         boxSizing: 'border-box',
       }}
     >
-      {visible && lastReceivedMessage && (
+      {showIncomingBanner && visible && lastReceivedMessage && (
         <div
           style={{
             background: 'rgba(201,168,76,0.15)',

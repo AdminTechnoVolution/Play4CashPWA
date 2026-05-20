@@ -1,15 +1,20 @@
+import { orderPlayersForTable, getSeatLayout } from './unoSeatLayout';
+
 interface SeatProps {
   playerId: string;
   username: string;
   cardCount: number;
   isCurrentTurn: boolean;
   isEliminated: boolean;
+  isSelf: boolean;
   hasUno: boolean;
   isOffender: boolean;
   canChallenge: boolean;
   onChallenge?: () => void;
   challengeLabel: string;
   unoLabel: string;
+  slotX: number;
+  slotY: number;
 }
 
 function Seat(p: SeatProps) {
@@ -18,9 +23,11 @@ function Seat(p: SeatProps) {
     <div
       className={[
         'uno-seat',
+        p.isSelf ? 'uno-seat--self' : '',
         p.isCurrentTurn ? 'uno-seat--current' : '',
         p.isEliminated ? 'uno-seat--eliminated' : '',
       ].join(' ')}
+      style={{ left: `${p.slotX}%`, top: `${p.slotY}%` }}
     >
       <div className="uno-seat__avatar">{initials}</div>
       <div className="uno-seat__name">{p.username || p.playerId}</div>
@@ -58,30 +65,38 @@ interface UnoSeatsProps {
 }
 
 /**
- * Renders all opponents (the current player is excluded — their hand renders separately
- * via `UnoHand`). Highlights the active turn, marks UNO holders, and exposes a "challenge"
- * pulsing button on any opponent currently in the miss-window.
+ * Renders every seated player around the felt (including the local user).
+ * Positions follow `unoSeatLayout` rules for 2–10 players.
  */
 export default function UnoSeats(p: UnoSeatsProps) {
-  const opponents = p.playerOrder.filter((id) => id !== p.myUserId);
+  const ordered = orderPlayersForTable(p.playerOrder, p.myUserId);
+  const slots = getSeatLayout(ordered.length);
+
   return (
-    <div className="uno-seats" aria-label="opponents">
-      {opponents.map((id) => (
-        <Seat
-          key={id}
-          playerId={id}
-          username={p.usernames[id] || ''}
-          cardCount={p.handCount[id] ?? 0}
-          isCurrentTurn={p.currentTurnPlayerId === id}
-          isEliminated={p.eliminatedPlayers.includes(id)}
-          hasUno={p.unoCalled.includes(id)}
-          isOffender={p.pendingUnoOffender === id}
-          canChallenge={p.pendingUnoOffender === id}
-          onChallenge={() => p.onChallenge(id)}
-          challengeLabel={p.challengeLabel}
-          unoLabel={p.unoLabel}
-        />
-      ))}
+    <div className="uno-seats" aria-label="players">
+      {ordered.map((id, index) => {
+        const slot = slots[index] ?? slots[0];
+        const isSelf = id === p.myUserId;
+        return (
+          <Seat
+            key={id}
+            playerId={id}
+            username={p.usernames[id] || ''}
+            cardCount={p.handCount[id] ?? 0}
+            isCurrentTurn={p.currentTurnPlayerId === id}
+            isEliminated={p.eliminatedPlayers.includes(id)}
+            isSelf={isSelf}
+            hasUno={p.unoCalled.includes(id)}
+            isOffender={p.pendingUnoOffender === id}
+            canChallenge={!isSelf && p.pendingUnoOffender === id}
+            onChallenge={() => p.onChallenge(id)}
+            challengeLabel={p.challengeLabel}
+            unoLabel={p.unoLabel}
+            slotX={slot.x}
+            slotY={slot.y}
+          />
+        );
+      })}
     </div>
   );
 }

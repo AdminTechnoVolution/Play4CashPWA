@@ -17,21 +17,34 @@ const baseProps = {
 };
 
 describe('UnoSeats', () => {
-  it('renders only opponents (excluding self) with their hand counts', () => {
+  it('renders every player including self with hand counts', () => {
     render(<UnoSeats {...baseProps} />);
+    expect(screen.getByText('Me')).toBeTruthy();
     expect(screen.getByText('Alice')).toBeTruthy();
     expect(screen.getByText('Bob')).toBeTruthy();
-    expect(screen.queryByText('Me')).toBeNull();
+    expect(screen.getByText('×5')).toBeTruthy();
     expect(screen.getByText('×1')).toBeTruthy();
     expect(screen.getByText('×4')).toBeTruthy();
   });
 
-  it('shows the UNO badge for any opponent in unoCalled', () => {
+  it('marks the local player seat', () => {
+    const { container } = render(<UnoSeats {...baseProps} />);
+    expect(container.querySelector('.uno-seat--self')).toBeTruthy();
+  });
+
+  it('positions seats around the table ring', () => {
+    const { container } = render(<UnoSeats {...baseProps} />);
+    const seat = container.querySelector('.uno-seat') as HTMLElement;
+    expect(seat.style.left).toBeTruthy();
+    expect(seat.style.top).toBeTruthy();
+  });
+
+  it('shows the UNO badge for any player in unoCalled', () => {
     render(<UnoSeats {...baseProps} unoCalled={['opp1']} />);
     expect(screen.getByText('UNO')).toBeTruthy();
   });
 
-  it('shows the catch button only when an opponent is the pending offender', () => {
+  it('shows the catch button only on an opponent offender seat', () => {
     const onChallenge = vi.fn();
     render(<UnoSeats {...baseProps} pendingUnoOffender="opp1" onChallenge={onChallenge} />);
     const catchBtn = screen.getByRole('button', { name: 'CATCH' });
@@ -44,8 +57,7 @@ describe('UnoSeats', () => {
     expect(screen.queryByRole('button', { name: 'CATCH' })).toBeNull();
   });
 
-  it('does not expose a catch button on the player themselves (always rendered as opponent only)', () => {
-    // Self is filtered before render — even setting pendingUnoOffender to 'me' must not paint a button.
+  it('does not show catch on the local player seat even if they are the offender', () => {
     render(<UnoSeats {...baseProps} pendingUnoOffender="me" />);
     expect(screen.queryByRole('button', { name: 'CATCH' })).toBeNull();
   });

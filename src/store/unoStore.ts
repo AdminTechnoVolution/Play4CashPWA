@@ -350,7 +350,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
         isSpectator: true,
         isPlayerTurn: false,
         turnTimeLeft: 0,
-        toast: primaryMsg,
+        toast: null,
         eliminatedPlayers: data?.eliminatedPlayers ?? get().eliminatedPlayers,
       });
       return;
@@ -416,7 +416,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
         lastRoundWinnerId: winnerId || null,
         lastRoundWinnerUsername: winnerName || null,
         lastRoundScoreDealt: dealt,
-        toast: primaryMsg,
+        toast: null,
       });
       // Start the local countdown ticker.
       stopNextRoundCountdown();
@@ -485,7 +485,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
       lastActionUsername: data?.lastActionUsername ?? null,
       turnTimeLeft: data?.turnTimerSeconds ?? get().turnTimeLeft,
       turnTimerTotal: data?.turnTimerSeconds ?? get().turnTimerTotal,
-      toast: primaryMsg,
+      toast: null,
       opponentConfirmed: get().opponentConfirmed || !!data?.gameStarted,
       matchScores: data?.matchScores ?? get().matchScores,
       roundNumber: data?.roundNumber ?? get().roundNumber,
@@ -595,7 +595,6 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
       return;
     }
     if (ev.type === 'Sent') {
-      scheduleUnoChatOverlay(set, { type: 'YouSent', text: ev.text });
       return;
     }
     if (ev.type === 'Failure') {
