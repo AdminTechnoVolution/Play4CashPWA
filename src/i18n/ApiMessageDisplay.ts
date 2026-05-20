@@ -257,6 +257,7 @@ export function socketPlaceholdersFromData(data?: Record<string, unknown> | null
     username: String(
       data.roundWinnerUsername ??
         data.unoCallerName ??
+        data.opponentName ??
         data.lastActionUsername ??
         data.username ??
         '',

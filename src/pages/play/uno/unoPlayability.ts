@@ -48,3 +48,13 @@ export function isCardPlayableClient(
   if (top.kind === 'number' && m.kind === 'number' && top.glyph === m.glyph) return true;
   return false;
 }
+
+/** True if at least one card in hand can be played (mirrors server `hasLegalPlay` for UI). */
+export function hasPlayableCardInHand(
+  hand: UnoCardCode[],
+  topDiscard: UnoCardCode | null,
+  currentColor: UnoColor,
+  drawStackPending: number,
+): boolean {
+  return hand.some((code) => isCardPlayableClient(code, topDiscard, currentColor, hand, drawStackPending));
+}

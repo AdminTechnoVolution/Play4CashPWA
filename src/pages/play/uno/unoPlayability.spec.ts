@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isCardPlayableClient } from './unoPlayability';
+import { hasPlayableCardInHand, isCardPlayableClient } from './unoPlayability';
 
 describe('isCardPlayableClient', () => {
   it('with pending stack: +2 only if top discard is +2; W4 stacks after +2 or +4 top', () => {
@@ -43,5 +43,15 @@ describe('isCardPlayableClient', () => {
 
   it('rejects mismatch on color and rank', () => {
     expect(isCardPlayableClient('B5', 'R7', 'R', ['B5'], 0)).toBe(false);
+  });
+});
+
+describe('hasPlayableCardInHand', () => {
+  it('returns true when any card is playable', () => {
+    expect(hasPlayableCardInHand(['B5', 'G3'], 'R7', 'B', 0)).toBe(true);
+  });
+
+  it('returns false when no card can be played', () => {
+    expect(hasPlayableCardInHand(['B5', 'G3'], 'R7', 'R', 0)).toBe(false);
   });
 });

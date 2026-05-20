@@ -449,6 +449,23 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
       return;
     }
 
+    const opponentJoined = !!(data as { opponentJoined?: boolean })?.opponentJoined;
+    const joinedName = String((data as { opponentName?: string })?.opponentName ?? '').trim();
+
+    if (opponentJoined) {
+      stopBetweenRoundResync();
+      set({
+        phase: UnoPhase.WAITING,
+        statusMessage: joinedName
+          ? `ws.games.opponentJoined|${joinedName}`
+          : 'ws.games.opponentJoined',
+        opponentConfirmed: true,
+        hasOpponent: true,
+        initialOpponentName: joinedName || get().initialOpponentName,
+      });
+      return;
+    }
+
     if (waitingForOpponent) {
       stopBetweenRoundResync();
       set({ phase: UnoPhase.WAITING, statusMessage: primaryMsg || 'uno_status_waiting_opponent' });

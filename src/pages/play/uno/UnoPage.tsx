@@ -17,7 +17,8 @@ import {
   useIonToast,
 } from '@ionic/react';
 import { arrowBackOutline } from 'ionicons/icons';
-import { useT, hasKey } from '../../../i18n/translations';
+import { useT } from '../../../i18n/translations';
+import { tStatus } from '../../../i18n/ApiMessageDisplay';
 import { useAuthStore } from '../../../store/authStore';
 import { useUnoStore, UnoPhase } from '../../../store/unoStore';
 import type { UnoColor, ChatMessage } from '../../../data/models/ApiModels';
@@ -28,6 +29,7 @@ import UnoSeats from './UnoSeats';
 import UnoColorPicker from './UnoColorPicker';
 import UnoScoreboard from './UnoScoreboard';
 import UnoMatchWinnerModal from './UnoMatchWinnerModal';
+import { hasPlayableCardInHand } from './unoPlayability';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import SpectatorBadge from '../components/SpectatorBadge';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
@@ -179,7 +181,16 @@ export default function UnoPage(props: UnoPageProps) {
 
   const canTakeStack = isPlayerTurn && drawStackPending > 0 && !props.isSpectator;
   const canDraw = isPlayerTurn && drawStackPending === 0 && !props.isSpectator;
-  const showPass = isPlayerTurn && drawStackPending === 0 && hand.length > 0 && !props.isSpectator;
+  const hasPlayableCard = useMemo(
+    () => hasPlayableCardInHand(hand, topDiscard, currentColor, drawStackPending),
+    [hand, topDiscard, currentColor, drawStackPending],
+  );
+  const showPass =
+    isPlayerTurn &&
+    drawStackPending === 0 &&
+    hand.length > 0 &&
+    !hasPlayableCard &&
+    !props.isSpectator;
 
   const colorLabels: Record<UnoColor, string> = useMemo(
     () => ({
@@ -200,11 +211,7 @@ export default function UnoPage(props: UnoPageProps) {
     hand.length === 1 &&
     !unoDeclared;
 
-  const waitingBody = statusMessage
-    ? hasKey(statusMessage)
-      ? t(statusMessage)
-      : statusMessage
-    : '';
+  const waitingBody = tStatus(statusMessage);
 
   const timerLow = turnTimeLeft > 0 && turnTimeLeft <= 10;
 
