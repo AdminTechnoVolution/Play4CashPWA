@@ -362,6 +362,8 @@ export interface UnoGamePayload {
   prize?: number;
 
   gameEnded?: boolean;
+  /** True when the player timed out but the match continues to the next round. */
+  eliminatedFromRound?: boolean;
   winner?: string;
   reason?: string;
   outcome?: string;

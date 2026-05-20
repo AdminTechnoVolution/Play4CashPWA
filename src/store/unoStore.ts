@@ -343,6 +343,19 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     // Opponent left while waiting / match cancelled
     const waitingForOpponent = !!data?.waitingForOpponent;
 
+    // Timed out for this round only — match continues; stay on table as spectator until next deal.
+    if (data?.eliminatedFromRound) {
+      stopUnoTurnTimer();
+      set({
+        isSpectator: true,
+        isPlayerTurn: false,
+        turnTimeLeft: 0,
+        toast: primaryMsg,
+        eliminatedPlayers: data?.eliminatedPlayers ?? get().eliminatedPlayers,
+      });
+      return;
+    }
+
     // Match end (matchEnded true OR Phase 1 fallback gameEnded without round_ended)
     if (data?.gameEnded || data?.matchEnded) {
       stopUnoTurnTimer();
@@ -392,6 +405,8 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
       const startsAt = data?.nextRoundStartsAt || null;
       set({
         phase: UnoPhase.BETWEEN_ROUNDS,
+        isSpectator: typeof data?.isSpectator === 'boolean' ? data.isSpectator : get().isSpectator,
+        eliminatedPlayers: data?.eliminatedPlayers ?? [],
         matchScores: data?.matchScores ?? get().matchScores,
         roundNumber: data?.roundNumber ?? get().roundNumber,
         matchTargetScore: data?.matchTargetScore ?? get().matchTargetScore,
@@ -449,6 +464,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     set({
       phase: UnoPhase.PLAY,
       apiErrorRawMessage: null,
+      isSpectator: typeof data?.isSpectator === 'boolean' ? data.isSpectator : get().isSpectator,
       hand: data?.hand ?? get().hand,
       topDiscard: data?.topDiscard ?? get().topDiscard,
       discardCount: typeof data?.discardCount === 'number' ? data.discardCount : get().discardCount,
