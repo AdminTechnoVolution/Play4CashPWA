@@ -16,6 +16,8 @@ import ChessPage from './chess/ChessPage';
 import DominoPage from './domino/DominoPage';
 import HalmaPage from './halma/HalmaPage';
 import UnoPage from './uno/UnoPage';
+import ConnectFourPage from './connect-four/ConnectFourPage';
+import { useConnectFourStore, ConnectFourPhase } from '../../store/connectFourStore';
 import { getPlayContext, clearPlayContext } from '../../util/routingStorage';
 import { formatUSD } from '../../util/formatCurrency';
 import { useAuthStore } from '../../store/authStore';
@@ -72,6 +74,14 @@ function getLeaveContext(gameSocketCode: string): {
         opponentConfirmed: s.opponentConfirmed,
       };
     }
+    case 'connect-four': {
+      const s = useConnectFourStore.getState();
+      return {
+        gameIsOver: s.phase === ConnectFourPhase.GAME_OVER || !!s.gameOver,
+        isPastPlacement: s.phase === ConnectFourPhase.WAITING || s.phase === ConnectFourPhase.PLAY,
+        opponentConfirmed: s.opponentConfirmed,
+      };
+    }
     default: { // battleship / naval-battle (and any unknown code)
       const s = useBattleshipStore.getState();
       // Same idea as Android: warn once the match is "live" — placement with both players,
@@ -103,6 +113,8 @@ function subscribeActiveGameStore(gameSocketCode: string, onChange: () => void) 
       return useHalmaStore.subscribe(onChange);
     case 'uno':
       return useUnoStore.subscribe(onChange);
+    case 'connect-four':
+      return useConnectFourStore.subscribe(onChange);
     default:
       return useBattleshipStore.subscribe(onChange);
   }
@@ -330,7 +342,10 @@ export default function PlayPage() {
       {gameSocketCode === 'uno'    && (
         <UnoPage {...gameProps} catalogUnoMatchTarget={catalogUnoMatchTarget} />
       )}
-      {!['chess', 'halma', 'domino', 'uno'].includes(gameSocketCode) && <BattleshipPage {...gameProps} />}
+      {gameSocketCode === 'connect-four' && <ConnectFourPage {...gameProps} />}
+      {!['chess', 'halma', 'domino', 'uno', 'connect-four'].includes(gameSocketCode) && (
+        <BattleshipPage {...gameProps} />
+      )}
 
       {/* Checking server status */}
       <IonLoading isOpen={checkingLeave} message="Checking game status…" />
