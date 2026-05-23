@@ -37,6 +37,8 @@ export interface GameResponse {
   id: string;
   name: string;
   description: string;
+  /** Localized bullet rules for catalog / lobby modals. */
+  rules?: string[];
   minBet: number;
   socketCode: string;
   turnTimerSeconds: number;

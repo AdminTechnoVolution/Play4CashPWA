@@ -49,6 +49,7 @@ import { useAuthStore } from '../../store/authStore';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../ui/components/ConnectionStrengthIndicator';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
+import GameRulesModal from '../../ui/components/GameRulesModal';
 import { useT } from '../../i18n/translations';
 import { saveGameContext } from '../../util/routingStorage';
 import { formatUSD } from '../../util/formatCurrency';
@@ -632,60 +633,23 @@ const DashboardPage: React.FC = () => {
         </IonModal>
 
         {/* Rules/Description Modal */}
-        <IonModal
+        <GameRulesModal
           isOpen={showRulesModal}
-          onDidDismiss={() => setShowRulesModal(false)}
-          style={{ '--height': '80%', '--border-radius': '20.dp' } as any}
-        >
-          <div style={{ padding: '24px', background: 'var(--sovereign-surface)', color: 'var(--sovereign-text)', height: '100%', overflowY: 'auto' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--sovereign-gold)', marginBottom: '16px' }}>
-              {selectedGame?.name}
-            </h2>
-            <div style={{ lineHeight: '1.6', fontSize: '15px' }}>
-              {selectedGame?.description || t('dashboard_no_games_subtitle')}
-
-              {selectedGame?.socketCode === 'uno' && typeof selectedGame?.unoMatchTarget === 'number' && (
-                <div style={{ marginTop: '20px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--sovereign-gold)', marginBottom: '8px' }}>
-                    {t('uno_target_label')}
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'var(--sovereign-text)' }}>
-                    {t('uno_lobby_match_target').replace('{{points}}', String(selectedGame.unoMatchTarget))}
-                  </p>
-                </div>
-              )}
-
-              {formatHouseEdgePercent(selectedGame?.houseEdge) && (
-                <div style={{ marginTop: '20px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--sovereign-gold)', marginBottom: '8px' }}>
-                    {t('game_commission')}
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'var(--sovereign-text)' }}>
-                    {formatHouseEdgePercent(selectedGame?.houseEdge)}
-                  </p>
-                </div>
-              )}
-
-              {selectedGame?.defaultBets?.length > 0 && (
-                <div style={{ marginTop: '20px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--sovereign-gold)', marginBottom: '8px' }}>
-                    {t('game_suggested_bets')}
-                  </h3>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {selectedGame.defaultBets.map((bet: number) => (
-                      <span key={bet} style={{ background: 'rgba(201,168,76,0.15)', padding: '4px 10px', borderRadius: '6px', fontSize: '13px', fontWeight: '700', color: 'var(--sovereign-gold)' }}>
-                        ${bet}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <SovereignPrimaryButton expand="block" onClick={() => setShowRulesModal(false)} style={{ marginTop: '32px' }}>
-              {t('ok')}
-            </SovereignPrimaryButton>
-          </div>
-        </IonModal>
+          onDismiss={() => setShowRulesModal(false)}
+          game={
+            selectedGame
+              ? {
+                  name: selectedGame.name,
+                  description: selectedGame.description,
+                  rules: selectedGame.rules,
+                  houseEdge: selectedGame.houseEdge,
+                  defaultBets: selectedGame.defaultBets,
+                  unoMatchTarget: selectedGame.unoMatchTarget,
+                  socketCode: selectedGame.socketCode,
+                }
+              : null
+          }
+        />
       </IonPage>
     </IonSplitPane>
   );
