@@ -22,9 +22,14 @@ export class ConnectFourSocketManager {
   private onConnectedCb?: () => void;
   private onConnectionErrorCb?: (msg: string) => void;
   private onDisconnectedCb?: () => void;
+  private onProxyReconnectedCb?: () => void;
 
   setOnDisconnected(cb: () => void): void {
     this.onDisconnectedCb = cb;
+  }
+
+  setOnProxyReconnected(cb: () => void): void {
+    this.onProxyReconnectedCb = cb;
   }
 
   setOnGamePayload(cb: (raw: unknown) => void): void {
@@ -82,6 +87,10 @@ export class ConnectFourSocketManager {
 
     this.socket.on(EVENT, (payload: unknown) => {
       this.onPayload?.(payload);
+    });
+
+    this.socket.on('proxy_reconnected', () => {
+      this.onProxyReconnectedCb?.();
     });
 
     this.socket.on('connect_error', async (err: Error) => {

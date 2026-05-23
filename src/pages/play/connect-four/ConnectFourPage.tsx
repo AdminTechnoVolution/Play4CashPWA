@@ -27,8 +27,8 @@ import ChatGreetingChips from '../components/ChatGreetingChips';
 import FloatingIncomingMessages from '../components/FloatingIncomingMessages';
 import SpectatorBadge from '../components/SpectatorBadge';
 import { formatIncomingFloatingGreeting } from '../../../util/ChatGreetingModels';
-import { formatApiMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
-import { useT, hasKey } from '../../../i18n/translations';
+import { formatApiMessageForDisplay, tStatus } from '../../../i18n/ApiMessageDisplay';
+import { useT } from '../../../i18n/translations';
 import GameSound from '../../../ui/game/GameSound';
 import { findDropRow } from './connectFourDropAnim';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
@@ -176,9 +176,25 @@ export default function ConnectFourPage({
     }
   }, [store.illegalMoveToast]);
 
-  const statusText = hasKey(store.statusMessage)
-    ? t(store.statusMessage)
-    : store.statusMessage;
+  const statusText = tStatus(store.statusMessage);
+
+  const resolvedOpponentFromNames = (() => {
+    const me = user?.username?.trim();
+    const p1 = store.player1Name.trim();
+    const p2 = store.player2Name.trim();
+    if (p1 && p2 && me) {
+      if (p1 === me) return p2;
+      if (p2 === me) return p1;
+    }
+    return '';
+  })();
+
+  const opponentLabel =
+    (!store.isPlayerTurn && store.turnHolder.trim()) ||
+    store.opponentName.trim() ||
+    resolvedOpponentFromNames ||
+    opponentName.trim() ||
+    t('connect_four_opponent');
 
   const canDrop =
     !isSpectator &&
@@ -221,9 +237,6 @@ export default function ConnectFourPage({
 
   const lastR = store.lastMove?.row;
   const lastC = store.lastMove?.col;
-
-  const opponentLabel =
-    store.opponentName || opponentName || t('connect_four_opponent');
 
   const colorLabel =
     store.yourColor === 'R'
@@ -387,7 +400,7 @@ export default function ConnectFourPage({
               totalSeconds={store.turnTimerTotal}
               isMyTurn={store.isPlayerTurn && !isSpectator}
               onTimeout={() => {}}
-              turnPlayerName={isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
+              turnPlayerName={isSpectator ? (store.spectatorCurrentPlayer || store.turnHolder || undefined) : undefined}
               otherPlayerName={opponentLabel}
               disableLocalTick
               timeoutAlarm={false}
