@@ -39,9 +39,19 @@ function parseBoard(raw: unknown): ConnectFourCell[][] {
 function parseWinningCells(raw: unknown): Array<{ row: number; col: number }> {
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter((c) => c && typeof c === 'object')
-    .map((c) => ({ row: Number((c as any).row), col: Number((c as any).col) }))
-    .filter((c) => Number.isFinite(c.row) && Number.isFinite(c.col));
+    .map((c) => {
+      if (Array.isArray(c) && c.length >= 2) {
+        return { row: Number(c[0]), col: Number(c[1]) };
+      }
+      if (c && typeof c === 'object') {
+        return { row: Number((c as { row?: unknown }).row), col: Number((c as { col?: unknown }).col) };
+      }
+      return null;
+    })
+    .filter(
+      (c): c is { row: number; col: number } =>
+        c !== null && Number.isFinite(c.row) && Number.isFinite(c.col),
+    );
 }
 
 function parseLastMove(raw: unknown): ConnectFourMove | null {
@@ -317,6 +327,8 @@ function handleConnectFourPayload(
       ? envelope.data
       : (json as Record<string, unknown>);
 
+  const success = envelope?.success !== false;
+  const hadMoveInFlight = get().isMovePending;
   const myUserId = get().myUserId;
 
   if (get().isSpectator) {
@@ -327,22 +339,31 @@ function handleConnectFourPayload(
     set({ spectatorsCount: Number(data.spectatorsCount) });
   }
 
-  if (envelope?.success === false && !data) {
+  if (!success && (!data || Object.keys(data).length === 0)) {
     const raw = apiMessagesJoinedOrNull(envelope) || '';
     if (!isInformationalNonBlockingSocketRaw(raw)) {
-      set({ apiErrorRawMessage: raw, illegalMoveToast: raw });
+      set({ apiErrorRawMessage: raw, illegalMoveToast: raw, isMovePending: false });
+    } else {
+      set({ isMovePending: false });
     }
     return;
   }
 
   const msgRaw = apiMessagesJoinedOrNull(envelope);
-  if (msgRaw && envelope?.success === false) {
+  if (!success && hadMoveInFlight) {
+    set({
+      isMovePending: false,
+      illegalMoveToast: msgRaw || undefined,
+    });
+  } else if (hadMoveInFlight) {
+    set({ isMovePending: false });
+  } else if (msgRaw && !success) {
     set({ illegalMoveToast: msgRaw });
   }
 
   const matchCancelled = String(data?.outcome || '') === 'match_cancelled';
   if (matchCancelled) {
-    set({ matchCancelledMessage: t('bs_match_cancelled'), navigateBack: true });
+    set({ matchCancelledMessage: t('bs_match_cancelled'), navigateBack: true, isMovePending: false });
     return;
   }
 
@@ -359,6 +380,7 @@ function handleConnectFourPayload(
       opponentConfirmed: false,
       statusMessage: 'connect_four_status_waiting',
       isPlayerTurn: false,
+      isMovePending: false,
     });
     return;
   }
@@ -392,7 +414,12 @@ function handleConnectFourPayload(
     if (waitingForOpponent) return;
   }
 
-  const gameEnded = !!data?.gameEnded || !!data?.game_ended;
+  const gameEnded =
+    !!data?.gameEnded ||
+    !!data?.game_ended ||
+    String(data?.status || '').toLowerCase() === 'finished' ||
+    (!!(data?.winnerUserId ?? data?.winner_user_id) &&
+      !!String(data?.reason ?? data?.winnerReason ?? data?.winner_reason ?? '').trim());
   const outcomeRaw = String(data?.outcome || '').trim();
   const terminalOutcomes = new Set([
     'win', 'lose', 'timeout_loss', 'opponent_disconnected', 'draw', 'forfeit',
@@ -445,6 +472,7 @@ function handleConnectFourPayload(
       winningCells: parseWinningCells(data.winningCells ?? data.winning_cells),
       lastMove: parseLastMove(data.lastMove ?? data.last_move),
       isPlayerTurn: false,
+      isMovePending: false,
       gameOverIsDraw: isDraw,
       gameOverWinnerDisplayName: winnerDisplay,
       statusMessage: statusMsg,
