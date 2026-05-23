@@ -18,6 +18,20 @@ import {
   parseLobbyJoinedCount,
   parseLobbyRequiredCount,
 } from '../pages/play/domino/dominoGameLogic';
+import {
+  connectFourPlayStatusMessage,
+  connectFourTurnHolderUsername,
+  deriveConnectFourOpponentName,
+  isConnectFourResyncOnlyPayload,
+  payloadIndicatesConnectFourPlay,
+  parseConnectFourMoveRevision,
+  resolveAppliedConnectFourMoveRevision,
+  resolveConnectFourBoard,
+  resolveConnectFourLastMove,
+  resolveConnectFourYourColor,
+  resolveConnectFourYourTurn,
+  shouldApplyConnectFourPlayPayload,
+} from '../pages/play/connect-four/connectFourPayloadLogic';
 
 export enum ConnectFourPhase {
   WAITING = 'WAITING',
@@ -74,6 +88,7 @@ function parseLastMove(raw: unknown): ConnectFourMove | null {
 
 let turnTimer: ReturnType<typeof setInterval> | null = null;
 let statusPollTimer: ReturnType<typeof setInterval> | null = null;
+let playHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let chatOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastGreetingSentAtMs = 0;
 let disconnectConnectFourSocketTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -81,14 +96,6 @@ let movePendingRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 let lobbyWatchdogTimers: ReturnType<typeof setTimeout>[] = [];
 /** Bumped on cleanup/init so stale socket callbacks from a prior room are ignored. */
 let connectFourSocketEpoch = 0;
-
-function findDropRowLocal(board: ConnectFourCell[][], col: number): number {
-  if (col < 0 || col >= COLS) return -1;
-  for (let row = ROWS - 1; row >= 0; row--) {
-    if (!board[row]?.[col]) return row;
-  }
-  return -1;
-}
 
 function teardownConnectFourSocket() {
   connectFourSocketEpoch++;
@@ -163,14 +170,7 @@ function payloadIndicatesPlay(
   phase: ConnectFourPhase,
   hadMoveInFlight: boolean,
 ): boolean {
-  const gameStarted = !!data?.gameStarted || !!data?.game_started;
-  const roomStarted = String(data?.status || '').toLowerCase() === 'started';
-  const hasBoard = data?.board != null;
-  return (
-    gameStarted ||
-    roomStarted ||
-    (hasBoard && (phase === ConnectFourPhase.PLAY || hadMoveInFlight))
-  );
+  return payloadIndicatesConnectFourPlay(data, phase, hadMoveInFlight);
 }
 
 function payloadTargetsCurrentRoom(
@@ -188,6 +188,24 @@ function stopStatusPolling() {
     clearInterval(statusPollTimer);
     statusPollTimer = null;
   }
+}
+
+function stopPlayHeartbeat() {
+  if (playHeartbeatTimer) {
+    clearInterval(playHeartbeatTimer);
+    playHeartbeatTimer = null;
+  }
+}
+
+function startPlayHeartbeat(roomId: string, get: () => ConnectFourStore) {
+  stopPlayHeartbeat();
+  const tick = () => {
+    const st = get();
+    if (st.phase !== ConnectFourPhase.PLAY || st.isSpectator || st.isMovePending) return;
+    const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
+    socket?.requestSync(roomId);
+  };
+  playHeartbeatTimer = setInterval(tick, 12000);
 }
 
 function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
@@ -269,21 +287,7 @@ function syncTurnCountdown(set: (fn: any) => void, get: () => ConnectFourStore) 
 }
 
 function connectFourTurnUsername(data: Record<string, unknown>): string {
-  const cp = Number(data.currentPlayer ?? data.current_player);
-  const p1 = String(data.player1 ?? '').trim();
-  const p2 = String(data.player2 ?? '').trim();
-  if (cp === 1 && p1) return p1;
-  if (cp === 2 && p2) return p2;
-  const turnId = String(data.currentTurnUserId ?? data.current_turn_user_id ?? '').trim();
-  const players = data.players;
-  if (Array.isArray(players)) {
-    for (const p of players) {
-      if (p && typeof p === 'object' && String((p as { userId?: string }).userId) === turnId) {
-        return String((p as { username?: string }).username ?? '').trim();
-      }
-    }
-  }
-  return SpectatorPayload.spectatorTurnHolderUsername(data);
+  return connectFourTurnHolderUsername(data);
 }
 
 function mergeSpectatorConnectFourLabels(
@@ -328,6 +332,7 @@ interface ConnectFourStoreState {
   turnTimeLeft: number;
   turnTimerTotal: number;
   statusMessage: string;
+  turnHolder: string;
   opponentName: string;
   opponentConfirmed: boolean;
   player1Name: string;
@@ -351,6 +356,7 @@ interface ConnectFourStoreState {
   apiErrorRawMessage: string | null;
   illegalMoveToast: string | null;
   isMovePending: boolean;
+  moveRevision: number;
   chatGreetingOverlay: ChatGreetingOverlay | null;
   chatErrorToast: string | null;
   greetings: GreetingResponse[];
@@ -385,29 +391,38 @@ function applyPlayPayload(
   get: () => ConnectFourStore,
 ) {
   stopStatusPolling();
-  const board = parseBoard(data.board);
+  const prior = get();
+  const ext = SpectatorPayload.extractStandardTurnAndNames(data);
+  const p1Name = ext.p1 || String(data.player1 ?? data.player1Name ?? prior.player1Name).trim();
+  const p2Name = ext.p2 || String(data.player2 ?? data.player2Name ?? prior.player2Name).trim();
+  const board = resolveConnectFourBoard(data, prior.board, parseBoard);
   const winningCells = parseWinningCells(data.winningCells ?? data.winning_cells);
-  const lastMove = parseLastMove(data.lastMove ?? data.last_move);
-  const yourTurn = !!data.yourTurn || !!data.your_turn;
-  const spect = get().isSpectator;
+  const lastMove = resolveConnectFourLastMove(data, prior.lastMove, parseLastMove);
+  const yourTurn = resolveConnectFourYourTurn(data, prior.isPlayerTurn);
+  const spect = prior.isSpectator;
   if (spect) mergeSpectatorConnectFourLabels(data, set);
 
-  let yourColor: ConnectFourDisc | null =
-    data.yourColor === 'R' || data.yourColor === 'Y'
-      ? data.yourColor
-      : data.your_color === 'R' || data.your_color === 'Y'
-        ? data.your_color
-        : get().yourColor;
-  if (!yourColor && data.isPlayerOne !== undefined) {
-    yourColor = data.isPlayerOne ? 'R' : 'Y';
-  }
+  const yourColor = resolveConnectFourYourColor(data, prior.yourColor);
+  const turnHolder = connectFourTurnHolderUsername(data);
 
   const timerRaw = data.turnTimerSeconds ?? data.turn_timer_seconds;
-  const timerSeconds = timerRaw != null ? Number(timerRaw) : get().turnTimeLeft;
-  const turnTimeLeft = Number.isFinite(timerSeconds) && timerSeconds > 0 ? timerSeconds : get().turnTimeLeft;
+  const timerSeconds = timerRaw != null ? Number(timerRaw) : prior.turnTimeLeft;
+  const turnTimeLeft =
+    Number.isFinite(timerSeconds) && timerSeconds > 0 ? timerSeconds : prior.turnTimeLeft;
   const turnTimerTotal =
-    get().turnTimerTotal > 0 ? get().turnTimerTotal : turnTimeLeft > 0 ? turnTimeLeft : 30;
+    prior.turnTimerTotal > 0 ? prior.turnTimerTotal : turnTimeLeft > 0 ? turnTimeLeft : 30;
 
+  const opponentName = deriveConnectFourOpponentName(
+    p1Name,
+    p2Name,
+    prior.myUserId,
+    data.players,
+    prior.opponentName,
+  );
+
+  const moveRevision = resolveAppliedConnectFourMoveRevision(data, prior.moveRevision);
+
+  const beforePlay = prior;
   set({
     phase: ConnectFourPhase.PLAY,
     board,
@@ -416,21 +431,38 @@ function applyPlayPayload(
     winningCells,
     lastMove,
     opponentConfirmed: true,
-    player1Name: String(data.player1 ?? data.player1Name ?? get().player1Name),
-    player2Name: String(data.player2 ?? data.player2Name ?? get().player2Name),
+    opponentName,
+    turnHolder,
+    player1Name: p1Name || prior.player1Name,
+    player2Name: p2Name || prior.player2Name,
     turnTimeLeft,
     turnTimerTotal,
     isMovePending: false,
-    spectatorCurrentPlayer: spect ? connectFourTurnUsername(data) : get().spectatorCurrentPlayer,
-    statusMessage: spect
-      ? connectFourSpectatorPlayStatus(data)
-      : yourTurn
-        ? 'connect_four_status_your_turn'
-        : 'connect_four_status_opponent_turn',
+    moveRevision,
+    spectatorCurrentPlayer: spect ? turnHolder || prior.spectatorCurrentPlayer : prior.spectatorCurrentPlayer,
+    statusMessage: connectFourPlayStatusMessage(
+      yourTurn,
+      turnHolder,
+      spect,
+      connectFourSpectatorPlayStatus(data),
+    ),
   });
 
-  syncTurnCountdown(set, get);
+  const afterPlay = get();
+  if (!spect && afterPlay.phase === ConnectFourPhase.PLAY && afterPlay.turnTimeLeft > 0) {
+    const turnChanged =
+      beforePlay.isPlayerTurn !== afterPlay.isPlayerTurn ||
+      beforePlay.turnHolder !== afterPlay.turnHolder;
+    const timerJump = Math.abs(beforePlay.turnTimeLeft - afterPlay.turnTimeLeft) > 2;
+    if (turnChanged || timerJump || turnTimer == null) {
+      syncTurnCountdown(set, get);
+    }
+  } else if (spect) {
+    stopTurnTimer();
+  }
+
   stopLobbyWatchdog();
+  startPlayHeartbeat(get().roomId, get);
 }
 
 function handleConnectFourPayload(
@@ -473,7 +505,16 @@ function handleConnectFourPayload(
   }
 
   const msgRaw = apiMessagesJoinedOrNull(envelope);
-  if (!success && hadMoveInFlight) {
+  const outcomeEarly = String(data?.outcome || '').trim().toLowerCase();
+  const terminalEarly = new Set([
+    'win', 'lose', 'timeout_loss', 'opponent_disconnected', 'draw', 'forfeit',
+  ]);
+  const isTerminalPayload =
+    !!data?.gameEnded ||
+    !!data?.game_ended ||
+    terminalEarly.has(outcomeEarly);
+
+  if (!success && hadMoveInFlight && !isTerminalPayload) {
     set({
       isMovePending: false,
       illegalMoveToast: msgRaw || undefined,
@@ -483,7 +524,7 @@ function handleConnectFourPayload(
   } else if (hadMoveInFlight) {
     set({ isMovePending: false });
     clearMovePendingRecoveryTimer();
-  } else if (msgRaw && !success) {
+  } else if (msgRaw && !success && !isTerminalPayload) {
     set({ illegalMoveToast: msgRaw });
   }
 
@@ -496,7 +537,9 @@ function handleConnectFourPayload(
   const waitingForOpponent = !!data?.waitingForOpponent || !!data?.waiting_for_opponent;
   const opponentJoined = !!data?.opponentJoined || !!data?.opponent_joined;
   const opponentLeft = !!data?.opponentLeft || !!data?.opponent_left;
-  const opponentName = String(data?.opponentName ?? data?.opponent_name ?? '').trim();
+  const opponentName = String(
+    data?.opponentName ?? data?.opponent_name ?? data?.userName ?? data?.user_name ?? '',
+  ).trim();
 
   const gameEnded =
     !!data?.gameEnded ||
@@ -512,6 +555,7 @@ function handleConnectFourPayload(
   if (gameEnded || terminalOutcomes.has(outcomeRaw.toLowerCase())) {
     stopTurnTimer();
     stopStatusPolling();
+    stopPlayHeartbeat();
     stopLobbyWatchdog();
     const spectating = get().isSpectator;
     const reasonNorm = normalizedGameEndReason(data);
@@ -551,11 +595,14 @@ function handleConnectFourPayload(
       disconnectConnectFourSocketTimeout = null;
     }, 3000);
 
+    const priorBoard = get().board;
+    const hasTerminalBoard =
+      Object.prototype.hasOwnProperty.call(data, 'board') && Array.isArray(data.board);
     set({
       phase: ConnectFourPhase.GAME_OVER,
-      board: parseBoard(data.board),
-      winningCells: parseWinningCells(data.winningCells ?? data.winning_cells),
-      lastMove: parseLastMove(data.lastMove ?? data.last_move),
+      board: hasTerminalBoard ? parseBoard(data.board) : priorBoard,
+      winningCells: parseWinningCells(data.winningCells ?? data.winning_cells) || get().winningCells,
+      lastMove: resolveConnectFourLastMove(data, get().lastMove, parseLastMove),
       isPlayerTurn: false,
       isMovePending: false,
       gameOverIsDraw: isDraw,
@@ -563,6 +610,12 @@ function handleConnectFourPayload(
       statusMessage: statusMsg,
       gameOver: SpectatorPayload.resolveStandardGameOver(data, get().myUsername, spectating, 'CONNECT_FOUR'),
     });
+    return;
+  }
+
+  if (isConnectFourResyncOnlyPayload(data)) {
+    stopStatusPolling();
+    (window as any).connectFourSocket?.requestSync(get().roomId);
     return;
   }
 
@@ -579,6 +632,31 @@ function handleConnectFourPayload(
       (window as any).connectFourSocket?.requestSync(get().roomId);
       return;
     }
+
+    const phaseStr = get().phase;
+    if (
+      !shouldApplyConnectFourPlayPayload(
+        data,
+        get().moveRevision,
+        get().board,
+        phaseStr,
+        parseBoard,
+      )
+    ) {
+      if (hadMoveInFlight) {
+        (window as any).connectFourSocket?.requestSync(get().roomId);
+      }
+      return;
+    }
+
+    if (hadMoveInFlight) {
+      const incomingRev = parseConnectFourMoveRevision(data);
+      if (incomingRev != null && incomingRev < get().moveRevision) {
+        (window as any).connectFourSocket?.requestSync(get().roomId);
+        return;
+      }
+    }
+
     applyPlayPayload(data, set, get);
     return;
   }
@@ -586,6 +664,7 @@ function handleConnectFourPayload(
   if (opponentLeft && waitingForOpponent) {
     stopTurnTimer();
     stopStatusPolling();
+    stopPlayHeartbeat();
     stopLobbyWatchdog();
     set({
       phase: ConnectFourPhase.WAITING,
@@ -647,6 +726,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   turnTimeLeft: 0,
   turnTimerTotal: 30,
   statusMessage: 'connect_four_status_waiting',
+  turnHolder: '',
   opponentName: '',
   opponentConfirmed: false,
   player1Name: '',
@@ -670,6 +750,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   apiErrorRawMessage: null,
   illegalMoveToast: null,
   isMovePending: false,
+  moveRevision: 0,
   chatGreetingOverlay: null,
   chatErrorToast: null,
   greetings: [],
@@ -677,6 +758,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   initGame(roomId, myUsername, myUserId, betAmount, hasOpponent, initialOpponentName, isSpectator) {
     stopTurnTimer();
     stopStatusPolling();
+    stopPlayHeartbeat();
     teardownConnectFourSocket();
     const epoch = connectFourSocketEpoch;
 
@@ -687,6 +769,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
       betAmount,
       hasOpponent,
       opponentName: initialOpponentName,
+      turnHolder: '',
       opponentConfirmed: hasOpponent || isSpectator,
       isSpectator,
       navigateBack: false,
@@ -705,6 +788,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
       lastMove: null,
       isPlayerTurn: false,
       isMovePending: false,
+      moveRevision: 0,
       apiErrorRawMessage: null,
       illegalMoveToast: null,
       opponentLeftMessage: null,
@@ -739,6 +823,16 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
       clearMovePendingRecoveryTimer();
     });
     socketManager.setOnConnectionError(() => set({ apiErrorRawMessage: 'bs_connection_error' }));
+    socketManager.setOnProxyReconnected(() => {
+      if (epoch !== connectFourSocketEpoch) return;
+      const phase = get().phase;
+      if (
+        get().roomId === roomId &&
+        (phase === ConnectFourPhase.WAITING || phase === ConnectFourPhase.PLAY)
+      ) {
+        socketManager.requestSync(roomId);
+      }
+    });
     socketManager.connect(roomId);
     (window as any).connectFourSocket = socketManager;
 
@@ -751,6 +845,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   cleanup() {
     stopTurnTimer();
     stopStatusPolling();
+    stopPlayHeartbeat();
     stopLobbyWatchdog();
     if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
     teardownConnectFourSocket();
@@ -771,25 +866,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
     if (s.roomId !== roomId) return;
     const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
     if (!socket?.dropDisc(roomId, col)) return;
-
-    const nextBoard = s.board.map((row) => [...row]);
-    const row = findDropRowLocal(nextBoard, col);
-    if (row >= 0 && s.yourColor) {
-      nextBoard[row][col] = s.yourColor;
-      set({
-        isMovePending: true,
-        board: nextBoard,
-        lastMove: {
-          userId: s.myUserId,
-          row,
-          col,
-          color: s.yourColor,
-          at: new Date().toISOString(),
-        },
-      });
-    } else {
-      set({ isMovePending: true });
-    }
+    set({ isMovePending: true });
     scheduleMovePendingRecovery(get, set);
   },
 
