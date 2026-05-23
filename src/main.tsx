@@ -20,8 +20,9 @@ import '@ionic/react/css/display.css';
 // Sovereign design system
 import './ui/theme/variables.css';
 
-// Google Client ID from env
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
+import { getGoogleClientId } from './config/runtimeEnv';
+
+const GOOGLE_CLIENT_ID = getGoogleClientId();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>

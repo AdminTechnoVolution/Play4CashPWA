@@ -115,10 +115,15 @@ handshake URL because the browser cannot set `Authorization` on a WebSocket upgr
 
 | Variable                  | Notes |
 |---------------------------|-------|
-| `VITE_API_URL`            | Production API origin. Leave empty in dev when using the proxy. |
-| `VITE_GOOGLE_CLIENT_ID`   | OAuth client used at the login screen. |
+| `VITE_API_URL`            | Production API/Gateway origin. Leave empty in dev when using the proxy. On Azure App Service, set as **Application Setting** (runtime); the Node server injects it via `/env-config.js` — no rebuild needed. |
+| `VITE_GOOGLE_CLIENT_ID`   | OAuth client used at the login screen. Same runtime injection on App Service. |
 | `VITE_DEV_PROXY_TARGET`   | Dev-only. When set, Vite proxies `/api` and `/socket.io` to that origin. |
 | `VITE_DEV_PROXY_INSECURE` | Dev-only. `true` to allow self-signed HTTPS targets. |
+
+**Azure App Service (p4c-web / p4c-web-dev):** configure `VITE_API_URL` and
+`VITE_GOOGLE_CLIENT_ID` under Configuration → Application settings. `server.mjs` reads them
+at startup and serves `/env-config.js` with `Cache-Control: no-store`. Startup command:
+`npm start` (included in the deploy package from `npm run build:azure`).
 
 ## 9. PWA versioning contract
 
