@@ -121,9 +121,25 @@ handshake URL because the browser cannot set `Authorization` on a WebSocket upgr
 | `VITE_DEV_PROXY_INSECURE` | Dev-only. `true` to allow self-signed HTTPS targets. |
 
 **Azure App Service (p4c-web / p4c-web-dev):** configure `VITE_API_URL` and
-`VITE_GOOGLE_CLIENT_ID` under Configuration → Application settings. `server.mjs` reads them
-at startup and serves `/env-config.js` with `Cache-Control: no-store`. Startup command:
-`npm start` (included in the deploy package from `npm run build:azure`).
+`VITE_GOOGLE_CLIENT_ID` under Configuration → Application settings.
+
+**Startup command** — replace plain `pm2 serve` (which skips runtime config) with:
+
+```bash
+bash startup.sh
+```
+
+Equivalent one-liner (same behaviour as before + env injection):
+
+```bash
+node /home/site/wwwroot/scripts/generate-runtime-config.mjs /home/site/wwwroot/env-config.js && pm2 serve /home/site/wwwroot --no-daemon --spa
+```
+
+`startup.sh` reads Application Settings, writes `env-config.js`, then runs
+`pm2 serve` on port `$PORT`. Alternative without pm2: `node server.mjs`.
+
+Set `SCM_DO_BUILD_DURING_DEPLOYMENT=false`. Deploy package: `./azure-deploy` (flat
+static files at wwwroot root + `scripts/`).
 
 ## 9. PWA versioning contract
 

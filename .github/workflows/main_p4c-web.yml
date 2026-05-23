@@ -41,6 +41,9 @@ jobs:
         run: npm version patch --no-git-tag-version
 
       - name: Build
+        env:
+          VITE_API_URL: ''
+          VITE_GOOGLE_CLIENT_ID: ''
         run: npm run build:azure
 
       - name: Login to Azure

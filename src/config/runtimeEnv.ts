@@ -9,14 +9,19 @@ declare global {
 
 /**
  * Reads a VITE_* value from runtime config (App Service) with build-time fallback (.env / CI).
+ * In production builds, import.meta.env VITE_* are intentionally empty — only
+ * window.__P4C_ENV__ (from /env-config.js) supplies values.
  */
 export function getRuntimeEnv(key: RuntimeEnvKey): string | undefined {
   const runtime = typeof window !== 'undefined' ? window.__P4C_ENV__?.[key] : undefined;
   if (runtime !== undefined && runtime !== '') {
     return runtime;
   }
-  const built = import.meta.env[key];
-  return typeof built === 'string' && built !== '' ? built : undefined;
+  if (import.meta.env.DEV) {
+    const built = import.meta.env[key];
+    return typeof built === 'string' && built !== '' ? built : undefined;
+  }
+  return undefined;
 }
 
 export function getGoogleClientId(): string {

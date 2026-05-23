@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { execSync } from 'node:child_process';
@@ -27,6 +27,25 @@ function readGitShortSha(): string {
 const APP_VERSION = readPackageVersion();
 const APP_GIT_SHA = readGitShortSha();
 const APP_FULL_VERSION = `${APP_VERSION}+${APP_GIT_SHA}`;
+
+/** Loads /env-config.js before the app bundle so window.__P4C_ENV__ is ready. */
+function injectRuntimeEnvConfig(): Plugin {
+  return {
+    name: 'inject-runtime-env-config',
+    transformIndexHtml: {
+      order: 'pre',
+      handler() {
+        return [
+          {
+            tag: 'script',
+            attrs: { src: '/env-config.js' },
+            injectTo: 'head-prepend',
+          },
+        ];
+      },
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -61,6 +80,7 @@ export default defineConfig(({ mode }) => {
       __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     },
     plugins: [
+      injectRuntimeEnvConfig(),
       react(),
       VitePWA({
         // 'prompt' = SW downloads in background but does NOT auto-activate.

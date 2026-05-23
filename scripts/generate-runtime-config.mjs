@@ -5,10 +5,8 @@ import { fileURLToPath } from 'node:url';
 const RUNTIME_ENV_KEYS = ['VITE_API_URL', 'VITE_GOOGLE_CLIENT_ID'];
 
 /**
- * Writes `env-config.js` so the browser can read Azure App Service Application Settings
- * without rebuilding the SPA.
- *
- * @param {string} outputPath — absolute or relative path to env-config.js
+ * Writes `env-config.js` from Azure App Service Application Settings (process.env).
+ * @param {string} outputPath
  */
 export function generateRuntimeConfig(outputPath) {
   /** @type {Record<string, string>} */
@@ -27,7 +25,7 @@ export function generateRuntimeConfig(outputPath) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const out = process.argv[2] || 'dist/env-config.js';
-  generateRuntimeConfig(out);
-  console.log(`Wrote runtime config to ${out}`);
+  const out = process.argv[2] || 'env-config.js';
+  const config = generateRuntimeConfig(out);
+  console.log(`Wrote runtime config to ${out} (${Object.keys(config).join(', ') || 'empty'})`);
 }
