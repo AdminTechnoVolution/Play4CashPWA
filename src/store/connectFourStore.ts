@@ -14,6 +14,10 @@ import { hasKey, t } from '../i18n/translations';
 import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
 import { SpectatorPayload } from '../util/SpectatorPayload';
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
+import {
+  parseLobbyJoinedCount,
+  parseLobbyRequiredCount,
+} from '../pages/play/domino/dominoGameLogic';
 
 export enum ConnectFourPhase {
   WAITING = 'WAITING',
@@ -74,6 +78,7 @@ let chatOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastGreetingSentAtMs = 0;
 let disconnectConnectFourSocketTimeout: ReturnType<typeof setTimeout> | null = null;
 let movePendingRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+let lobbyWatchdogTimers: ReturnType<typeof setTimeout>[] = [];
 /** Bumped on cleanup/init so stale socket callbacks from a prior room are ignored. */
 let connectFourSocketEpoch = 0;
 
@@ -87,6 +92,7 @@ function findDropRowLocal(board: ConnectFourCell[][], col: number): number {
 
 function teardownConnectFourSocket() {
   connectFourSocketEpoch++;
+  stopLobbyWatchdog();
   if (disconnectConnectFourSocketTimeout) {
     clearTimeout(disconnectConnectFourSocketTimeout);
     disconnectConnectFourSocketTimeout = null;
@@ -121,6 +127,52 @@ function scheduleMovePendingRecovery(get: () => ConnectFourStore, set: (fn: any)
   }, 8000);
 }
 
+function stopLobbyWatchdog() {
+  for (const t of lobbyWatchdogTimers) clearTimeout(t);
+  lobbyWatchdogTimers = [];
+}
+
+function scheduleLobbyWatchdog(roomId: string, get: () => ConnectFourStore) {
+  stopLobbyWatchdog();
+  const attempt = async () => {
+    const st = get();
+    if (st.phase !== ConnectFourPhase.WAITING || st.isSpectator) return;
+    try {
+      const status = await apiRepository.getRoomStatus(roomId);
+      if (status.status?.toLowerCase() === 'started') {
+        (window as any).connectFourSocket?.requestSync(roomId);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+  lobbyWatchdogTimers.push(setTimeout(() => void attempt(), 2000));
+  lobbyWatchdogTimers.push(setTimeout(() => void attempt(), 5000));
+}
+
+function triggerLobbyFullSync(roomId: string, get: () => ConnectFourStore) {
+  if (get().isSpectator) return;
+  apiRepository.roomReady(roomId).catch(() => {});
+  (window as any).connectFourSocket?.requestSync(roomId);
+  startStatusPolling(roomId, get);
+  scheduleLobbyWatchdog(roomId, get);
+}
+
+function payloadIndicatesPlay(
+  data: Record<string, unknown>,
+  phase: ConnectFourPhase,
+  hadMoveInFlight: boolean,
+): boolean {
+  const gameStarted = !!data?.gameStarted || !!data?.game_started;
+  const roomStarted = String(data?.status || '').toLowerCase() === 'started';
+  const hasBoard = data?.board != null;
+  return (
+    gameStarted ||
+    roomStarted ||
+    (hasBoard && (phase === ConnectFourPhase.PLAY || hadMoveInFlight))
+  );
+}
+
 function payloadTargetsCurrentRoom(
   data: Record<string, unknown>,
   get: () => ConnectFourStore,
@@ -140,7 +192,7 @@ function stopStatusPolling() {
 
 function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
   stopStatusPolling();
-  statusPollTimer = setInterval(async () => {
+  const tick = async () => {
     const st = get();
     if (st.phase !== ConnectFourPhase.WAITING || st.isSpectator) {
       stopStatusPolling();
@@ -148,7 +200,6 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
     }
     try {
       const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
-      // Re-emit join every 5s so the server re-checks both player sockets are present.
       if (st.opponentConfirmed || st.hasOpponent) {
         apiRepository.roomReady(roomId).catch(() => {});
       }
@@ -162,7 +213,9 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
     } catch {
       /* ignore */
     }
-  }, 5000);
+  };
+  void tick();
+  statusPollTimer = setInterval(tick, 5000);
 }
 
 let timeoutWarned = false;
@@ -377,6 +430,7 @@ function applyPlayPayload(
   });
 
   syncTurnCountdown(set, get);
+  stopLobbyWatchdog();
 }
 
 function handleConnectFourPayload(
@@ -444,51 +498,6 @@ function handleConnectFourPayload(
   const opponentLeft = !!data?.opponentLeft || !!data?.opponent_left;
   const opponentName = String(data?.opponentName ?? data?.opponent_name ?? '').trim();
 
-  if (opponentLeft && waitingForOpponent) {
-    stopTurnTimer();
-    stopStatusPolling();
-    set({
-      phase: ConnectFourPhase.WAITING,
-      opponentConfirmed: false,
-      statusMessage: 'connect_four_status_waiting',
-      isPlayerTurn: false,
-      isMovePending: false,
-    });
-    return;
-  }
-
-  if (opponentLeft && get().phase === ConnectFourPhase.WAITING) {
-    set({ opponentLeftMessage: t('bs_opponent_left'), opponentConfirmed: false });
-    return;
-  }
-
-  if (opponentJoined && opponentName) {
-    set({ opponentConfirmed: true, opponentName });
-    if (!get().isSpectator) {
-      apiRepository.roomReady(get().roomId).catch(() => {});
-    }
-  }
-
-  if (waitingForOpponent || opponentJoined) {
-    set({
-      phase: ConnectFourPhase.WAITING,
-      statusMessage: get().isSpectator
-        ? 'spectator_watching_status'
-        : opponentJoined
-          ? 'connect_four_status_place_pieces'
-          : 'connect_four_status_waiting',
-      board: data?.board ? parseBoard(data.board) : get().board,
-      isPlayerTurn: false,
-    });
-    if (!get().isSpectator) {
-      if (get().opponentConfirmed || get().hasOpponent || opponentJoined) {
-        apiRepository.roomReady(get().roomId).catch(() => {});
-      }
-      startStatusPolling(get().roomId, get);
-    }
-    if (waitingForOpponent) return;
-  }
-
   const gameEnded =
     !!data?.gameEnded ||
     !!data?.game_ended ||
@@ -503,6 +512,7 @@ function handleConnectFourPayload(
   if (gameEnded || terminalOutcomes.has(outcomeRaw.toLowerCase())) {
     stopTurnTimer();
     stopStatusPolling();
+    stopLobbyWatchdog();
     const spectating = get().isSpectator;
     const reasonNorm = normalizedGameEndReason(data);
     const outcome = outcomeRaw.toLowerCase();
@@ -556,13 +566,74 @@ function handleConnectFourPayload(
     return;
   }
 
-  const gameStarted = !!data?.gameStarted || !!data?.game_started;
-  const hasBoard = data?.board != null;
-  if (
-    gameStarted ||
-    (hasBoard && (get().phase === ConnectFourPhase.PLAY || hadMoveInFlight))
-  ) {
+  if (payloadIndicatesPlay(data, get().phase, hadMoveInFlight)) {
+    const hasBoard = data?.board != null;
+    if (
+      !hasBoard &&
+      (!!data?.gameStarted ||
+        !!data?.game_started ||
+        String(data?.status || '').toLowerCase() === 'started')
+    ) {
+      stopStatusPolling();
+      stopLobbyWatchdog();
+      (window as any).connectFourSocket?.requestSync(get().roomId);
+      return;
+    }
     applyPlayPayload(data, set, get);
+    return;
+  }
+
+  if (opponentLeft && waitingForOpponent) {
+    stopTurnTimer();
+    stopStatusPolling();
+    stopLobbyWatchdog();
+    set({
+      phase: ConnectFourPhase.WAITING,
+      opponentConfirmed: false,
+      statusMessage: 'connect_four_status_waiting',
+      isPlayerTurn: false,
+      isMovePending: false,
+    });
+    return;
+  }
+
+  if (opponentLeft && get().phase === ConnectFourPhase.WAITING) {
+    set({ opponentLeftMessage: t('bs_opponent_left'), opponentConfirmed: false });
+    return;
+  }
+
+  if (opponentJoined && opponentName) {
+    set({ opponentConfirmed: true, opponentName });
+    if (!get().isSpectator && get().phase !== ConnectFourPhase.PLAY) {
+      apiRepository.roomReady(get().roomId).catch(() => {});
+    }
+  }
+
+  if (waitingForOpponent && get().phase !== ConnectFourPhase.PLAY) {
+    set({
+      phase: ConnectFourPhase.WAITING,
+      statusMessage: get().isSpectator
+        ? 'spectator_watching_status'
+        : opponentJoined
+          ? 'connect_four_status_place_pieces'
+          : 'connect_four_status_waiting',
+      board: data?.board ? parseBoard(data.board) : get().board,
+      isPlayerTurn: false,
+    });
+    if (!get().isSpectator) {
+      const joined = parseLobbyJoinedCount(data);
+      const required = parseLobbyRequiredCount(data) ?? 2;
+      if (joined != null && joined >= required) {
+        triggerLobbyFullSync(get().roomId, get);
+      } else if (get().opponentConfirmed || get().hasOpponent || opponentJoined) {
+        apiRepository.roomReady(get().roomId).catch(() => {});
+        startStatusPolling(get().roomId, get);
+        scheduleLobbyWatchdog(get().roomId, get);
+      } else {
+        startStatusPolling(get().roomId, get);
+      }
+    }
+    return;
   }
 }
 
@@ -680,6 +751,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   cleanup() {
     stopTurnTimer();
     stopStatusPolling();
+    stopLobbyWatchdog();
     if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
     teardownConnectFourSocket();
     set({
