@@ -107,11 +107,20 @@ const LoginPage: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: 'calc(100vh + 64px)',
+          minHeight: '100vh',
           padding: '40px 32px',
-          paddingBottom: 'max(48px, calc(40px + env(safe-area-inset-bottom, 0px)))',
+          paddingBottom: 'max(24px, calc(16px + env(safe-area-inset-bottom, 0px)))',
         }}>
+
+          {/* Main — logo, card, terms */}
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+          }}>
 
           {/* Logo */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '44px' }}>
@@ -200,7 +209,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           {/* Terms */}
-          <div style={{ marginTop: 32, textAlign: 'center' }}>
+          <div style={{ marginTop: 24, textAlign: 'center' }}>
             <IonText>
               <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 12, margin: 0, lineHeight: 1.8 }}>
                 {t('login_compliance_agree')}{' '}
@@ -214,34 +223,20 @@ const LoginPage: React.FC = () => {
               </p>
             </IonText>
           </div>
+          </div>
 
-          {/* Footer */}
+          {/* Footer — community stats, version, credit */}
           <div
             style={{
-              marginTop: 'auto',
               width: '100%',
-              paddingTop: 28,
-              paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
+              marginTop: 16,
               textAlign: 'center',
+              flexShrink: 0,
             }}
           >
-            <IonText>
-              <p
-                style={{
-                  color: 'var(--sovereign-text-muted)',
-                  fontSize: 12,
-                  margin: 0,
-                  opacity: 0.7,
-                  letterSpacing: '0.04em',
-                }}
-              >
-                By Techno Volution
-              </p>
-            </IonText>
             {(statsLoading || registeredCount !== null) && (
               <div
                 style={{
-                  marginTop: 14,
                   marginLeft: 'auto',
                   marginRight: 'auto',
                   maxWidth: 320,
@@ -321,6 +316,19 @@ const LoginPage: React.FC = () => {
             >
               v{__APP_FULL_VERSION__}
             </div>
+            <IonText>
+              <p
+                style={{
+                  color: 'var(--sovereign-text-muted)',
+                  fontSize: 12,
+                  margin: '10px 0 0',
+                  opacity: 0.7,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {t('login_by_techno_volution')}
+              </p>
+            </IonText>
           </div>
         </div>
 

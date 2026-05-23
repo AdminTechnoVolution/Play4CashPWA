@@ -510,7 +510,7 @@ export function playerGameEndReasonFallback(
     case 'DOMINO':
       return t(youWon ? 'game_over_reason_domino_won' : 'game_over_reason_domino_lost');
     case 'CONNECT_FOUR':
-      return t(youWon ? 'connect_four_win' : 'connect_four_lose');
+      return youWon ? 'game_over_reason_connect_four_won' : 'game_over_reason_connect_four_lost';
     default:
       return '';
   }

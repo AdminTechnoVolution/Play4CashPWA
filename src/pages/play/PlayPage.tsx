@@ -348,7 +348,7 @@ export default function PlayPage() {
       )}
 
       {/* Checking server status */}
-      <IonLoading isOpen={checkingLeave} message="Checking game status…" />
+      <IonLoading isOpen={checkingLeave} message={t('play_checking_game_status')} />
 
       {/* Forfeit warning — game active, opponent present */}
       <IonModal

@@ -5,12 +5,14 @@ import type { ConnectFourCell, ConnectFourDisc, ConnectFourMove } from '../data/
 import type { GameOverPayload, GreetingResponse } from '../data/models/ApiModels';
 import {
   apiMessagesJoinedOrNull,
-  formatApiMessageForDisplay,
   gameEndMessageForDisplay,
   isInformationalNonBlockingSocketRaw,
+  normalizedGameEndReason,
+  playerGameEndReasonFallback,
 } from '../i18n/ApiMessageDisplay';
 import { hasKey, t } from '../i18n/translations';
 import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
+import { SpectatorPayload } from '../util/SpectatorPayload';
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 
 export enum ConnectFourPhase {
@@ -60,6 +62,7 @@ let turnTimer: ReturnType<typeof setInterval> | null = null;
 let statusPollTimer: ReturnType<typeof setInterval> | null = null;
 let chatOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastGreetingSentAtMs = 0;
+let disconnectConnectFourSocketTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function stopStatusPolling() {
   if (statusPollTimer) {
@@ -138,6 +141,47 @@ function syncTurnCountdown(set: (fn: any) => void, get: () => ConnectFourStore) 
   }, 1000);
 }
 
+function connectFourTurnUsername(data: Record<string, unknown>): string {
+  const cp = Number(data.currentPlayer ?? data.current_player);
+  const p1 = String(data.player1 ?? '').trim();
+  const p2 = String(data.player2 ?? '').trim();
+  if (cp === 1 && p1) return p1;
+  if (cp === 2 && p2) return p2;
+  const turnId = String(data.currentTurnUserId ?? data.current_turn_user_id ?? '').trim();
+  const players = data.players;
+  if (Array.isArray(players)) {
+    for (const p of players) {
+      if (p && typeof p === 'object' && String((p as { userId?: string }).userId) === turnId) {
+        return String((p as { username?: string }).username ?? '').trim();
+      }
+    }
+  }
+  return SpectatorPayload.spectatorTurnHolderUsername(data);
+}
+
+function mergeSpectatorConnectFourLabels(
+  data: Record<string, unknown>,
+  set: (fn: any) => void,
+) {
+  const p1 = String(data.player1 ?? SpectatorPayload.optPlayerSlot(data, 1) ?? '').trim();
+  const p2 = String(data.player2 ?? SpectatorPayload.optPlayerSlot(data, 2) ?? '').trim();
+  const fallback1 = t('spectator_player_n').replace('%d', '1');
+  const fallback2 = t('spectator_player_n').replace('%d', '2');
+  set({
+    spectatorRedLabel: p1 || fallback1,
+    spectatorYellowLabel: p2 || fallback2,
+    player1Name: p1 || fallback1,
+    player2Name: p2 || fallback2,
+  });
+}
+
+function connectFourSpectatorPlayStatus(data: Record<string, unknown>): string {
+  const turnName = connectFourTurnUsername(data);
+  return turnName
+    ? t('spectator_turn_of_x').replace('%s', turnName)
+    : t('spectator_waiting_next_move');
+}
+
 function scheduleChatOverlay(set: (fn: any) => void, overlay: ChatGreetingOverlay) {
   if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
   set({ chatGreetingOverlay: overlay });
@@ -170,6 +214,10 @@ interface ConnectFourStoreState {
   hasOpponent: boolean;
   gameOver: GameOverPayload | null;
   gameOverIsDraw: boolean;
+  gameOverWinnerDisplayName: string | null;
+  spectatorCurrentPlayer: string;
+  spectatorRedLabel: string;
+  spectatorYellowLabel: string;
   navigateBack: boolean;
   matchCancelledMessage: string | null;
   opponentLeftMessage: string | null;
@@ -214,6 +262,9 @@ function applyPlayPayload(
   const winningCells = parseWinningCells(data.winningCells ?? data.winning_cells);
   const lastMove = parseLastMove(data.lastMove ?? data.last_move);
   const yourTurn = !!data.yourTurn || !!data.your_turn;
+  const spect = get().isSpectator;
+  if (spect) mergeSpectatorConnectFourLabels(data, set);
+
   let yourColor: ConnectFourDisc | null =
     data.yourColor === 'R' || data.yourColor === 'Y'
       ? data.yourColor
@@ -243,7 +294,12 @@ function applyPlayPayload(
     turnTimeLeft,
     turnTimerTotal,
     isMovePending: false,
-    statusMessage: yourTurn ? 'connect_four_status_your_turn' : 'connect_four_status_opponent_turn',
+    spectatorCurrentPlayer: spect ? connectFourTurnUsername(data) : get().spectatorCurrentPlayer,
+    statusMessage: spect
+      ? connectFourSpectatorPlayStatus(data)
+      : yourTurn
+        ? 'connect_four_status_your_turn'
+        : 'connect_four_status_opponent_turn',
   });
 
   syncTurnCountdown(set, get);
@@ -262,6 +318,10 @@ function handleConnectFourPayload(
       : (json as Record<string, unknown>);
 
   const myUserId = get().myUserId;
+
+  if (get().isSpectator) {
+    mergeSpectatorConnectFourLabels(data, set);
+  }
 
   if (data?.spectatorsCount !== undefined) {
     set({ spectatorsCount: Number(data.spectatorsCount) });
@@ -318,7 +378,11 @@ function handleConnectFourPayload(
   if (waitingForOpponent || opponentJoined) {
     set({
       phase: ConnectFourPhase.WAITING,
-      statusMessage: get().isSpectator ? 'spectator_watching_status' : 'connect_four_status_waiting',
+      statusMessage: get().isSpectator
+        ? 'spectator_watching_status'
+        : opponentJoined
+          ? 'connect_four_status_place_pieces'
+          : 'connect_four_status_waiting',
       board: data?.board ? parseBoard(data.board) : get().board,
       isPlayerTurn: false,
     });
@@ -329,29 +393,51 @@ function handleConnectFourPayload(
   }
 
   const gameEnded = !!data?.gameEnded || !!data?.game_ended;
-  if (gameEnded) {
+  const outcomeRaw = String(data?.outcome || '').trim();
+  const terminalOutcomes = new Set([
+    'win', 'lose', 'timeout_loss', 'opponent_disconnected', 'draw', 'forfeit',
+  ]);
+
+  if (gameEnded || terminalOutcomes.has(outcomeRaw.toLowerCase())) {
     stopTurnTimer();
     stopStatusPolling();
-    const winnerId = String(data?.winner ?? data?.winnerUserId ?? '').trim();
-    const reasonNorm = String(data?.reason ?? data?.winnerReason ?? '')
-      .trim()
-      .toLowerCase();
-    const outcome = String(data?.outcome || '').trim().toLowerCase();
+    const spectating = get().isSpectator;
+    const reasonNorm = normalizedGameEndReason(data);
+    const outcome = outcomeRaw.toLowerCase();
     const isDraw =
       outcome === 'draw' ||
       reasonNorm === 'draw' ||
       !!data?.isDraw ||
       !!data?.is_draw ||
-      (!winnerId && reasonNorm !== 'timeout' && outcome !== 'forfeit');
+      (!outcome && gameEnded && !String(data?.winner ?? data?.winnerUserId ?? '').trim());
     let youWon = !!data?.youWon || !!data?.you_won;
+    const winnerId = String(data?.winner ?? data?.winnerUserId ?? '').trim();
     if (winnerId && myUserId) youWon = winnerId === myUserId;
     if (outcome === 'opponent_disconnected') youWon = true;
 
-    const resolvedOutcome = isDraw
-      ? 'draw'
-      : outcome || (youWon ? 'win' : 'lose');
+    const resolvedOutcome = outcome || (isDraw ? 'draw' : youWon ? 'win' : 'lose');
+    const seats = SpectatorPayload.seatsForSpectatorSummary(data);
+    const reasonFallback = playerGameEndReasonFallback(
+      data,
+      resolvedOutcome,
+      youWon,
+      isDraw,
+      'CONNECT_FOUR',
+      spectating,
+    );
+    const statusMsg = spectating
+      ? SpectatorPayload.spectatorGameEndReasonStatusMessage(json, data, resolvedOutcome)
+      : gameEndMessageForDisplay(data, envelope, reasonFallback);
+    const winnerDisplay =
+      spectating && !isDraw
+        ? SpectatorPayload.gameEndWinnerDisplayName(winnerId, seats)
+        : null;
 
-    const body = gameEndMessageForDisplay(data, envelope, t('spectator_end_decisive'));
+    if (disconnectConnectFourSocketTimeout) clearTimeout(disconnectConnectFourSocketTimeout);
+    disconnectConnectFourSocketTimeout = setTimeout(() => {
+      (window as any).connectFourSocket?.disconnect();
+      disconnectConnectFourSocketTimeout = null;
+    }, 3000);
 
     set({
       phase: ConnectFourPhase.GAME_OVER,
@@ -360,15 +446,9 @@ function handleConnectFourPayload(
       lastMove: parseLastMove(data.lastMove ?? data.last_move),
       isPlayerTurn: false,
       gameOverIsDraw: isDraw,
-      statusMessage: body,
-      gameOver: {
-        outcome: resolvedOutcome,
-        youWon: get().isSpectator ? false : youWon,
-        isDraw,
-        winner: winnerId || undefined,
-        reason: reasonNorm || resolvedOutcome,
-        prize: Number(data?.prize) || undefined,
-      },
+      gameOverWinnerDisplayName: winnerDisplay,
+      statusMessage: statusMsg,
+      gameOver: SpectatorPayload.resolveStandardGameOver(data, get().myUsername, spectating, 'CONNECT_FOUR'),
     });
     return;
   }
@@ -402,6 +482,10 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   hasOpponent: false,
   gameOver: null,
   gameOverIsDraw: false,
+  gameOverWinnerDisplayName: null,
+  spectatorCurrentPlayer: '',
+  spectatorRedLabel: '',
+  spectatorYellowLabel: '',
   navigateBack: false,
   matchCancelledMessage: null,
   opponentLeftMessage: null,
@@ -428,7 +512,11 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
       navigateBack: false,
       phase: ConnectFourPhase.WAITING,
       board: emptyBoard(),
-      statusMessage: isSpectator ? 'spectator_watching_status' : 'connect_four_status_waiting',
+      statusMessage: isSpectator
+        ? 'spectator_watching_status'
+        : hasOpponent
+          ? 'connect_four_status_place_pieces'
+          : 'connect_four_status_waiting',
       yourColor: null,
       gameOver: null,
       isMovePending: false,
@@ -462,6 +550,10 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
     stopTurnTimer();
     stopStatusPolling();
     if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
+    if (disconnectConnectFourSocketTimeout) {
+      clearTimeout(disconnectConnectFourSocketTimeout);
+      disconnectConnectFourSocketTimeout = null;
+    }
     if ((window as any).connectFourSocket) {
       (window as any).connectFourSocket.disconnect();
       (window as any).connectFourSocket = null;

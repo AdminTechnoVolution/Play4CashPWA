@@ -363,7 +363,19 @@ export default function ConnectFourPage({
 
         <div style={{ opacity: store.phase === ConnectFourPhase.WAITING ? 0.3 : 1 }}>
         {isSpectator && store.phase !== ConnectFourPhase.WAITING && (
-          <SpectatorBadge isSpectator count={store.spectatorsCount} />
+          <div style={{ padding: '8px 16px 0' }}>
+            <SpectatorBadge isSpectator count={store.spectatorsCount} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <IonText style={{ color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="cf-color-dot" style={{ background: 'var(--cf-disc-r)', width: 10, height: 10 }} />
+                {store.spectatorRedLabel || store.player1Name}
+              </IonText>
+              <IonText style={{ color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="cf-color-dot" style={{ background: 'var(--cf-disc-y)', width: 10, height: 10 }} />
+                {store.spectatorYellowLabel || store.player2Name}
+              </IonText>
+            </div>
+          </div>
         )}
 
         <div style={{ padding: '8px 16px', textAlign: 'center' }}>
@@ -387,6 +399,7 @@ export default function ConnectFourPage({
               totalSeconds={store.turnTimerTotal}
               isMyTurn={store.isPlayerTurn && !isSpectator}
               onTimeout={() => {}}
+              turnPlayerName={isSpectator ? (store.spectatorCurrentPlayer || undefined) : undefined}
               otherPlayerName={opponentLabel}
               disableLocalTick
               timeoutAlarm={false}
@@ -396,6 +409,16 @@ export default function ConnectFourPage({
 
         {(store.phase === ConnectFourPhase.PLAY || store.phase === ConnectFourPhase.GAME_OVER) && (
           <div className="cf-board-wrap">
+            <div
+              className="cf-board-frame"
+              style={{
+                background: 'var(--cf-board-bg)',
+                border: '2px solid rgba(233,195,73,0.30)',
+                borderRadius: 12,
+                padding: 8,
+                boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+              }}
+            >
             <div className="cf-board" role="grid" aria-label={t('connect_four_title')}>
               {store.board.map((row, rowIdx) =>
                 row.map((cell, colIdx) => {
@@ -444,6 +467,7 @@ export default function ConnectFourPage({
                   );
                 }),
               )}
+            </div>
             </div>
           </div>
         )}

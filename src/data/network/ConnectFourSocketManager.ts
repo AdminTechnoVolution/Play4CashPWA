@@ -8,7 +8,7 @@ import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken } from '../auth/AuthSessionStore';
-import { socketIoExtraHeaders } from './socketExtraHeaders';
+import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
@@ -21,6 +21,11 @@ export class ConnectFourSocketManager {
   private onPayload?: (raw: unknown) => void;
   private onConnectedCb?: () => void;
   private onConnectionErrorCb?: (msg: string) => void;
+  private onDisconnectedCb?: () => void;
+
+  setOnDisconnected(cb: () => void): void {
+    this.onDisconnectedCb = cb;
+  }
 
   setOnGamePayload(cb: (raw: unknown) => void): void {
     this.onPayload = cb;
@@ -47,6 +52,8 @@ export class ConnectFourSocketManager {
       return;
     }
 
+    const lang = acceptLanguageTag();
+
     this.socket = io(`${BASE_URL}${NAMESPACE}`, {
       transports: ['polling', 'websocket'],
       autoConnect: false,
@@ -56,8 +63,8 @@ export class ConnectFourSocketManager {
       reconnectionDelayMax: 5000,
       timeout: SOCKET_TIMEOUT_MS,
       forceNew: true,
-      query: { token, appVersion: __APP_VERSION__ },
-      auth: { token, appVersion: __APP_VERSION__ },
+      query: { token, appVersion: __APP_VERSION__, lang },
+      auth: { token, appVersion: __APP_VERSION__, lang },
       extraHeaders: socketIoExtraHeaders(token),
     });
 
@@ -67,6 +74,10 @@ export class ConnectFourSocketManager {
     this.socket.on('connect', () => {
       this.onConnectedCb?.();
       this.socket?.emit('join', { room_id: roomId });
+    });
+
+    this.socket.on('disconnect', () => {
+      this.onDisconnectedCb?.();
     });
 
     this.socket.on(EVENT, (payload: unknown) => {
