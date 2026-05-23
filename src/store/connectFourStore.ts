@@ -73,6 +73,63 @@ let statusPollTimer: ReturnType<typeof setInterval> | null = null;
 let chatOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastGreetingSentAtMs = 0;
 let disconnectConnectFourSocketTimeout: ReturnType<typeof setTimeout> | null = null;
+let movePendingRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+/** Bumped on cleanup/init so stale socket callbacks from a prior room are ignored. */
+let connectFourSocketEpoch = 0;
+
+function findDropRowLocal(board: ConnectFourCell[][], col: number): number {
+  if (col < 0 || col >= COLS) return -1;
+  for (let row = ROWS - 1; row >= 0; row--) {
+    if (!board[row]?.[col]) return row;
+  }
+  return -1;
+}
+
+function teardownConnectFourSocket() {
+  connectFourSocketEpoch++;
+  if (disconnectConnectFourSocketTimeout) {
+    clearTimeout(disconnectConnectFourSocketTimeout);
+    disconnectConnectFourSocketTimeout = null;
+  }
+  if (movePendingRecoveryTimer) {
+    clearTimeout(movePendingRecoveryTimer);
+    movePendingRecoveryTimer = null;
+  }
+  const prev = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
+  if (prev) {
+    prev.disconnect();
+    (window as any).connectFourSocket = null;
+  }
+}
+
+function clearMovePendingRecoveryTimer() {
+  if (movePendingRecoveryTimer) {
+    clearTimeout(movePendingRecoveryTimer);
+    movePendingRecoveryTimer = null;
+  }
+}
+
+function scheduleMovePendingRecovery(get: () => ConnectFourStore, set: (fn: any) => void) {
+  clearMovePendingRecoveryTimer();
+  movePendingRecoveryTimer = setTimeout(() => {
+    movePendingRecoveryTimer = null;
+    const st = get();
+    if (!st.isMovePending || st.phase !== ConnectFourPhase.PLAY) return;
+    set({ isMovePending: false });
+    const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
+    socket?.requestSync(st.roomId);
+  }, 8000);
+}
+
+function payloadTargetsCurrentRoom(
+  data: Record<string, unknown>,
+  get: () => ConnectFourStore,
+): boolean {
+  const payloadRoomId = String(data.roomId ?? data.room_id ?? '').trim();
+  const activeRoomId = get().roomId.trim();
+  if (!payloadRoomId || !activeRoomId) return true;
+  return payloadRoomId === activeRoomId;
+}
 
 function stopStatusPolling() {
   if (statusPollTimer) {
@@ -326,13 +383,18 @@ function handleConnectFourPayload(
   payload: unknown,
   set: (fn: any) => void,
   get: () => ConnectFourStore,
+  epoch: number,
 ) {
+  if (epoch !== connectFourSocketEpoch) return;
+
   const json = typeof payload === 'string' ? JSON.parse(payload) : payload;
   const envelope = json as { success?: boolean; messages?: string[]; data?: Record<string, unknown> };
   const data =
     envelope?.data && typeof envelope.data === 'object' && !Array.isArray(envelope.data)
       ? envelope.data
       : (json as Record<string, unknown>);
+
+  if (!payloadTargetsCurrentRoom(data, get)) return;
 
   const success = envelope?.success !== false;
   const hadMoveInFlight = get().isMovePending;
@@ -362,8 +424,11 @@ function handleConnectFourPayload(
       isMovePending: false,
       illegalMoveToast: msgRaw || undefined,
     });
+    clearMovePendingRecoveryTimer();
+    (window as any).connectFourSocket?.requestSync(get().roomId);
   } else if (hadMoveInFlight) {
     set({ isMovePending: false });
+    clearMovePendingRecoveryTimer();
   } else if (msgRaw && !success) {
     set({ illegalMoveToast: msgRaw });
   }
@@ -492,7 +557,11 @@ function handleConnectFourPayload(
   }
 
   const gameStarted = !!data?.gameStarted || !!data?.game_started;
-  if (gameStarted || (get().phase === ConnectFourPhase.PLAY && data?.board != null)) {
+  const hasBoard = data?.board != null;
+  if (
+    gameStarted ||
+    (hasBoard && (get().phase === ConnectFourPhase.PLAY || hadMoveInFlight))
+  ) {
     applyPlayPayload(data, set, get);
   }
 }
@@ -537,6 +606,8 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   initGame(roomId, myUsername, myUserId, betAmount, hasOpponent, initialOpponentName, isSpectator) {
     stopTurnTimer();
     stopStatusPolling();
+    teardownConnectFourSocket();
+    const epoch = connectFourSocketEpoch;
 
     set({
       roomId,
@@ -557,29 +628,44 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
           : 'connect_four_status_waiting',
       yourColor: null,
       gameOver: null,
+      gameOverIsDraw: false,
+      gameOverWinnerDisplayName: null,
+      winningCells: [],
+      lastMove: null,
+      isPlayerTurn: false,
       isMovePending: false,
+      apiErrorRawMessage: null,
+      illegalMoveToast: null,
+      opponentLeftMessage: null,
+      matchCancelledMessage: null,
     });
 
     const socketManager = new ConnectFourSocketManager();
-    socketManager.setOnGamePayload((raw) => handleConnectFourPayload(raw, set, get));
+    socketManager.setOnGamePayload((raw) =>
+      handleConnectFourPayload(raw, set, get, epoch),
+    );
     socketManager.setOnConnected(() => {
+      if (epoch !== connectFourSocketEpoch) return;
       if (hasOpponent && !isSpectator) {
         apiRepository.roomReady(roomId).catch(() => {});
       }
       const phase = get().phase;
-      if (phase === ConnectFourPhase.WAITING || phase === ConnectFourPhase.PLAY) {
+      if (get().roomId === roomId && (phase === ConnectFourPhase.WAITING || phase === ConnectFourPhase.PLAY)) {
         socketManager.requestSync(roomId);
       }
       if (isSpectator) {
         setTimeout(() => {
-          if (get().phase === ConnectFourPhase.WAITING) {
+          if (epoch !== connectFourSocketEpoch) return;
+          if (get().roomId === roomId && get().phase === ConnectFourPhase.WAITING) {
             socketManager.requestSync(roomId);
           }
         }, 1500);
       }
     });
     socketManager.setOnDisconnected(() => {
+      if (epoch !== connectFourSocketEpoch) return;
       set({ isMovePending: false });
+      clearMovePendingRecoveryTimer();
     });
     socketManager.setOnConnectionError(() => set({ apiErrorRawMessage: 'bs_connection_error' }));
     socketManager.connect(roomId);
@@ -595,28 +681,44 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
     stopTurnTimer();
     stopStatusPolling();
     if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
-    if (disconnectConnectFourSocketTimeout) {
-      clearTimeout(disconnectConnectFourSocketTimeout);
-      disconnectConnectFourSocketTimeout = null;
-    }
-    if ((window as any).connectFourSocket) {
-      (window as any).connectFourSocket.disconnect();
-      (window as any).connectFourSocket = null;
-    }
+    teardownConnectFourSocket();
     set({
       phase: ConnectFourPhase.WAITING,
       board: emptyBoard(),
       isPlayerTurn: false,
       isMovePending: false,
+      apiErrorRawMessage: null,
+      illegalMoveToast: null,
+      gameOver: null,
     });
   },
 
   dropInColumn(roomId, col) {
     const s = get();
     if (s.isSpectator || s.phase !== ConnectFourPhase.PLAY || !s.isPlayerTurn || s.isMovePending) return;
+    if (s.roomId !== roomId) return;
     const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
     if (!socket?.dropDisc(roomId, col)) return;
-    set({ isMovePending: true });
+
+    const nextBoard = s.board.map((row) => [...row]);
+    const row = findDropRowLocal(nextBoard, col);
+    if (row >= 0 && s.yourColor) {
+      nextBoard[row][col] = s.yourColor;
+      set({
+        isMovePending: true,
+        board: nextBoard,
+        lastMove: {
+          userId: s.myUserId,
+          row,
+          col,
+          color: s.yourColor,
+          at: new Date().toISOString(),
+        },
+      });
+    } else {
+      set({ isMovePending: true });
+    }
+    scheduleMovePendingRecovery(get, set);
   },
 
   clearIllegalMoveToast: () => set({ illegalMoveToast: null }),
