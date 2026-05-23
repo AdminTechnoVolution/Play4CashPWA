@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonIcon, IonText, IonCard, IonCardContent, IonSpinner
@@ -13,7 +13,9 @@ import { useT } from '../../../i18n/translations';
 import TurnTimer from '../components/TurnTimer';
 import GameOverModal from '../components/GameOverModal';
 import ChatGreetingChips from '../components/ChatGreetingChips';
+import FloatingIncomingMessages from '../components/FloatingIncomingMessages';
 import SpectatorBadge from '../components/SpectatorBadge';
+import { formatIncomingFloatingGreeting } from '../../../util/ChatGreetingModels';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import GameSound from '../../../ui/game/GameSound';
@@ -88,6 +90,11 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
   };
 
   const cellSize = Math.min(Math.floor((window.innerWidth - 32) / 8), 44);
+
+  const incomingGreetingMessage = useMemo(
+    () => formatIncomingFloatingGreeting(null, lastMsg),
+    [lastMsg],
+  );
 
   const getCellBg = (r: number, c: number) => {
     const dark = (r + c) % 2 !== 0;
@@ -198,6 +205,10 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
       </IonHeader>
 
       <IonContent style={{ '--background': '#0a1628' }}>
+        <FloatingIncomingMessages
+          message={incomingGreetingMessage}
+          active={store.phase === HalmaPhase.PLAY && !isSpectator}
+        />
         {store.phase === HalmaPhase.WAITING && renderWaiting()}
 
         <div style={{ padding: '16px', opacity: store.phase === HalmaPhase.WAITING ? 0.3 : 1 }}>
@@ -308,7 +319,12 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
 
           {!isSpectator && (
             <div style={{ marginTop: 'auto', paddingBottom: '20px' }}>
-              <ChatGreetingChips greetings={greetings} onSend={(id) => chatRef.current.sendGreeting(roomId, id)} lastReceivedMessage={lastMsg} />
+              <ChatGreetingChips
+                greetings={greetings}
+                onSend={(id) => chatRef.current.sendGreeting(roomId, id)}
+                lastReceivedMessage={lastMsg}
+                showIncomingBanner={false}
+              />
             </div>
           )}
         </div>

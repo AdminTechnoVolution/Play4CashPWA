@@ -1,0 +1,62 @@
+name: Build and deploy Node.js app to Azure Web App - p4c-web
+
+on:
+  push:
+    branches:
+      - sit
+  workflow_dispatch:
+
+# Evita carreras si llegan varios pushes seguidos (no cancelamos un deploy en curso).
+concurrency:
+  group: deploy-p4c-web-dev-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      # Push del bump de versión tras deploy OK (solo main).
+      contents: write
+      # OIDC para azure/login.
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Semver que verá el usuario/API (`X-App-Version`). Debe ejecutarse antes del build:
+      # vite lee `package.json` en `vite.config.ts`.
+      - name: Bump patch version for this deploy
+        run: npm version patch --no-git-tag-version
+
+      - name: Build
+        env:
+          VITE_API_URL: ''
+          VITE_GOOGLE_CLIENT_ID: ''
+        run: npm run build:azure
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_FBC9648BB2244CF08FCD1F824668D34B }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C38BBFD336064C348BD57085233960F8 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_0131C29311C04B5D82B6A289BB4FEE8E }}
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'p4c-web-dev'
+          slot-name: 'Production'
+          package: ./azure-deploy

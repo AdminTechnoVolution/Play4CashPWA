@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonIcon, IonText, IonActionSheet,
@@ -12,7 +12,9 @@ import { ChatSocketManager } from '../../../data/network/ChatSocketManager';
 import GameOverModal from '../components/GameOverModal';
 import TurnTimer from '../components/TurnTimer';
 import ChatGreetingChips from '../components/ChatGreetingChips';
+import FloatingIncomingMessages from '../components/FloatingIncomingMessages';
 import SpectatorBadge from '../components/SpectatorBadge';
+import { formatIncomingFloatingGreeting } from '../../../util/ChatGreetingModels';
 import { formatApiMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
 import { useT } from '../../../i18n/translations';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
@@ -182,6 +184,11 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
   // 8 cells + 7 gaps + 16px board padding + outer padding
   const cellSize = Math.min(Math.floor((window.innerWidth - 32 - 16 - 7 * CELL_GAP) / 8), 42);
 
+  const incomingGreetingMessage = useMemo(
+    () => formatIncomingFloatingGreeting(store.chatGreetingOverlay, lastMsg),
+    [store.chatGreetingOverlay, lastMsg],
+  );
+
   return (
     <IonPage style={{ '--background': '#0a1628' }}>
       <IonHeader>
@@ -212,31 +219,13 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
             </div>
           </IonButtons>
         </IonToolbar>
-        
-        {store.chatGreetingOverlay && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 10,
-            background: 'rgba(201,168,76,0.95)',
-            color: '#000',
-            padding: '8px 16px',
-            fontSize: '13px',
-            fontWeight: '600',
-            textAlign: 'center',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            animation: 'slideDown 0.3s ease-out'
-          }}>
-            {store.chatGreetingOverlay.type === 'FromOpponent' 
-              ? `${store.chatGreetingOverlay.from}: ${store.chatGreetingOverlay.text}`
-              : `${t('you')}: ${store.chatGreetingOverlay.text}`}
-          </div>
-        )}
       </IonHeader>
 
       <IonContent style={{ '--background': '#0a1628' }}>
+        <FloatingIncomingMessages
+          message={incomingGreetingMessage}
+          active={store.phase === ChessPhase.PLAY && !isSpectator}
+        />
         {store.phase === ChessPhase.WAITING && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}>
             <IonCard style={{ width: '85%', maxWidth: '340px', '--background': '#1a2940', borderRadius: '24px', textAlign: 'center', border: '2px solid rgba(255,255,255,0.1)' }}>
@@ -420,7 +409,8 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
               <ChatGreetingChips 
                 greetings={store.greetings} 
                 onSend={(id) => store.sendGreeting(roomId, id)} 
-                lastReceivedMessage={lastMsg} 
+                lastReceivedMessage={lastMsg}
+                showIncomingBanner={false}
               />
             )}
           </div>

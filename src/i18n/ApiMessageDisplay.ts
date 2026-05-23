@@ -354,7 +354,7 @@ export function normalizedGameEndReason(data: any): string {
     .toLowerCase();
 }
 
-export type PlayerGameEndReasonProfile = 'CHESS' | 'HALMA' | 'BATTLESHIP' | 'DOMINO';
+export type PlayerGameEndReasonProfile = 'CHESS' | 'HALMA' | 'BATTLESHIP' | 'DOMINO' | 'CONNECT_FOUR';
 
 export interface GameEndMessageKeys {
   victoryOpponentTimeout: string;
@@ -508,7 +508,9 @@ export function playerGameEndReasonFallback(
     case 'BATTLESHIP':
       return t(youWon ? 'game_over_reason_bs_won' : 'game_over_reason_bs_lost');
     case 'DOMINO':
-      return t(youWon ? 'game_over_reason_domino_won' : 'game_over_reason_domino_lost'); 
+      return t(youWon ? 'game_over_reason_domino_won' : 'game_over_reason_domino_lost');
+    case 'CONNECT_FOUR':
+      return youWon ? 'game_over_reason_connect_four_won' : 'game_over_reason_connect_four_lost';
     default:
       return '';
   }

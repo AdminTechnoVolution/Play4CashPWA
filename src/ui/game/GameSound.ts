@@ -101,6 +101,23 @@ function buildThud(): Float32Array {
   return buf;
 }
 
+/** Plastic disc landing in a Connect Four column — thud + short bounce transient. */
+function buildDiscDrop(): Float32Array {
+  const len = msToSamples(280);
+  const buf = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    const t = i / SAMPLE_RATE;
+    const progress = i / len;
+    const env = Math.exp(-9.0 * progress);
+    const impact = Math.sin(2 * Math.PI * 140 * t) * Math.exp(-22.0 * progress);
+    const bounce =
+      Math.sin(2 * Math.PI * 320 * t) * Math.exp(-38.0 * progress) * (progress < 0.35 ? 1 : 0);
+    const click = Math.sin(2 * Math.PI * 780 * t) * Math.exp(-55.0 * progress) * 0.25;
+    buf[i] = (impact * 0.75 + bounce * 0.35 + click) * env * 0.58;
+  }
+  return buf;
+}
+
 function buildSecurityAlarm(): Float32Array {
   const segLen = msToSamples(270);
   const pairs = 6;
@@ -199,6 +216,11 @@ export function tilePlace(): void {
   playBuffer(buildThud());
 }
 
+/** Disc dropped into a Connect Four column. */
+export function discDrop(): void {
+  playBuffer(buildDiscDrop());
+}
+
 /** Security-style dual-tone alarm — timeout warning. */
 export function turnTimeoutWarning(): void {
   playBuffer(buildSecurityAlarm());
@@ -210,6 +232,7 @@ const GameSound = {
   splash,
   pieceMove,
   tilePlace,
+  discDrop,
   unoCardPlay,
   turnTimeoutWarning,
 };

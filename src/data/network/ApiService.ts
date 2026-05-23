@@ -101,6 +101,10 @@ export const apiService = {
       const um = g.unoMatchTarget ?? g.uno_match_target;
       const unoMatchTarget =
         typeof um === 'number' && Number.isFinite(um) ? um : undefined;
+      const rawRules = g.rules ?? [];
+      const rules = Array.isArray(rawRules)
+        ? rawRules.map((r: unknown) => (typeof r === 'string' ? r : '')).filter(Boolean)
+        : [];
       return {
         id: g._id ?? g.id ?? '',
         name: g.name ?? '',
@@ -109,6 +113,7 @@ export const apiService = {
         turnTimerSeconds: g.turn_timer_seconds ?? 0,
         defaultBets: g.default_bets ?? [],
         description: g.description ?? '',
+        rules,
         minPlayers: g.min_players ?? g.minPlayers ?? 2,
         maxPlayers: g.max_players ?? g.maxPlayers ?? 2,
         activeRooms: g.activeRooms ?? g.active_rooms ?? 0,

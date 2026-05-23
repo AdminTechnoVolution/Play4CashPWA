@@ -17,6 +17,7 @@ import {
   IonFabButton,
   IonModal,
   IonInput,
+  IonButton,
   IonSelect,
   IonSelectOption,
   IonSegment,
@@ -38,6 +39,7 @@ import {
   enterOutline,
   closeOutline,
   gameControllerOutline,
+  listOutline,
 } from 'ionicons/icons';
 import { useRoomsStore } from '../../store/roomsStore';
 import { useDashboardStore } from '../../store/dashboardStore';
@@ -45,6 +47,7 @@ import { LobbySocketManager } from '../../data/network/LobbySocketManager';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import ConnectionStrengthIndicator from '../../ui/components/ConnectionStrengthIndicator';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
+import GameRulesModal from '../../ui/components/GameRulesModal';
 import { useT, hasKey } from '../../i18n/translations';
 import {
   formatApiMessageForDisplay,
@@ -124,7 +127,7 @@ const RoomsPage: React.FC = () => {
   const [spectatingId, setSpectatingId] = useState<string | null>(null);
 
   /** Matches PlayPage routing: upfront stake + join confirm for chess / halma / domino / uno. */
-  const showJoinStakeConfirm = ['chess', 'halma', 'domino', 'uno'].includes(
+  const showJoinStakeConfirm = ['chess', 'halma', 'domino', 'uno', 'connect-four'].includes(
     (gameSocketCode || '').toLowerCase(),
   );
   const [joinConfirmRoom, setJoinConfirmRoom] = useState<{
@@ -133,6 +136,7 @@ const RoomsPage: React.FC = () => {
     betAmount: number;
     opponentName: string;
   } | null>(null);
+  const [showRulesModal, setShowRulesModal] = useState(false);
   
   // Reset form and default to minBet when modal opens
   useEffect(() => {
@@ -366,6 +370,17 @@ const RoomsPage: React.FC = () => {
                 marginRight: '12px',
               }}
             >
+              {catalogGame && (
+                <IonButton
+                  fill="clear"
+                  size="small"
+                  onClick={() => setShowRulesModal(true)}
+                  aria-label={t('game_view_rules')}
+                  style={{ '--padding-start': '6px', '--padding-end': '6px' }}
+                >
+                  <IonIcon icon={listOutline} style={{ color: 'var(--sovereign-gold)', fontSize: '22px' }} />
+                </IonButton>
+              )}
               <div
                 style={{
                   display: 'flex',
@@ -783,7 +798,7 @@ const RoomsPage: React.FC = () => {
                 </div>
               )}
 
-              {['chess', 'halma', 'domino', 'uno'].includes(gameSocketCode) && (
+              {['chess', 'halma', 'domino', 'uno', 'connect-four'].includes(gameSocketCode) && (
                 <div style={{
                   background: 'rgba(255,107,53,0.10)',
                   border: '1px solid rgba(255,107,53,0.30)',
@@ -938,6 +953,24 @@ const RoomsPage: React.FC = () => {
       </IonContent>
 
       <GenericErrorModal isOpen={!!error} message={error ?? ''} onDismiss={clearError} />
+
+      <GameRulesModal
+        isOpen={showRulesModal}
+        onDismiss={() => setShowRulesModal(false)}
+        game={
+          catalogGame
+            ? {
+                name: catalogGame.name,
+                description: catalogGame.description,
+                rules: catalogGame.rules,
+                houseEdge: catalogGame.houseEdge,
+                defaultBets: catalogGame.defaultBets,
+                unoMatchTarget: catalogGame.unoMatchTarget,
+                socketCode: catalogGame.socketCode,
+              }
+            : null
+        }
+      />
     </IonPage>
   );
 };

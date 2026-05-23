@@ -12,6 +12,7 @@ build/
 dist/
 www/
 out/
+azure-deploy/
 
 # Ionic
 

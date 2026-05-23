@@ -115,10 +115,31 @@ handshake URL because the browser cannot set `Authorization` on a WebSocket upgr
 
 | Variable                  | Notes |
 |---------------------------|-------|
-| `VITE_API_URL`            | Production API origin. Leave empty in dev when using the proxy. |
-| `VITE_GOOGLE_CLIENT_ID`   | OAuth client used at the login screen. |
+| `VITE_API_URL`            | Production API/Gateway origin. Leave empty in dev when using the proxy. On Azure App Service, set as **Application Setting** (runtime); the Node server injects it via `/env-config.js` — no rebuild needed. |
+| `VITE_GOOGLE_CLIENT_ID`   | OAuth client used at the login screen. Same runtime injection on App Service. |
 | `VITE_DEV_PROXY_TARGET`   | Dev-only. When set, Vite proxies `/api` and `/socket.io` to that origin. |
 | `VITE_DEV_PROXY_INSECURE` | Dev-only. `true` to allow self-signed HTTPS targets. |
+
+**Azure App Service (p4c-web / p4c-web-dev):** configure `VITE_API_URL` and
+`VITE_GOOGLE_CLIENT_ID` under Configuration → Application settings.
+
+**Startup command** — replace plain `pm2 serve` (which skips runtime config) with:
+
+```bash
+bash startup.sh
+```
+
+Equivalent one-liner (same behaviour as before + env injection):
+
+```bash
+node /home/site/wwwroot/scripts/generate-runtime-config.mjs /home/site/wwwroot/env-config.js && pm2 serve /home/site/wwwroot --no-daemon --spa
+```
+
+`startup.sh` reads Application Settings, writes `env-config.js`, then runs
+`pm2 serve` on port `$PORT`. Alternative without pm2: `node server.mjs`.
+
+Set `SCM_DO_BUILD_DURING_DEPLOYMENT=false`. Deploy package: `./azure-deploy` (flat
+static files at wwwroot root + `scripts/`).
 
 ## 9. PWA versioning contract
 

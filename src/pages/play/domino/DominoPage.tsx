@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonButton, IonIcon, IonText, IonSpinner, IonCard, IonCardContent,
@@ -11,7 +11,9 @@ import { ChatSocketManager } from '../../../data/network/ChatSocketManager';
 import type { DominoTile, ChatMessage } from '../../../data/models/ApiModels';
 import GameOverModal from '../components/GameOverModal';
 import ChatGreetingChips from '../components/ChatGreetingChips';
+import FloatingIncomingMessages from '../components/FloatingIncomingMessages';
 import SpectatorBadge from '../components/SpectatorBadge';
+import { formatIncomingFloatingGreeting } from '../../../util/ChatGreetingModels';
 import TurnTimer from '../components/TurnTimer';
 import { useT, hasKey } from '../../../i18n/translations';
 import { applyWsMessagePlaceholders, formatApiMessageForDisplay, formatCatalogInteger, tStatus } from '../../../i18n/ApiMessageDisplay';
@@ -409,6 +411,11 @@ export default function DominoPage({
   const showPlayBottom =
     store.phase === DominoPhase.PLAY && !showWaitingOverlay;
 
+  const incomingGreetingMessage = useMemo(
+    () => formatIncomingFloatingGreeting(store.chatGreetingOverlay, lastMsg),
+    [store.chatGreetingOverlay, lastMsg],
+  );
+
   return (
     <IonPage style={{ '--background': '#0a1628' }}>
       <IonHeader>
@@ -437,20 +444,13 @@ export default function DominoPage({
             </div>
           </IonButtons>
         </IonToolbar>
-        {store.chatGreetingOverlay && (
-          <div style={{
-            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-            background: 'rgba(201,168,76,0.95)', color: '#000', padding: '8px 16px',
-            fontSize: 13, fontWeight: 600, textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          }}>
-            {store.chatGreetingOverlay.type === 'FromOpponent'
-              ? `${store.chatGreetingOverlay.from}: ${store.chatGreetingOverlay.text}`
-              : `${t('chat_greeting_you_sent')}: ${store.chatGreetingOverlay.text}`}
-          </div>
-        )}
       </IonHeader>
 
       <IonContent scrollY={false} fullscreen style={{ '--background': '#0a1628' }}>
+        <FloatingIncomingMessages
+          message={incomingGreetingMessage}
+          active={store.phase === DominoPhase.PLAY && !isSpectator}
+        />
         {showWaitingOverlay && (
           <div style={{
             display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', justifyContent: 'center',
@@ -533,6 +533,7 @@ export default function DominoPage({
                 greetings={store.greetings}
                 onSend={(id) => store.sendGreeting(roomId, id)}
                 lastReceivedMessage={lastMsg}
+                showIncomingBanner={false}
               />
             )}
 
