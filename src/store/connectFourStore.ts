@@ -90,9 +90,16 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
       return;
     }
     try {
+      const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
+      // Re-emit join every 5s so the server re-checks both player sockets are present.
+      if (st.opponentConfirmed || st.hasOpponent) {
+        apiRepository.roomReady(roomId).catch(() => {});
+      }
+      socket?.requestSync(roomId);
+
       const status = await apiRepository.getRoomStatus(roomId);
       if (status.status?.toLowerCase() === 'started') {
-        (window as any).connectFourSocket?.requestSync(roomId);
+        socket?.requestSync(roomId);
         stopStatusPolling();
       }
     } catch {
@@ -409,6 +416,9 @@ function handleConnectFourPayload(
       isPlayerTurn: false,
     });
     if (!get().isSpectator) {
+      if (get().opponentConfirmed || get().hasOpponent || opponentJoined) {
+        apiRepository.roomReady(get().roomId).catch(() => {});
+      }
       startStatusPolling(get().roomId, get);
     }
     if (waitingForOpponent) return;
@@ -482,7 +492,7 @@ function handleConnectFourPayload(
   }
 
   const gameStarted = !!data?.gameStarted || !!data?.game_started;
-  if (gameStarted || data?.board) {
+  if (gameStarted || (get().phase === ConnectFourPhase.PLAY && data?.board != null)) {
     applyPlayPayload(data, set, get);
   }
 }
@@ -556,13 +566,20 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
       if (hasOpponent && !isSpectator) {
         apiRepository.roomReady(roomId).catch(() => {});
       }
+      const phase = get().phase;
+      if (phase === ConnectFourPhase.WAITING || phase === ConnectFourPhase.PLAY) {
+        socketManager.requestSync(roomId);
+      }
       if (isSpectator) {
         setTimeout(() => {
           if (get().phase === ConnectFourPhase.WAITING) {
-            (window as any).connectFourSocket?.requestSync(roomId);
+            socketManager.requestSync(roomId);
           }
         }, 1500);
       }
+    });
+    socketManager.setOnDisconnected(() => {
+      set({ isMovePending: false });
     });
     socketManager.setOnConnectionError(() => set({ apiErrorRawMessage: 'bs_connection_error' }));
     socketManager.connect(roomId);
@@ -597,8 +614,9 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   dropInColumn(roomId, col) {
     const s = get();
     if (s.isSpectator || s.phase !== ConnectFourPhase.PLAY || !s.isPlayerTurn || s.isMovePending) return;
+    const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
+    if (!socket?.dropDisc(roomId, col)) return;
     set({ isMovePending: true });
-    (window as any).connectFourSocket?.dropDisc(roomId, col);
   },
 
   clearIllegalMoveToast: () => set({ illegalMoveToast: null }),

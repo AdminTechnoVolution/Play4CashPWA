@@ -100,14 +100,15 @@ export class ConnectFourSocketManager {
     this.socket.connect();
   }
 
+  /** Re-emit join to resync state or re-attempt start when both players are in the room. */
   requestSync(roomId: string): void {
-    if (!this.isConnected) return;
     this.socket?.emit('join', { room_id: roomId });
   }
 
-  dropDisc(roomId: string, col: number): void {
-    if (!this.isConnected) return;
+  dropDisc(roomId: string, col: number): boolean {
+    if (!this.isConnected) return false;
     this.socket?.emit('drop_disc', { room_id: roomId, col });
+    return true;
   }
 
   forfeit(roomId: string): void {
