@@ -124,7 +124,7 @@ const RoomsPage: React.FC = () => {
   const [spectatingId, setSpectatingId] = useState<string | null>(null);
 
   /** Matches PlayPage routing: upfront stake + join confirm for chess / halma / domino / uno. */
-  const showJoinStakeConfirm = ['chess', 'halma', 'domino', 'uno'].includes(
+  const showJoinStakeConfirm = ['chess', 'halma', 'domino', 'uno', 'connect-four'].includes(
     (gameSocketCode || '').toLowerCase(),
   );
   const [joinConfirmRoom, setJoinConfirmRoom] = useState<{
@@ -783,7 +783,7 @@ const RoomsPage: React.FC = () => {
                 </div>
               )}
 
-              {['chess', 'halma', 'domino', 'uno'].includes(gameSocketCode) && (
+              {['chess', 'halma', 'domino', 'uno', 'connect-four'].includes(gameSocketCode) && (
                 <div style={{
                   background: 'rgba(255,107,53,0.10)',
                   border: '1px solid rgba(255,107,53,0.30)',

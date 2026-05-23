@@ -11,6 +11,9 @@ import {
   IonText,
   useIonToast,
   IonSpinner,
+  IonCard,
+  IonCardContent,
+  IonAlert,
 } from '@ionic/react';
 import { arrowBackOutline } from 'ionicons/icons';
 import { useAuthStore } from '../../../store/authStore';
@@ -140,6 +143,25 @@ export default function ConnectFourPage({
   }, []);
 
   useEffect(() => {
+    if (store.chatErrorToast) {
+      present({
+        message: store.chatErrorToast,
+        duration: 2500,
+        position: 'bottom',
+        color: 'warning',
+        onDidDismiss: () => store.clearChatErrorToast(),
+      });
+    }
+  }, [store.chatErrorToast]);
+
+  useEffect(() => {
+    if (store.matchCancelledMessage) {
+      present({ message: store.matchCancelledMessage, duration: 2500, position: 'bottom' });
+      store.clearMatchCancelledToast();
+    }
+  }, [store.matchCancelledMessage]);
+
+  useEffect(() => {
     if (store.illegalMoveToast) {
       setDropAnim(null);
       present({
@@ -209,23 +231,140 @@ export default function ConnectFourPage({
         : '';
 
   return (
-    <IonPage className="cf-page">
+    <IonPage className="cf-page" style={{ '--background': '#0a1628' }}>
       <IonHeader>
-        <IonToolbar>
+        <IonToolbar style={{ '--background': '#0a1628', '--border-color': 'rgba(201,168,76,0.2)' }}>
           <IonButtons slot="start">
             <IonButton onClick={onLeaveRequest} aria-label={t('chess_cd_back')}>
-              <IonIcon icon={arrowBackOutline} />
+              <IonIcon icon={arrowBackOutline} style={{ color: '#c9a84c' }} />
             </IonButton>
           </IonButtons>
-          <IonTitle>{roomName || t('connect_four_title')}</IonTitle>
+          <IonTitle style={{ color: '#fff', fontSize: 16 }}>
+            {roomName || t('connect_four_title')}
+          </IonTitle>
           <IonButtons slot="end">
-            <ConnectionStrengthIndicator />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 28,
+                  padding: '0 6px',
+                  background: 'rgba(201,168,76,0.08)',
+                  border: '1px solid var(--sovereign-border)',
+                  borderRadius: '8px',
+                }}
+              >
+                <ConnectionStrengthIndicator />
+              </div>
+              <IonText style={{ color: '#c9a84c', fontSize: 14, fontWeight: 800 }}>${betAmount}</IonText>
+            </div>
           </IonButtons>
         </IonToolbar>
+
+        {store.chatGreetingOverlay && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              background: 'rgba(201,168,76,0.95)',
+              color: '#000',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: '600',
+              textAlign: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            }}
+          >
+            {store.chatGreetingOverlay.type === 'FromOpponent'
+              ? `${store.chatGreetingOverlay.from}: ${store.chatGreetingOverlay.text}`
+              : `${t('you')}: ${store.chatGreetingOverlay.text}`}
+          </div>
+        )}
       </IonHeader>
 
-      <IonContent>
-        {isSpectator && <SpectatorBadge isSpectator count={store.spectatorsCount} />}
+      <IonContent style={{ '--background': '#0a1628' }}>
+        {store.phase === ConnectFourPhase.WAITING && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0,0,0,0.5)',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 10,
+            }}
+          >
+            <IonCard
+              style={{
+                width: '85%',
+                maxWidth: '340px',
+                '--background': '#1a2940',
+                borderRadius: '24px',
+                textAlign: 'center',
+                border: '2px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <IonCardContent style={{ padding: '32px 24px' }}>
+                <IonText
+                  style={{
+                    color: '#fff',
+                    fontSize: '20px',
+                    fontWeight: '800',
+                    display: 'block',
+                    marginBottom: '16px',
+                    letterSpacing: '2px',
+                  }}
+                >
+                  {t('bs_waiting_title').toUpperCase()}
+                </IonText>
+                <IonSpinner
+                  name="crescent"
+                  style={{ color: '#c9a84c', marginBottom: '24px', width: '48px', height: '48px' }}
+                />
+                <IonText
+                  style={{
+                    color: '#8a9bbf',
+                    fontSize: '15px',
+                    display: 'block',
+                    marginBottom: '32px',
+                    lineHeight: '1.4',
+                  }}
+                >
+                  {statusText}
+                </IonText>
+                <IonButton
+                  expand="block"
+                  onClick={onLeaveRequest}
+                  style={{
+                    '--background': 'transparent',
+                    '--color': '#8a9bbf',
+                    '--border-radius': '12px',
+                    border: '1px solid rgba(138,155,191,0.3)',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {t('bs_leave_room')}
+                </IonButton>
+              </IonCardContent>
+            </IonCard>
+          </div>
+        )}
+
+        <div style={{ opacity: store.phase === ConnectFourPhase.WAITING ? 0.3 : 1 }}>
+        {isSpectator && store.phase !== ConnectFourPhase.WAITING && (
+          <SpectatorBadge isSpectator count={store.spectatorsCount} />
+        )}
 
         <div style={{ padding: '8px 16px', textAlign: 'center' }}>
           {store.yourColor && !isSpectator && (
@@ -254,12 +393,6 @@ export default function ConnectFourPage({
             />
           )}
         </div>
-
-        {store.phase === ConnectFourPhase.WAITING && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
-            <IonSpinner name="crescent" />
-          </div>
-        )}
 
         {(store.phase === ConnectFourPhase.PLAY || store.phase === ConnectFourPhase.GAME_OVER) && (
           <div className="cf-board-wrap">
@@ -322,19 +455,28 @@ export default function ConnectFourPage({
             lastReceivedMessage={lastMsg}
           />
         )}
+        </div>
 
         <GameOverModal
           isOpen={store.phase === ConnectFourPhase.GAME_OVER}
           gameOver={store.gameOver}
           isSpectator={isSpectator}
           gameProfile="CONNECT_FOUR"
-          onExit={() => void store.leaveRoom(roomId)}
+          onExit={onLeaveRequest}
         />
 
         <GenericErrorModal
           isOpen={store.apiErrorRawMessage != null}
           message={formatApiMessageForDisplay(store.apiErrorRawMessage, 'error_try_later_message')}
           onDismiss={() => store.clearGenericError()}
+        />
+
+        <IonAlert
+          isOpen={!!store.opponentLeftMessage}
+          header={t('bs_opponent_left_title')}
+          message={store.opponentLeftMessage ?? ''}
+          buttons={[{ text: t('ok'), handler: () => store.clearOpponentLeft() }]}
+          onDidDismiss={() => store.clearOpponentLeft()}
         />
       </IonContent>
     </IonPage>

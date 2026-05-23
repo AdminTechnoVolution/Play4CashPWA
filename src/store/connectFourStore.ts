@@ -57,8 +57,37 @@ function parseLastMove(raw: unknown): ConnectFourMove | null {
 }
 
 let turnTimer: ReturnType<typeof setInterval> | null = null;
+let statusPollTimer: ReturnType<typeof setInterval> | null = null;
 let chatOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastGreetingSentAtMs = 0;
+
+function stopStatusPolling() {
+  if (statusPollTimer) {
+    clearInterval(statusPollTimer);
+    statusPollTimer = null;
+  }
+}
+
+function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
+  stopStatusPolling();
+  statusPollTimer = setInterval(async () => {
+    const st = get();
+    if (st.phase !== ConnectFourPhase.WAITING || st.isSpectator) {
+      stopStatusPolling();
+      return;
+    }
+    try {
+      const status = await apiRepository.getRoomStatus(roomId);
+      if (status.status?.toLowerCase() === 'started') {
+        (window as any).connectFourSocket?.requestSync(roomId);
+        stopStatusPolling();
+      }
+    } catch {
+      /* ignore */
+    }
+  }, 5000);
+}
+
 let timeoutWarned = false;
 
 function stopTurnTimer() {
@@ -138,6 +167,7 @@ interface ConnectFourStoreState {
   myUsername: string;
   roomId: string;
   betAmount: number;
+  hasOpponent: boolean;
   gameOver: GameOverPayload | null;
   gameOverIsDraw: boolean;
   navigateBack: boolean;
@@ -179,6 +209,7 @@ function applyPlayPayload(
   set: (fn: any) => void,
   get: () => ConnectFourStore,
 ) {
+  stopStatusPolling();
   const board = parseBoard(data.board);
   const winningCells = parseWinningCells(data.winningCells ?? data.winning_cells);
   const lastMove = parseLastMove(data.lastMove ?? data.last_move);
@@ -206,6 +237,7 @@ function applyPlayPayload(
     isPlayerTurn: yourTurn,
     winningCells,
     lastMove,
+    opponentConfirmed: true,
     player1Name: String(data.player1 ?? data.player1Name ?? get().player1Name),
     player2Name: String(data.player2 ?? data.player2Name ?? get().player2Name),
     turnTimeLeft,
@@ -261,6 +293,7 @@ function handleConnectFourPayload(
 
   if (opponentLeft && waitingForOpponent) {
     stopTurnTimer();
+    stopStatusPolling();
     set({
       phase: ConnectFourPhase.WAITING,
       opponentConfirmed: false,
@@ -277,24 +310,28 @@ function handleConnectFourPayload(
 
   if (opponentJoined && opponentName) {
     set({ opponentConfirmed: true, opponentName });
-    if (!get().isSpectator && !waitingForOpponent) {
+    if (!get().isSpectator) {
       apiRepository.roomReady(get().roomId).catch(() => {});
     }
   }
 
-  if (waitingForOpponent || (!data?.gameStarted && !data?.game_started && get().phase === ConnectFourPhase.WAITING)) {
+  if (waitingForOpponent || opponentJoined) {
     set({
       phase: ConnectFourPhase.WAITING,
       statusMessage: get().isSpectator ? 'spectator_watching_status' : 'connect_four_status_waiting',
       board: data?.board ? parseBoard(data.board) : get().board,
       isPlayerTurn: false,
     });
-    return;
+    if (!get().isSpectator) {
+      startStatusPolling(get().roomId, get);
+    }
+    if (waitingForOpponent) return;
   }
 
   const gameEnded = !!data?.gameEnded || !!data?.game_ended;
   if (gameEnded) {
     stopTurnTimer();
+    stopStatusPolling();
     const winnerId = String(data?.winner ?? data?.winnerUserId ?? '').trim();
     const reasonNorm = String(data?.reason ?? data?.winnerReason ?? '')
       .trim()
@@ -362,6 +399,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   myUsername: '',
   roomId: '',
   betAmount: 0,
+  hasOpponent: false,
   gameOver: null,
   gameOverIsDraw: false,
   navigateBack: false,
@@ -376,11 +414,14 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
 
   initGame(roomId, myUsername, myUserId, betAmount, hasOpponent, initialOpponentName, isSpectator) {
     stopTurnTimer();
+    stopStatusPolling();
+
     set({
       roomId,
       myUsername,
       myUserId,
       betAmount,
+      hasOpponent,
       opponentName: initialOpponentName,
       opponentConfirmed: hasOpponent || isSpectator,
       isSpectator,
@@ -390,31 +431,40 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
       statusMessage: isSpectator ? 'spectator_watching_status' : 'connect_four_status_waiting',
       yourColor: null,
       gameOver: null,
+      isMovePending: false,
     });
 
-    const socket = new ConnectFourSocketManager();
-    socket.setOnGamePayload((raw) => handleConnectFourPayload(raw, set, get));
-    socket.setOnConnected(() => {
-      if (hasOpponent && !isSpectator) apiRepository.roomReady(roomId).catch(() => {});
+    const socketManager = new ConnectFourSocketManager();
+    socketManager.setOnGamePayload((raw) => handleConnectFourPayload(raw, set, get));
+    socketManager.setOnConnected(() => {
+      if (hasOpponent && !isSpectator) {
+        apiRepository.roomReady(roomId).catch(() => {});
+      }
       if (isSpectator) {
-        setTimeout(() => socket.requestSync(roomId), 1500);
+        setTimeout(() => {
+          if (get().phase === ConnectFourPhase.WAITING) {
+            (window as any).connectFourSocket?.requestSync(roomId);
+          }
+        }, 1500);
       }
     });
-    socket.setOnConnectionError(() => set({ apiErrorRawMessage: 'bs_connection_error' }));
-    socket.connect(roomId);
-    (window as any).connectFourSocket = socket;
+    socketManager.setOnConnectionError(() => set({ apiErrorRawMessage: 'bs_connection_error' }));
+    socketManager.connect(roomId);
+    (window as any).connectFourSocket = socketManager;
+
+    if (!isSpectator) {
+      startStatusPolling(roomId, get);
+      get().loadGreetings();
+    }
   },
 
   cleanup() {
     stopTurnTimer();
+    stopStatusPolling();
     if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
     if ((window as any).connectFourSocket) {
       (window as any).connectFourSocket.disconnect();
       (window as any).connectFourSocket = null;
-    }
-    if ((window as any).connectFourChatSocket) {
-      (window as any).connectFourChatSocket.disconnect();
-      (window as any).connectFourChatSocket = null;
     }
     set({
       phase: ConnectFourPhase.WAITING,

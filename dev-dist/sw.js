@@ -67,7 +67,7 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-f6478a00'], (function (workbox) { 'use strict';
+define(['./workbox-a0f53fdc'], (function (workbox) { 'use strict';
 
   workbox.enable();
   self.addEventListener('message', event => {
@@ -86,12 +86,13 @@ define(['./workbox-f6478a00'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "/index.html",
-    "revision": "0.bvmlsvvser"
+    "revision": "0.0hvndrcpvr"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
     allowlist: [/^\/$/]
   }));
+  workbox.registerRoute(/\/env-config\.js$/, new workbox.NetworkOnly(), 'GET');
   workbox.registerRoute(/^https:\/\/p4c-api/, new workbox.NetworkFirst({
     "cacheName": "api-cache",
     plugins: [new workbox.ExpirationPlugin({

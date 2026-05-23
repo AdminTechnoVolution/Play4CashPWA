@@ -1,3 +1,9 @@
+/**
+ * 2-player staked game socket — mirrors `ChessSocketManager` (namespace/event differ).
+ * Namespace: /connect-four
+ * Events listened: "connect-four"
+ * Events emitted: "join", "drop_disc", "forfeit"
+ */
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
@@ -86,11 +92,6 @@ export class ConnectFourSocketManager {
   requestSync(roomId: string): void {
     if (!this.isConnected) return;
     this.socket?.emit('join', { room_id: roomId });
-  }
-
-  getState(roomId: string): void {
-    if (!this.isConnected) return;
-    this.socket?.emit('get_state', { room_id: roomId });
   }
 
   dropDisc(roomId: string, col: number): void {
