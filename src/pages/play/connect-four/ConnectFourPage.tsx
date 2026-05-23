@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -24,7 +24,9 @@ import { ChatSocketManager } from '../../../data/network/ChatSocketManager';
 import GameOverModal from '../components/GameOverModal';
 import TurnTimer from '../components/TurnTimer';
 import ChatGreetingChips from '../components/ChatGreetingChips';
+import FloatingIncomingMessages from '../components/FloatingIncomingMessages';
 import SpectatorBadge from '../components/SpectatorBadge';
+import { formatIncomingFloatingGreeting } from '../../../util/ChatGreetingModels';
 import { formatApiMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
 import { useT, hasKey } from '../../../i18n/translations';
 import GameSound from '../../../ui/game/GameSound';
@@ -230,6 +232,11 @@ export default function ConnectFourPage({
         ? t('connect_four_playing_yellow')
         : '';
 
+  const incomingGreetingMessage = useMemo(
+    () => formatIncomingFloatingGreeting(store.chatGreetingOverlay, lastMsg),
+    [store.chatGreetingOverlay, lastMsg],
+  );
+
   return (
     <IonPage className="cf-page" style={{ '--background': '#0a1628' }}>
       <IonHeader>
@@ -262,32 +269,13 @@ export default function ConnectFourPage({
             </div>
           </IonButtons>
         </IonToolbar>
-
-        {store.chatGreetingOverlay && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              zIndex: 10,
-              background: 'rgba(201,168,76,0.95)',
-              color: '#000',
-              padding: '8px 16px',
-              fontSize: '13px',
-              fontWeight: '600',
-              textAlign: 'center',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            }}
-          >
-            {store.chatGreetingOverlay.type === 'FromOpponent'
-              ? `${store.chatGreetingOverlay.from}: ${store.chatGreetingOverlay.text}`
-              : `${t('you')}: ${store.chatGreetingOverlay.text}`}
-          </div>
-        )}
       </IonHeader>
 
       <IonContent style={{ '--background': '#0a1628' }}>
+        <FloatingIncomingMessages
+          message={incomingGreetingMessage}
+          active={store.phase === ConnectFourPhase.PLAY && !isSpectator}
+        />
         {store.phase === ConnectFourPhase.WAITING && (
           <div
             style={{
@@ -477,6 +465,7 @@ export default function ConnectFourPage({
             greetings={store.greetings}
             onSend={(id) => store.sendGreeting(roomId, id)}
             lastReceivedMessage={lastMsg}
+            showIncomingBanner={false}
           />
         )}
         </div>

@@ -33,6 +33,7 @@ import { hasPlayableCardInHand } from './unoPlayability';
 import ChatGreetingChips from '../components/ChatGreetingChips';
 import FloatingIncomingMessages from '../components/FloatingIncomingMessages';
 import SpectatorBadge from '../components/SpectatorBadge';
+import { formatIncomingFloatingGreeting } from '../../../util/ChatGreetingModels';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import { formatApiMessageForDisplay, formatSocketMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
 import { SovereignSecondaryButton } from '../../../ui/components/SovereignButton';
@@ -205,15 +206,10 @@ export default function UnoPage(props: UnoPageProps) {
 
   const timerLow = turnTimeLeft > 0 && turnTimeLeft <= 10;
 
-  const incomingGreetingMessage = useMemo(() => {
-    if (chatGreetingOverlay?.type === 'FromOpponent') {
-      return `${chatGreetingOverlay.from}: ${chatGreetingOverlay.text}`;
-    }
-    const text = lastMsg?.text?.trim();
-    if (!text) return '';
-    const from = (lastMsg?.from ?? '').trim();
-    return from ? `${from}: ${text}` : text;
-  }, [chatGreetingOverlay, lastMsg]);
+  const incomingGreetingMessage = useMemo(
+    () => formatIncomingFloatingGreeting(chatGreetingOverlay, lastMsg),
+    [chatGreetingOverlay, lastMsg],
+  );
 
   const displayMatchTarget =
     phase === UnoPhase.WAITING && props.catalogUnoMatchTarget != null

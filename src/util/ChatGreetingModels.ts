@@ -1,6 +1,22 @@
+import type { ChatMessage } from '../data/models/ApiModels';
+
 export type ChatGreetingOverlay =
   | { type: 'FromOpponent'; from: string; text: string }
   | { type: 'YouSent'; text: string };
+
+/** Floating incoming line (UNO-style): opponent overlay or last chat message with sender. */
+export function formatIncomingFloatingGreeting(
+  overlay: ChatGreetingOverlay | null | undefined,
+  lastMsg: ChatMessage | null | undefined,
+): string {
+  if (overlay?.type === 'FromOpponent') {
+    return `${overlay.from}: ${overlay.text}`;
+  }
+  const text = lastMsg?.text?.trim();
+  if (!text) return '';
+  const from = (lastMsg?.from ?? '').trim();
+  return from ? `${from}: ${text}` : text;
+}
 
 export type ParsedChatEnvelope =
   | { type: 'Incoming'; from: string; text: string }
