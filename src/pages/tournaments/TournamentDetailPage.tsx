@@ -13,7 +13,6 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   checkmarkCircleOutline,
-  playCircleOutline,
   gitNetworkOutline,
   removeCircleOutline,
 } from 'ionicons/icons';
@@ -22,13 +21,14 @@ import { useT } from '../../i18n/translations';
 import { savePlayContext } from '../../util/routingStorage';
 import { useAuthStore } from '../../store/authStore';
 import TournamentCard from '../../ui/components/tournaments/TournamentCard';
+import TournamentMatchJoinPanel from '../../ui/components/tournaments/TournamentMatchJoinPanel';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import {
   canRegisterForTournament,
-  findMyMatchRoomId,
   formatTournamentCountdown,
   isLiveTournamentStatus,
   isUserRegistered,
+  resolveJoinRoomId,
   tournamentStatusKey,
 } from '../../util/tournamentUtils';
 
@@ -45,8 +45,6 @@ const TournamentDetailPage: React.FC = () => {
     loadBracket,
     register,
     unregister,
-    connectSocket,
-    disconnectSocket,
   } = useTournamentsStore();
   const { user } = useAuthStore();
 
@@ -54,9 +52,12 @@ const TournamentDetailPage: React.FC = () => {
     if (!tournamentId) return;
     void loadDetail(tournamentId);
     void loadBracket(tournamentId);
-    connectSocket(tournamentId);
-    return () => disconnectSocket();
-  }, [tournamentId, loadDetail, loadBracket, connectSocket, disconnectSocket]);
+    const poll = setInterval(() => {
+      void loadDetail(tournamentId);
+      void loadBracket(tournamentId);
+    }, 5_000);
+    return () => clearInterval(poll);
+  }, [tournamentId, loadDetail, loadBracket]);
 
   useEffect(() => {
     const timer = setInterval(() => bumpClock(), 1000);
@@ -71,9 +72,9 @@ const TournamentDetailPage: React.FC = () => {
 
   const [actionPending, setActionPending] = useState(false);
 
-  const myMatchRoomId = useMemo(
-    () => findMyMatchRoomId(bracket, user?.id),
-    [bracket, user?.id],
+  const joinRoomId = useMemo(
+    () => resolveJoinRoomId(detail, bracket, user?.id),
+    [detail, bracket, user?.id],
   );
 
   const registered = isUserRegistered(detail);
@@ -101,12 +102,12 @@ const TournamentDetailPage: React.FC = () => {
   };
 
   const goToMatch = () => {
-    if (!detail || !myMatchRoomId) return;
+    if (!detail || !joinRoomId) return;
     savePlayContext({
-      roomId: myMatchRoomId,
+      roomId: joinRoomId,
       betAmount: 0,
       roomName: detail.title,
-      opponentName: '',
+      opponentName: detail.myActiveMatch?.opponentUsername ?? '',
       hasOpponent: true,
       isPlayer1: true,
       isSpectator: false,
@@ -160,6 +161,15 @@ const TournamentDetailPage: React.FC = () => {
                 </div>
               )}
 
+              {registered && live && (
+                <TournamentMatchJoinPanel
+                  tournament={detail}
+                  myMatch={detail.myActiveMatch}
+                  roomId={joinRoomId}
+                  onJoin={goToMatch}
+                />
+              )}
+
               <div
                 style={{
                   textAlign: 'center',
@@ -200,13 +210,6 @@ const TournamentDetailPage: React.FC = () => {
                   <SovereignPrimaryButton expand="block" onClick={() => void onRegister()} disabled={actionPending}>
                     {t('tournament_register')}
                   </SovereignPrimaryButton>
-                )}
-
-                {myMatchRoomId && (
-                  <IonButton expand="block" color="success" onClick={goToMatch}>
-                    <IonIcon icon={playCircleOutline} slot="start" />
-                    {t('tournament_go_to_match')}
-                  </IonButton>
                 )}
 
                 <IonButton

@@ -196,6 +196,10 @@ export const apiRepository = {
     return apiService.getTournaments();
   },
 
+  async getMyTournaments(): Promise<TournamentSummary[]> {
+    return apiService.getMyTournaments();
+  },
+
   async getTournament(id: string): Promise<TournamentSummary> {
     return apiService.getTournament(id);
   },

@@ -8,6 +8,7 @@ import { usePWAInstallStore } from './store/pwaInstallStore';
 import PWAInstallBanner from './ui/components/PWAInstallBanner';
 import ActiveRoomBanner from './ui/components/ActiveRoomBanner';
 import MyTournamentsFloater from './ui/components/tournaments/MyTournamentsFloater';
+import TournamentLobbyManager from './ui/components/tournaments/TournamentLobbyManager';
 import ReconnectionBanner from './ui/components/ReconnectionBanner';
 import AppUpdateModal from './pwa/AppUpdateModal';
 import { useVisibilityReconnect } from './hooks/useVisibilityReconnect';
@@ -95,6 +96,7 @@ export default function App() {
         </Routes>
         {/* Phase C: needs useNavigate/useLocation, so it lives inside the router. */}
         <ActiveRoomBanner />
+        <TournamentLobbyManager />
         <MyTournamentsFloater />
       </BrowserRouter>
       <PWAInstallBanner />

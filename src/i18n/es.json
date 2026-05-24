@@ -1043,5 +1043,14 @@
   "tournament_status_finals_running": "Finales",
   "tournament_status_finished": "Finalizado",
   "tournament_status_cancelled": "Cancelado",
-  "tournament_status_draft": "Borrador"
+  "tournament_status_draft": "Borrador",
+  "tournament_match_ready_title": "¡Tu partida está lista!",
+  "tournament_match_pending_title": "Próxima partida",
+  "tournament_match_vs": "vs {{name}}",
+  "tournament_lobby_stay": "Permanece en la app — debes estar presente en el lobby del torneo antes de que empiece la partida.",
+  "tournament_lobby_stay_short": "Quédate en el lobby",
+  "tournament_lobby_presence_hint": "Mantén la app abierta en el inicio o en la página del torneo. Cerrar la app puede significar forfeiture.",
+  "tournament_presence_in": "Control de presencia en",
+  "tournament_join_match_now": "Pulsa abajo para entrar a tu sala de partida.",
+  "tournament_between_rounds_wait": "Pausa entre rondas — próxima partida en"
 }
