@@ -27,8 +27,11 @@ import {
   canRegisterForTournament,
   formatTournamentCountdown,
   isLiveTournamentStatus,
+  isTournamentMatchReady,
+  isUserEliminatedFromTournament,
   isUserRegistered,
   resolveJoinRoomId,
+  shouldFocusTournamentMatch,
   tournamentStatusKey,
 } from '../../util/tournamentUtils';
 
@@ -82,6 +85,9 @@ const TournamentDetailPage: React.FC = () => {
   const canUnregister =
     registered && detail && ['open', 'full', 'countdown'].includes(detail.status);
   const live = detail ? isLiveTournamentStatus(detail.status) : false;
+  const eliminated = detail ? isUserEliminatedFromTournament(detail) : false;
+  const matchReady = detail ? isTournamentMatchReady(detail, joinRoomId) : false;
+  const focusMatch = detail ? shouldFocusTournamentMatch(detail, joinRoomId) : false;
 
   const onRegister = async () => {
     setActionPending(true);
@@ -132,7 +138,47 @@ const TournamentDetailPage: React.FC = () => {
         <div style={{ maxWidth: '640px', margin: '0 auto', paddingBottom: '120px' }}>
           {detail && (
             <>
+              {matchReady ? (
+                <>
+                  <TournamentMatchJoinPanel
+                    tournament={detail}
+                    myMatch={detail.myActiveMatch}
+                    roomId={joinRoomId}
+                    onJoin={goToMatch}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+                    <IonButton
+                      expand="block"
+                      fill="outline"
+                      onClick={() => navigate(`/tournaments/${tournamentId}/bracket`)}
+                    >
+                      <IonIcon icon={gitNetworkOutline} slot="start" />
+                      {t('tournament_view_bracket')}
+                    </IonButton>
+                  </div>
+                </>
+              ) : (
+                <>
               <TournamentCard tournament={detail} showRegisteredBadge={false} />
+
+              {eliminated && (
+                <div
+                  style={{
+                    marginBottom: '16px',
+                    padding: '14px 16px',
+                    borderRadius: '14px',
+                    background: 'rgba(244,67,54,0.1)',
+                    border: '1px solid rgba(244,67,54,0.35)',
+                  }}
+                >
+                  <p style={{ margin: 0, color: '#ef9a9a', fontWeight: 800, fontSize: '14px' }}>
+                    {t('tournament_eliminated_title')}
+                  </p>
+                  <p style={{ margin: '8px 0 0', color: 'var(--sovereign-text-muted)', fontSize: '13px', lineHeight: 1.45 }}>
+                    {t('tournament_eliminated_watch_hint')}
+                  </p>
+                </div>
+              )}
 
               {registered && (
                 <div
@@ -161,7 +207,7 @@ const TournamentDetailPage: React.FC = () => {
                 </div>
               )}
 
-              {registered && live && (
+              {registered && live && focusMatch && (
                 <TournamentMatchJoinPanel
                   tournament={detail}
                   myMatch={detail.myActiveMatch}
@@ -170,6 +216,7 @@ const TournamentDetailPage: React.FC = () => {
                 />
               )}
 
+              {!focusMatch && (
               <div
                 style={{
                   textAlign: 'center',
@@ -204,6 +251,7 @@ const TournamentDetailPage: React.FC = () => {
                   </p>
                 )}
               </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {canRegister && (
@@ -234,6 +282,8 @@ const TournamentDetailPage: React.FC = () => {
                   </IonButton>
                 )}
               </div>
+                </>
+              )}
             </>
           )}
         </div>

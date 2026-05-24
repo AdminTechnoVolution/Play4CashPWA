@@ -1032,6 +1032,12 @@ export default function BattleshipPage({
   /** Side-by-side boards on wide viewports; stacked on narrow — same ocean panel. */
   const [battleSeaDualColumn, setBattleSeaDualColumn] = useState(true);
   const placementGridRef = useRef<HTMLDivElement>(null);
+  const catalogDragRef = useRef<{ shipType: string; sx: number; sy: number } | null>(null);
+  const [catalogDragGhost, setCatalogDragGhost] = useState<{
+    shipType: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 720px)');
@@ -1076,6 +1082,40 @@ export default function BattleshipPage({
   }, [store.shotCount, store.lastShot]);
 
   // ── Placement phase ─────────────────────────────────────────────────────────
+  const handlePlacementCellTap = useCallback((row: number, col: number) => {
+    if (isSpectator || store.phase !== 'placement') return;
+    const st = useBattleshipStore.getState();
+    if (!st.selectedShipType) return;
+    if (st.placedShips.some((p) => p.type === st.selectedShipType)) {
+      st.moveShipTo(st.selectedShipType, row, col);
+    } else {
+      st.placeShipAt(row, col);
+    }
+  }, [isSpectator, store.phase, store.selectedShipType, store.placedShips]);
+
+  const finishCatalogPointerDrag = useCallback((e: React.PointerEvent) => {
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const d = catalogDragRef.current;
+    catalogDragRef.current = null;
+    setCatalogDragGhost(null);
+    if (!d) return;
+    const drop = pointerClientToPlacementCell(
+      e.clientX,
+      e.clientY,
+      placementGridRef.current,
+    );
+    if (drop) {
+      const st = useBattleshipStore.getState();
+      if (st.placedShips.some((p) => p.type === d.shipType)) return;
+      st.selectShipType(d.shipType);
+      st.placeShipAt(drop.row, drop.col);
+    }
+  }, []);
+
   const handlePlacementDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const el = placementGridRef.current;
@@ -1116,6 +1156,26 @@ export default function BattleshipPage({
         <p style={{ color: 'rgba(201,168,76,0.75)', fontSize: 12, margin: 0, textAlign: 'center' }}>
           {t('bs_placement_hint') || t('recharge_important_information')}
         </p>
+
+        {store.selectedShipType &&
+          !store.placedShips.some((p) => p.type === store.selectedShipType) && (
+          <button
+            type="button"
+            onClick={() => store.toggleOrientation()}
+            style={{
+              padding: '10px 18px',
+              borderRadius: 10,
+              border: '1px solid rgba(201,168,76,0.45)',
+              background: 'rgba(201,168,76,0.12)',
+              color: '#e8c96b',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            ↻ {t('bs_rotate_ship')} ({store.selectedHorizontal ? '→' : '↓'})
+          </button>
+        )}
 
         {/* Opponent joined status banner */}
         {!store.opponentConfirmed ? (
@@ -1201,18 +1261,23 @@ export default function BattleshipPage({
                 width: GRID_PX,
                 height: GRID_PX,
                 overflow: 'hidden',
+                touchAction: 'none',
               }}
             >
               {store.playerBoard.map((row, r) =>
                 row.map((_cell, c) => (
                   <div
                     key={`${r}-${c}`}
+                    role="button"
+                    tabIndex={-1}
+                    onClick={() => handlePlacementCellTap(r, c)}
                     style={{
                       width: CELL, height: CELL,
                       background: 'rgba(8,26,50,0.55)',
                       borderRadius: 3,
                       border: '1px solid rgba(201,168,76,0.14)',
                       boxSizing: 'border-box',
+                      cursor: store.selectedShipType ? 'pointer' : 'default',
                     }}
                   />
                 ))
@@ -1264,6 +1329,24 @@ export default function BattleshipPage({
                     );
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
+                  onPointerDown={(e) => {
+                    if (placed || e.button !== 0) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    store.selectShipType(s.type);
+                    catalogDragRef.current = { shipType: s.type, sx: e.clientX, sy: e.clientY };
+                    setCatalogDragGhost({ shipType: s.type, x: e.clientX, y: e.clientY });
+                    (e.currentTarget as HTMLImageElement).setPointerCapture(e.pointerId);
+                  }}
+                  onPointerMove={(e) => {
+                    if (!catalogDragRef.current || catalogDragRef.current.shipType !== s.type) return;
+                    setCatalogDragGhost({ shipType: s.type, x: e.clientX, y: e.clientY });
+                  }}
+                  onPointerUp={finishCatalogPointerDrag}
+                  onPointerCancel={() => {
+                    catalogDragRef.current = null;
+                    setCatalogDragGhost(null);
+                  }}
                   style={{
                     width: s.size * 18 + 4,
                     height: 22,
@@ -1301,6 +1384,27 @@ export default function BattleshipPage({
             );
           })}
         </div>
+
+        {catalogDragGhost && (
+          <img
+            src={shipImageSrc(catalogDragGhost.shipType)}
+            alt=""
+            draggable={false}
+            style={{
+              position: 'fixed',
+              left: catalogDragGhost.x,
+              top: catalogDragGhost.y,
+              transform: 'translate(-50%, -50%)',
+              width: (SHIP_CATALOG.find((s) => s.type === catalogDragGhost.shipType)?.size ?? 3) * 18 + 4,
+              height: 22,
+              objectFit: 'fill',
+              pointerEvents: 'none',
+              zIndex: 100000,
+              opacity: 0.85,
+              filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.6))',
+            }}
+          />
+        )}
       </div>
 
       <IonToast

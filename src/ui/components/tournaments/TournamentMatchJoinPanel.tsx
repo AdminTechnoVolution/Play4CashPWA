@@ -2,7 +2,7 @@ import { IonButton, IonIcon } from '@ionic/react';
 import { playCircleOutline, radioButtonOnOutline, timeOutline } from 'ionicons/icons';
 import type { TournamentMyActiveMatch, TournamentSummary } from '../../../data/models/ApiModels';
 import { useT } from '../../../i18n/translations';
-import { formatTournamentCountdown } from '../../../util/tournamentUtils';
+import { formatTournamentCountdown, isActiveTournamentPlayer } from '../../../util/tournamentUtils';
 import { officialRemainingMs, useTournamentsStore } from '../../../store/tournamentsStore';
 
 type Props = {
@@ -17,6 +17,7 @@ export default function TournamentMatchJoinPanel({ tournament, myMatch, roomId, 
   const clockTick = useTournamentsStore((s) => s.clockTick);
   void clockTick;
 
+  if (!isActiveTournamentPlayer(tournament)) return null;
   if (!myMatch && !roomId) return null;
 
   const canJoin = myMatch?.canJoin || !!roomId;

@@ -440,8 +440,9 @@
   "bs_outcome_you_sunk_cruiser": "¡Hundiste su Crucero!",
   "bs_outcome_you_sunk_destroyer": "¡Hundiste su Destructor!",
   "bs_outcome_you_sunk_submarine": "¡Hundiste su Submarino!",
-  "bs_placement_hint": "Arrastra un barco desde la lista hasta la cuadrícula • Toca un barco colocado para cambiar la orientación",
+  "bs_placement_hint": "Selecciona un barco y toca la cuadrícula • Arrastra para mover • Toca un barco colocado para rotar",
   "bs_placement_instruction": "Arrastra los barcos desde la lista a la cuadrícula",
+  "bs_rotate_ship": "Rotar barco",
   "bs_placement_waiting_opponent": "Esperando a que un oponente se una… ¡Coloca tus barcos mientras tanto!",
   "bs_play_again": "Jugar de nuevo",
   "bs_ready_button": "LISTO",
@@ -1052,5 +1053,8 @@
   "tournament_lobby_presence_hint": "Mantén la app abierta en el inicio o en la página del torneo. Cerrar la app puede significar forfeiture.",
   "tournament_presence_in": "Control de presencia en",
   "tournament_join_match_now": "Pulsa abajo para entrar a tu sala de partida.",
-  "tournament_between_rounds_wait": "Pausa entre rondas — próxima partida en"
+  "tournament_between_rounds_wait": "Pausa entre rondas — próxima partida en",
+  "tournament_eliminated_title": "Quedaste eliminado del torneo",
+  "tournament_eliminated_watch_hint": "Abre el bracket, elige un grupo y pulsa Ver en una partida en vivo para seguirla como espectador.",
+  "tournament_spectate_match": "Ver"
 }
