@@ -9,31 +9,22 @@ import {
   isMyUpcomingTournament,
   pickPrimaryMyTournament,
   resolveJoinRoomId,
+  shouldFocusTournamentMatch,
 } from '../../../util/tournamentUtils';
 import TournamentReminderPanel from './TournamentReminderPanel';
 import TournamentMatchJoinPanel from './TournamentMatchJoinPanel';
 
-/**
- * Persistent floater for registered upcoming/live tournaments.
- * Rendered via portal on document.body so IonSplitPane/IonContent cannot hide it.
- */
-export default function MyTournamentsFloater() {
+function useTournamentBannerData() {
   const { user, authHydrated } = useAuthStore();
-  const navigate = useNavigate();
-  const location = useLocation();
   const {
     myList,
     list,
     bracketsById,
-    matchRoomsById,
     clockTick,
     bumpClock,
     refreshMyTournaments,
     loadMatchRoom,
   } = useTournamentsStore();
-
-  const inPlay = location.pathname.startsWith('/play/');
-  const onDashboard = location.pathname === '/dashboard';
 
   useEffect(() => {
     if (!authHydrated || !user) return;
@@ -61,6 +52,39 @@ export default function MyTournamentsFloater() {
     void loadMatchRoom(primary.id, user.id);
   }, [primary?.id, primary?.status, user, loadMatchRoom]);
 
+  const focusMatch = shouldFocusTournamentMatch(primary, matchRoomId);
+
+  return { authHydrated, user, myTournaments, primary, matchRoomId, focusMatch, clockTick };
+}
+
+function joinTournamentMatch(
+  navigate: ReturnType<typeof useNavigate>,
+  primary: NonNullable<ReturnType<typeof pickPrimaryMyTournament>>,
+  matchRoomId: string,
+) {
+  savePlayContext({
+    roomId: matchRoomId,
+    betAmount: 0,
+    roomName: primary.title,
+    opponentName: primary.myActiveMatch?.opponentUsername ?? '',
+    hasOpponent: true,
+    isPlayer1: true,
+    isSpectator: false,
+  });
+  navigate(`/play/${primary.gameSocketCode}`);
+}
+
+export default function MyTournamentsFloater() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { authHydrated, user, myTournaments, primary, matchRoomId, focusMatch, clockTick } =
+    useTournamentBannerData();
+
+  const inPlay = location.pathname.startsWith('/play/');
+  const onDashboard = location.pathname === '/dashboard';
+  const onTournamentDetail =
+    !!primary && location.pathname === `/tournaments/${primary.id}`;
+
   const goToTournament = useCallback(() => {
     if (!primary) return;
     navigate(`/tournaments/${primary.id}`);
@@ -68,20 +92,12 @@ export default function MyTournamentsFloater() {
 
   const joinMatch = useCallback(() => {
     if (!primary || !matchRoomId) return;
-    savePlayContext({
-      roomId: matchRoomId,
-      betAmount: 0,
-      roomName: primary.title,
-      opponentName: '',
-      hasOpponent: true,
-      isPlayer1: true,
-      isSpectator: false,
-    });
-    navigate(`/play/${primary.gameSocketCode}`);
+    joinTournamentMatch(navigate, primary, matchRoomId);
   }, [navigate, primary, matchRoomId]);
 
   if (!authHydrated || !user || myTournaments.length === 0 || inPlay || onDashboard) return null;
   if (!primary) return null;
+  if (focusMatch && onTournamentDetail) return null;
 
   void clockTick;
   const remaining = officialRemainingMs(primary);
@@ -100,13 +116,22 @@ export default function MyTournamentsFloater() {
       }}
     >
       <div style={{ pointerEvents: 'auto' }}>
-        <TournamentReminderPanel
-          tournament={primary}
-          countdownMs={remaining}
-          matchRoomId={matchRoomId}
-          onOpen={goToTournament}
-          onJoinMatch={joinMatch}
-        />
+        {focusMatch ? (
+          <TournamentMatchJoinPanel
+            tournament={primary}
+            myMatch={primary.myActiveMatch}
+            roomId={matchRoomId}
+            onJoin={joinMatch}
+          />
+        ) : (
+          <TournamentReminderPanel
+            tournament={primary}
+            countdownMs={remaining}
+            matchRoomId={matchRoomId}
+            onOpen={goToTournament}
+            onJoinMatch={joinMatch}
+          />
+        )}
       </div>
     </div>,
     document.body,
@@ -115,48 +140,30 @@ export default function MyTournamentsFloater() {
 
 /** Inline banner for the dashboard — same data, always visible above the game grid. */
 export function DashboardTournamentBanner() {
-  const { user, authHydrated } = useAuthStore();
   const navigate = useNavigate();
-  const {
-    myList,
-    list,
-    bracketsById,
-    matchRoomsById,
-    clockTick,
-    bumpClock,
-    refreshMyTournaments,
-    loadMatchRoom,
-  } = useTournamentsStore();
-
-  useEffect(() => {
-    if (!authHydrated || !user) return;
-    void refreshMyTournaments(user.id);
-    const poll = setInterval(() => void refreshMyTournaments(user.id), 15_000);
-    return () => clearInterval(poll);
-  }, [authHydrated, user, refreshMyTournaments]);
-
-  useEffect(() => {
-    const timer = setInterval(() => bumpClock(), 1000);
-    return () => clearInterval(timer);
-  }, [bumpClock]);
-
-  const sourceList = myList.length > 0 ? myList : list;
-  const myTournaments = useMemo(() => sourceList.filter(isMyUpcomingTournament), [sourceList]);
-  const primary = useMemo(() => pickPrimaryMyTournament(sourceList), [sourceList, clockTick]);
-
-  const matchRoomId = useMemo(() => {
-    if (!primary || !user) return null;
-    return resolveJoinRoomId(primary, bracketsById[primary.id], user.id);
-  }, [primary, user, bracketsById, clockTick]);
-
-  useEffect(() => {
-    if (!primary || !user || !isLiveTournamentStatus(primary.status)) return;
-    void loadMatchRoom(primary.id, user.id);
-  }, [primary?.id, primary?.status, user, loadMatchRoom]);
+  const { authHydrated, user, myTournaments, primary, matchRoomId, focusMatch } =
+    useTournamentBannerData();
 
   if (!authHydrated || !user || !primary || myTournaments.length === 0) return null;
 
-  void clockTick;
+  const onJoin = () => {
+    if (!matchRoomId) return;
+    joinTournamentMatch(navigate, primary, matchRoomId);
+  };
+
+  if (focusMatch) {
+    return (
+      <div style={{ marginBottom: '20px', animation: 'fadeInUp 0.5s ease' }}>
+        <TournamentMatchJoinPanel
+          tournament={primary}
+          myMatch={primary.myActiveMatch}
+          roomId={matchRoomId}
+          onJoin={onJoin}
+        />
+      </div>
+    );
+  }
+
   const remaining = officialRemainingMs(primary);
 
   return (
@@ -167,42 +174,8 @@ export function DashboardTournamentBanner() {
         matchRoomId={matchRoomId}
         compact
         onOpen={() => navigate(`/tournaments/${primary.id}`)}
-        onJoinMatch={() => {
-          if (!matchRoomId) return;
-          savePlayContext({
-            roomId: matchRoomId,
-            betAmount: 0,
-            roomName: primary.title,
-            opponentName: primary.myActiveMatch?.opponentUsername ?? '',
-            hasOpponent: true,
-            isPlayer1: true,
-            isSpectator: false,
-          });
-          navigate(`/play/${primary.gameSocketCode}`);
-        }}
+        onJoinMatch={onJoin}
       />
-      {isLiveTournamentStatus(primary.status) && (
-        <div style={{ marginTop: '12px' }}>
-          <TournamentMatchJoinPanel
-            tournament={primary}
-            myMatch={primary.myActiveMatch}
-            roomId={matchRoomId}
-            onJoin={() => {
-              if (!matchRoomId) return;
-              savePlayContext({
-                roomId: matchRoomId,
-                betAmount: 0,
-                roomName: primary.title,
-                opponentName: primary.myActiveMatch?.opponentUsername ?? '',
-                hasOpponent: true,
-                isPlayer1: true,
-                isSpectator: false,
-              });
-              navigate(`/play/${primary.gameSocketCode}`);
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 }

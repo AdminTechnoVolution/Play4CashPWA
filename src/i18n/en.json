@@ -438,8 +438,9 @@
   "bs_outcome_you_sunk_cruiser": "You sunk their Cruiser!",
   "bs_outcome_you_sunk_destroyer": "You sunk their Destroyer!",
   "bs_outcome_you_sunk_submarine": "You sunk their Submarine!",
-  "bs_placement_hint": "Drag a ship from the list to the grid • Tap a placed ship to change orientation",
+  "bs_placement_hint": "Select a ship, tap the grid to place • Drag to move • Tap placed ship to rotate",
   "bs_placement_instruction": "Drag ships from the list onto the grid",
+  "bs_rotate_ship": "Rotate ship",
   "bs_placement_waiting_opponent": "Waiting for an opponent to join… Place your ships in the meantime!",
   "bs_play_again": "Play Again",
   "bs_ready_button": "READY",
@@ -1049,5 +1050,8 @@
   "tournament_lobby_presence_hint": "Keep this app open on the dashboard or tournament page. Closing the app may forfeit the match.",
   "tournament_presence_in": "Presence check in",
   "tournament_join_match_now": "Tap below to enter your match room.",
-  "tournament_between_rounds_wait": "Break between rounds — next match in"
+  "tournament_between_rounds_wait": "Break between rounds — next match in",
+  "tournament_eliminated_title": "You are out of this tournament",
+  "tournament_eliminated_watch_hint": "Open the bracket, pick a group, and tap Watch on a live match to follow as a spectator.",
+  "tournament_spectate_match": "Watch"
 }

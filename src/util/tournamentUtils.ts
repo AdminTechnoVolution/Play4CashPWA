@@ -14,10 +14,29 @@ const UPCOMING_STATUSES = new Set(['open', 'full', 'countdown', ...LIVE_STATUSES
 
 const ACTIVE_MATCH_STATUSES = new Set(['ready', 'started', 'waiting_presence']);
 
+/** Participant can still be assigned to playable matches (not out of the tournament). */
+const OUT_OF_TOURNAMENT_STATUSES = new Set([
+  'eliminated',
+  'forfeited',
+  'refunded',
+  'runner_up',
+  'winner',
+]);
+
+export function isActiveTournamentPlayer(t: TournamentSummary | null | undefined): boolean {
+  if (!t?.myRegistration) return false;
+  return !OUT_OF_TOURNAMENT_STATUSES.has(t.myRegistration.status);
+}
+
+export function isUserEliminatedFromTournament(t: TournamentSummary | null | undefined): boolean {
+  const s = t?.myRegistration?.status;
+  return s === 'eliminated' || s === 'forfeited';
+}
+
 export function isUserRegistered(t: TournamentSummary | null | undefined): boolean {
   if (!t?.myRegistration) return false;
   const s = t.myRegistration.status;
-  return s !== 'refunded' && s !== 'eliminated';
+  return s !== 'refunded' && s !== 'eliminated' && s !== 'forfeited';
 }
 
 export function canRegisterForTournament(t: TournamentSummary): boolean {
@@ -63,7 +82,9 @@ export function gameAssetCode(socketCode: string): string {
 export function findMyMatchRoomId(
   bracket: TournamentBracketResponse | null | undefined,
   userId: string | undefined,
+  tournament?: TournamentSummary | null,
 ): string | null {
+  if (!isActiveTournamentPlayer(tournament ?? null)) return null;
   if (!userId || !bracket) return null;
   const all = [...bracket.groupMatches, ...bracket.finalsMatches];
   const mine = all.find(
@@ -91,12 +112,41 @@ export function resolveJoinRoomId(
   bracket: TournamentBracketResponse | null | undefined,
   userId: string | undefined,
 ): string | null {
+  if (!isActiveTournamentPlayer(tournament)) return null;
   if (tournament?.myActiveMatch?.canJoin && tournament.myActiveMatch.roomId) {
     return tournament.myActiveMatch.roomId;
   }
-  return findMyMatchRoomId(bracket, userId);
+  return findMyMatchRoomId(bracket, userId, tournament);
+}
+
+export function isTournamentMatchReady(
+  tournament: TournamentSummary | null | undefined,
+  roomId: string | null | undefined,
+): boolean {
+  if (!isActiveTournamentPlayer(tournament)) return false;
+  if (!tournament) return false;
+  if (tournament.myActiveMatch?.canJoin && tournament.myActiveMatch.roomId) return true;
+  return !!roomId && !!tournament.myActiveMatch?.canJoin;
+}
+
+/** Live match UI (ready, lobby, or pending) — hide duplicate countdown/reminder cards. */
+export function shouldFocusTournamentMatch(
+  tournament: TournamentSummary | null | undefined,
+  roomId: string | null | undefined,
+): boolean {
+  if (!isActiveTournamentPlayer(tournament)) return false;
+  if (!tournament || !isLiveTournamentStatus(tournament.status)) return false;
+  const m = tournament.myActiveMatch;
+  if (m?.canJoin) return true;
+  if (m?.needsLobby) return true;
+  if (m && roomId) return true;
+  return false;
 }
 
 export function tournamentStatusKey(status: string): string {
   return `tournament_status_${status}`;
+}
+
+export function canSpectateTournamentMatch(status: string, roomId: string | null | undefined): boolean {
+  return !!roomId && (status === 'started' || status === 'ready');
 }
