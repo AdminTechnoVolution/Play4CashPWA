@@ -46,8 +46,10 @@ import {
 } from 'ionicons/icons';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAuthStore } from '../../store/authStore';
+import { useTournamentsStore } from '../../store/tournamentsStore';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../ui/components/ConnectionStrengthIndicator';
+import { DashboardTournamentBanner } from '../../ui/components/tournaments/MyTournamentsFloater';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import GameRulesModal from '../../ui/components/GameRulesModal';
 import { useT } from '../../i18n/translations';
@@ -60,7 +62,8 @@ const MENU_ID = 'dashboard-menu';
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { account, games, roomStats, isLoading, error, loadDashboard, clearError } = useDashboardStore();
-  const { logout } = useAuthStore();
+  const { logout, user } = useAuthStore();
+  const refreshMyTournaments = useTournamentsStore((s) => s.refreshMyTournaments);
   const contentRef = useRef<HTMLIonContentElement>(null);
   const t = useT();
 
@@ -79,7 +82,10 @@ const DashboardPage: React.FC = () => {
   }, []);
 
   const handleRefresh = async (event: CustomEvent<RefresherEventDetail>) => {
-    await loadDashboard();
+    await Promise.all([
+      loadDashboard(),
+      user ? refreshMyTournaments(user.id) : Promise.resolve(),
+    ]);
     event.detail.complete();
   };
 
@@ -444,6 +450,8 @@ const DashboardPage: React.FC = () => {
 
           <div style={{ padding: '20px 16px', maxWidth: '900px', margin: '0 auto' }}>
 
+            <DashboardTournamentBanner />
+
             {/* Live stats bar */}
             <div
               style={{
@@ -597,8 +605,6 @@ const DashboardPage: React.FC = () => {
             )}
 
             <div style={{ height: '40px' }} />
-            {/* Extra space when tournament floater is visible */}
-            <div style={{ height: '88px' }} />
           </div>
         </IonContent>
 

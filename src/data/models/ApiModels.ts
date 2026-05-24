@@ -380,6 +380,17 @@ export interface ChatMessage {
 }
 
 // ─── Tournaments ─────────────────────────────────────────────────────────────
+export interface TournamentMyActiveMatch {
+  matchId: string;
+  status: string;
+  roomId: string | null;
+  roundName: string;
+  opponentUsername: string | null;
+  presenceCheckAt: string | null;
+  canJoin: boolean;
+  needsLobby: boolean;
+}
+
 export interface TournamentSummary {
   id: string;
   title: string;
@@ -396,6 +407,7 @@ export interface TournamentSummary {
   turnTimerSeconds: number;
   grossPrizePool: number;
   myRegistration?: { status: string; seed?: number; groupNumber?: number } | null;
+  myActiveMatch?: TournamentMyActiveMatch | null;
 }
 
 export interface TournamentBracketResponse {

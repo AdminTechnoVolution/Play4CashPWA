@@ -375,12 +375,17 @@ export const apiService = {
 
   async getTournaments(): Promise<TournamentSummary[]> {
     const res = await apiClient.get<ApiResponse<TournamentSummary[]>>('/api/tournaments');
-    return unwrap(res.data) ?? [];
+    return (unwrap(res.data) ?? []).map(normalizeTournament);
+  },
+
+  async getMyTournaments(): Promise<TournamentSummary[]> {
+    const res = await apiClient.get<ApiResponse<TournamentSummary[]>>('/api/tournaments/mine');
+    return (unwrap(res.data) ?? []).map(normalizeTournament);
   },
 
   async getTournament(id: string): Promise<TournamentSummary> {
     const res = await apiClient.get<ApiResponse<TournamentSummary>>(`/api/tournaments/${id}`);
-    return unwrap(res.data);
+    return normalizeTournament(unwrap(res.data));
   },
 
   async getTournamentBracket(id: string): Promise<TournamentBracketResponse> {
@@ -412,6 +417,49 @@ export const apiService = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeTournament(raw: any): TournamentSummary {
+  const serverNow = raw.serverNow ?? raw.server_now ?? new Date().toISOString();
+  const startsAt = raw.startsAt ?? raw.starts_at ?? serverNow;
+  const myReg = raw.myRegistration ?? raw.my_registration ?? null;
+  const myMatch = raw.myActiveMatch ?? raw.my_active_match ?? null;
+  return {
+    id: String(raw.id ?? raw._id ?? ''),
+    title: raw.title ?? '',
+    description: raw.description ?? '',
+    gameSocketCode: raw.gameSocketCode ?? raw.game_socket_code ?? '',
+    status: raw.status ?? '',
+    buyIn: raw.buyIn ?? raw.buy_in ?? 0,
+    maxPlayers: raw.maxPlayers ?? raw.max_players ?? 0,
+    registeredCount: raw.registeredCount ?? raw.registered_count ?? 0,
+    startsAt,
+    serverNow,
+    remainingMs: raw.remainingMs ?? raw.remaining_ms ?? 0,
+    pauseRemainingMs: raw.pauseRemainingMs ?? raw.pause_remaining_ms ?? null,
+    turnTimerSeconds: raw.turnTimerSeconds ?? raw.turn_timer_seconds ?? 30,
+    grossPrizePool: raw.grossPrizePool ?? raw.gross_prize_pool ?? 0,
+    myRegistration: myReg
+      ? {
+          status: myReg.status ?? 'registered',
+          seed: myReg.seed,
+          groupNumber: myReg.groupNumber ?? myReg.group_number,
+        }
+      : null,
+    myActiveMatch: myMatch
+      ? {
+          matchId: String(myMatch.matchId ?? myMatch.match_id ?? ''),
+          status: myMatch.status ?? '',
+          roomId: myMatch.roomId ?? myMatch.room_id ?? null,
+          roundName: myMatch.roundName ?? myMatch.round_name ?? '',
+          opponentUsername: myMatch.opponentUsername ?? myMatch.opponent_username ?? null,
+          presenceCheckAt: myMatch.presenceCheckAt ?? myMatch.presence_check_at ?? null,
+          canJoin: !!(myMatch.canJoin ?? myMatch.can_join),
+          needsLobby: !!(myMatch.needsLobby ?? myMatch.needs_lobby),
+        }
+      : null,
+  };
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeRoom(raw: any): RoomResponse {

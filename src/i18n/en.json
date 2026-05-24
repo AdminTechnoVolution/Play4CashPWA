@@ -1040,5 +1040,14 @@
   "tournament_status_finals_running": "Finals",
   "tournament_status_finished": "Finished",
   "tournament_status_cancelled": "Cancelled",
-  "tournament_status_draft": "Draft"
+  "tournament_status_draft": "Draft",
+  "tournament_match_ready_title": "Your match is ready!",
+  "tournament_match_pending_title": "Upcoming match",
+  "tournament_match_vs": "vs {{name}}",
+  "tournament_lobby_stay": "Stay in the app — your presence is required in the tournament lobby before the match starts.",
+  "tournament_lobby_stay_short": "Stay in lobby",
+  "tournament_lobby_presence_hint": "Keep this app open on the dashboard or tournament page. Closing the app may forfeit the match.",
+  "tournament_presence_in": "Presence check in",
+  "tournament_join_match_now": "Tap below to enter your match room.",
+  "tournament_between_rounds_wait": "Break between rounds — next match in"
 }

@@ -86,6 +86,17 @@ export function pickPrimaryMyTournament(list: TournamentSummary[]): TournamentSu
   })[0];
 }
 
+export function resolveJoinRoomId(
+  tournament: TournamentSummary | null | undefined,
+  bracket: TournamentBracketResponse | null | undefined,
+  userId: string | undefined,
+): string | null {
+  if (tournament?.myActiveMatch?.canJoin && tournament.myActiveMatch.roomId) {
+    return tournament.myActiveMatch.roomId;
+  }
+  return findMyMatchRoomId(bracket, userId);
+}
+
 export function tournamentStatusKey(status: string): string {
   return `tournament_status_${status}`;
 }

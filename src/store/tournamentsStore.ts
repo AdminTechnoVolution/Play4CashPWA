@@ -3,9 +3,15 @@ import { apiRepository } from '../data/network/ApiRepository';
 import type { TournamentBracketResponse, TournamentSummary } from '../data/models/ApiModels';
 import { TournamentSocketManager } from '../data/network/TournamentSocketManager';
 import { isMyUpcomingTournament } from '../util/tournamentUtils';
+import {
+  readTrackedTournamentIds,
+  trackRegisteredTournament,
+  untrackRegisteredTournament,
+} from '../util/tournamentRegistrationStorage';
 
 interface TournamentsStore {
   list: TournamentSummary[];
+  myList: TournamentSummary[];
   detail: TournamentSummary | null;
   bracket: TournamentBracketResponse | null;
   bracketsById: Record<string, TournamentBracketResponse>;
@@ -13,6 +19,7 @@ interface TournamentsStore {
   loading: boolean;
   error: string | null;
   clockTick: number;
+  lobbyTournamentId: string | null;
   loadList: () => Promise<void>;
   loadDetail: (id: string) => Promise<void>;
   loadBracket: (id: string) => Promise<TournamentBracketResponse | null>;
@@ -23,19 +30,29 @@ interface TournamentsStore {
   connectSocket: (id: string) => void;
   disconnectSocket: () => void;
   bumpClock: () => void;
-  refreshMyTournaments: (userId: string) => Promise<void>;
+  refreshMyTournaments: (userId?: string) => Promise<void>;
 }
 
 let socketManager: TournamentSocketManager | null = null;
 
 function serverOffsetMs(serverNow: string): number {
-  return Date.parse(serverNow) - Date.now();
+  const parsed = Date.parse(serverNow);
+  if (!Number.isFinite(parsed)) return 0;
+  return parsed - Date.now();
 }
 
 export function officialRemainingMs(t: TournamentSummary): number {
+  if (typeof t.remainingMs === 'number' && Number.isFinite(t.remainingMs) && t.remainingMs >= 0) {
+    const fetchedAt = Date.parse(t.serverNow);
+    if (Number.isFinite(fetchedAt)) {
+      const elapsed = Date.now() - fetchedAt;
+      return Math.max(0, t.remainingMs - elapsed);
+    }
+  }
   const offset = serverOffsetMs(t.serverNow);
   const now = Date.now() + offset;
   const starts = Date.parse(t.startsAt);
+  if (!Number.isFinite(starts)) return 0;
   return Math.max(0, starts - now);
 }
 
@@ -43,8 +60,30 @@ function patchListItem(list: TournamentSummary[], id: string, patch: Partial<Tou
   return list.map((item) => (item.id === id ? { ...item, ...patch } : item));
 }
 
+function mergeMyList(existing: TournamentSummary[], incoming: TournamentSummary[]): TournamentSummary[] {
+  const byId = new Map(existing.map((t) => [t.id, t]));
+  for (const t of incoming) byId.set(t.id, t);
+  return [...byId.values()].sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+}
+
+async function hydrateTrackedDetails(userId: string): Promise<TournamentSummary[]> {
+  const tracked = readTrackedTournamentIds();
+  if (tracked.length === 0) return [];
+  const results = await Promise.all(
+    tracked.map(async (id) => {
+      try {
+        return await apiRepository.getTournament(id);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return results.filter((t): t is TournamentSummary => !!t && isMyUpcomingTournament(t));
+}
+
 export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
   list: [],
+  myList: [],
   detail: null,
   bracket: null,
   bracketsById: {},
@@ -52,6 +91,7 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
   loading: false,
   error: null,
   clockTick: 0,
+  lobbyTournamentId: null,
 
   bumpClock() {
     set((s) => ({ clockTick: s.clockTick + 1 }));
@@ -71,10 +111,14 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const detail = await apiRepository.getTournament(id);
+      if (isMyUpcomingTournament(detail)) trackRegisteredTournament(id);
       set((s) => ({
         detail,
         loading: false,
         list: patchListItem(s.list, id, detail),
+        myList: isMyUpcomingTournament(detail)
+          ? mergeMyList(s.myList, [detail])
+          : s.myList.filter((t) => t.id !== id),
       }));
     } catch {
       set({ loading: false, error: 'tournament_load_error' });
@@ -117,6 +161,7 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
 
   async register(id) {
     await apiRepository.registerTournament(id);
+    trackRegisteredTournament(id);
     set((s) => {
       const reg = { status: 'registered' as const };
       const detail =
@@ -127,23 +172,28 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
               registeredCount: Math.min(s.detail.maxPlayers, s.detail.registeredCount + 1),
             }
           : s.detail;
+      const patched = {
+        myRegistration: reg,
+        registeredCount: Math.min(
+          s.list.find((t) => t.id === id)?.maxPlayers ?? 0,
+          (s.list.find((t) => t.id === id)?.registeredCount ?? 0) + 1,
+        ),
+      };
+      const listItem = s.list.find((t) => t.id === id);
+      const myEntry = listItem ? { ...listItem, ...patched } : null;
       return {
         detail,
-        list: patchListItem(s.list, id, {
-          myRegistration: reg,
-          registeredCount: Math.min(
-            s.list.find((t) => t.id === id)?.maxPlayers ?? 0,
-            (s.list.find((t) => t.id === id)?.registeredCount ?? 0) + 1,
-          ),
-        }),
+        list: patchListItem(s.list, id, patched),
+        myList: myEntry && isMyUpcomingTournament(myEntry) ? mergeMyList(s.myList, [myEntry]) : s.myList,
       };
     });
     await get().loadDetail(id);
-    await get().loadList();
+    await get().refreshMyTournaments();
   },
 
   async unregister(id) {
     await apiRepository.unregisterTournament(id);
+    untrackRegisteredTournament(id);
     set((s) => ({
       detail:
         s.detail?.id === id
@@ -157,27 +207,45 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
         myRegistration: null,
         registeredCount: Math.max(0, (s.list.find((t) => t.id === id)?.registeredCount ?? 1) - 1),
       }),
+      myList: s.myList.filter((t) => t.id !== id),
     }));
     await get().loadDetail(id);
     await get().loadList();
   },
 
   applyServerState(data) {
+    const normalized = { ...data, serverNow: data.serverNow || new Date().toISOString() };
+    if (isMyUpcomingTournament(normalized)) trackRegisteredTournament(normalized.id);
     set((s) => ({
-      detail: s.detail?.id === data.id ? { ...s.detail, ...data, myRegistration: data.myRegistration ?? s.detail.myRegistration } : s.detail,
-      list: patchListItem(s.list, data.id, {
-        ...data,
-        myRegistration: data.myRegistration ?? s.list.find((t) => t.id === data.id)?.myRegistration,
+      detail:
+        s.detail?.id === normalized.id
+          ? { ...s.detail, ...normalized, myRegistration: normalized.myRegistration ?? s.detail.myRegistration }
+          : s.detail,
+      list: patchListItem(s.list, normalized.id, {
+        ...normalized,
+        myRegistration: normalized.myRegistration ?? s.list.find((t) => t.id === normalized.id)?.myRegistration,
       }),
+      myList: isMyUpcomingTournament(normalized)
+        ? mergeMyList(s.myList, [{ ...normalized, myRegistration: normalized.myRegistration ?? { status: 'registered' } }])
+        : s.myList.filter((t) => t.id !== normalized.id),
     }));
   },
 
   connectSocket(id) {
+    if (socketManager && get().lobbyTournamentId === id) return;
     get().disconnectSocket();
+    set({ lobbyTournamentId: id });
     socketManager = new TournamentSocketManager();
     socketManager.setOnPayload((raw) => {
-      const json = raw as { data?: TournamentSummary };
-      if (json?.data) get().applyServerState(json.data);
+      const json = raw as { event?: string; data?: TournamentSummary };
+      if (json?.event === 'tournament:bracketUpdated') {
+        void get().loadBracket(id);
+        void get().loadDetail(id);
+        return;
+      }
+      if (json?.event === 'tournament:state' && json?.data) {
+        get().applyServerState(json.data);
+      }
     });
     socketManager.setOnProxyReconnected(() => {
       socketManager?.requestState();
@@ -190,11 +258,30 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
   disconnectSocket() {
     socketManager?.disconnect();
     socketManager = null;
+    set({ lobbyTournamentId: null });
   },
 
-  async refreshMyTournaments(userId) {
-    await get().loadList();
-    const mine = get().list.filter(isMyUpcomingTournament);
+  async refreshMyTournaments(userId?: string) {
+    let mine: TournamentSummary[] = [];
+    try {
+      mine = await apiRepository.getMyTournaments();
+    } catch {
+      /* endpoint may be unavailable on older API builds */
+    }
+
+    if (mine.length === 0 && userId) {
+      const fromTracked = await hydrateTrackedDetails(userId);
+      mine = fromTracked.length > 0 ? fromTracked : get().list.filter(isMyUpcomingTournament);
+    }
+
+    if (mine.length === 0) {
+      await get().loadList();
+      mine = get().list.filter(isMyUpcomingTournament);
+    }
+
+    for (const t of mine) trackRegisteredTournament(t.id);
+    set({ myList: mine, list: mergeMyList(get().list, mine) });
+
     await Promise.all(
       mine
         .filter((t) =>
@@ -204,6 +291,7 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
         )
         .map(async (t) => {
           await get().loadBracket(t.id);
+          if (!userId) return;
           const bracket = get().bracketsById[t.id];
           if (!bracket) return;
           const all = [...bracket.groupMatches, ...bracket.finalsMatches];
