@@ -5,20 +5,18 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonList,
-  IonItem,
-  IonLabel,
-  IonNote,
   IonBackButton,
   IonButtons,
   IonRefresher,
   IonRefresherContent,
+  IonText,
+  IonIcon,
 } from '@ionic/react';
 import { useNavigate } from 'react-router-dom';
+import { trophyOutline } from 'ionicons/icons';
 import { useTournamentsStore } from '../../store/tournamentsStore';
 import { useT } from '../../i18n/translations';
-import { formatUSD } from '../../util/formatCurrency';
-import { officialRemainingMs } from '../../store/tournamentsStore';
+import TournamentCard from '../../ui/components/tournaments/TournamentCard';
 
 const TournamentsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +26,10 @@ const TournamentsPage: React.FC = () => {
   useEffect(() => {
     void loadList();
   }, [loadList]);
+
+  const sorted = [...list].sort(
+    (a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt),
+  );
 
   return (
     <IonPage>
@@ -39,7 +41,7 @@ const TournamentsPage: React.FC = () => {
           <IonTitle>{t('tournaments_title')}</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent>
+      <IonContent style={{ '--background': 'var(--sovereign-bg)' } as React.CSSProperties}>
         <IonRefresher
           slot="fixed"
           onIonRefresh={(e) => {
@@ -48,33 +50,63 @@ const TournamentsPage: React.FC = () => {
         >
           <IonRefresherContent />
         </IonRefresher>
-        <IonList>
-          {list.map((item) => (
-            <IonItem
-              key={item.id}
-              button
-              detail
-              onClick={() => navigate(`/tournaments/${item.id}`)}
+
+        <div style={{ padding: '16px', maxWidth: '640px', margin: '0 auto', paddingBottom: '100px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              marginBottom: '18px',
+            }}
+          >
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #b8922a, #e8c96b)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              <IonLabel>
-                <h2>{item.title}</h2>
-                <p>{item.gameSocketCode}</p>
-                <p>
-                  {t('tournament_buy_in')}: {formatUSD(item.buyIn)} ·{' '}
-                  {item.registeredCount}/{item.maxPlayers}
+              <IonIcon icon={trophyOutline} style={{ color: '#1a1200', fontSize: '24px' }} />
+            </div>
+            <div>
+              <IonText>
+                <h2 style={{ margin: 0, color: 'var(--sovereign-text)', fontSize: '20px', fontWeight: 800 }}>
+                  {t('tournaments_title')}
+                </h2>
+              </IonText>
+              <IonText>
+                <p style={{ margin: '2px 0 0', color: 'var(--sovereign-text-muted)', fontSize: '13px' }}>
+                  {t('tournaments_subtitle')}
                 </p>
-              </IonLabel>
-              <IonNote slot="end">
-                {Math.ceil(officialRemainingMs(item) / 60000)}m
-              </IonNote>
-            </IonItem>
+              </IonText>
+            </div>
+          </div>
+
+          {sorted.map((item) => (
+            <TournamentCard
+              key={item.id}
+              tournament={item}
+              onClick={() => navigate(`/tournaments/${item.id}`)}
+            />
           ))}
-          {!loading && list.length === 0 && (
-            <IonItem lines="none">
-              <IonLabel>{t('tournaments_empty')}</IonLabel>
-            </IonItem>
+
+          {!loading && sorted.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+              <IonIcon
+                icon={trophyOutline}
+                style={{ fontSize: '56px', color: 'var(--sovereign-text-muted)', marginBottom: '12px' }}
+              />
+              <IonText>
+                <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '15px' }}>{t('tournaments_empty')}</p>
+              </IonText>
+            </div>
           )}
-        </IonList>
+        </div>
       </IonContent>
     </IonPage>
   );

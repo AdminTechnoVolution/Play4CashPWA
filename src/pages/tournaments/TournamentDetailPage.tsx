@@ -8,16 +8,29 @@ import {
   IonButtons,
   IonBackButton,
   IonButton,
-  IonText,
-  IonCard,
-  IonCardContent,
+  IonIcon,
 } from '@ionic/react';
 import { useNavigate, useParams } from 'react-router-dom';
+import {
+  checkmarkCircleOutline,
+  playCircleOutline,
+  gitNetworkOutline,
+  removeCircleOutline,
+} from 'ionicons/icons';
 import { useTournamentsStore, officialRemainingMs } from '../../store/tournamentsStore';
 import { useT } from '../../i18n/translations';
-import { formatUSD } from '../../util/formatCurrency';
 import { savePlayContext } from '../../util/routingStorage';
 import { useAuthStore } from '../../store/authStore';
+import TournamentCard from '../../ui/components/tournaments/TournamentCard';
+import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
+import {
+  canRegisterForTournament,
+  findMyMatchRoomId,
+  formatTournamentCountdown,
+  isLiveTournamentStatus,
+  isUserRegistered,
+  tournamentStatusKey,
+} from '../../util/tournamentUtils';
 
 const TournamentDetailPage: React.FC = () => {
   const { tournamentId = '' } = useParams();
@@ -26,6 +39,8 @@ const TournamentDetailPage: React.FC = () => {
   const {
     detail,
     bracket,
+    clockTick,
+    bumpClock,
     loadDetail,
     loadBracket,
     register,
@@ -43,31 +58,29 @@ const TournamentDetailPage: React.FC = () => {
     return () => disconnectSocket();
   }, [tournamentId, loadDetail, loadBracket, connectSocket, disconnectSocket]);
 
+  useEffect(() => {
+    const timer = setInterval(() => bumpClock(), 1000);
+    return () => clearInterval(timer);
+  }, [bumpClock]);
+
+  void clockTick;
   const remainingLabel = useMemo(() => {
     if (!detail) return '';
-    const ms = officialRemainingMs(detail);
-    const sec = Math.floor(ms / 1000);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${String(s).padStart(2, '0')}`;
-  }, [detail]);
+    return formatTournamentCountdown(officialRemainingMs(detail));
+  }, [detail, clockTick]);
 
   const [actionPending, setActionPending] = useState(false);
 
-  const myMatchRoomId = useMemo(() => {
-    const uid = user?.id;
-    if (!uid || !bracket) return null;
-    const all = [...bracket.groupMatches, ...bracket.finalsMatches];
-    const mine = all.find(
-      (m) =>
-        (m.playerA?.userId === uid || m.playerB?.userId === uid) &&
-        m.roomId &&
-        ['ready', 'started', 'waiting_presence'].includes(m.status),
-    );
-    return mine?.roomId ?? null;
-  }, [bracket, user?.id]);
+  const myMatchRoomId = useMemo(
+    () => findMyMatchRoomId(bracket, user?.id),
+    [bracket, user?.id],
+  );
 
-  const registered = !!detail?.myRegistration;
+  const registered = isUserRegistered(detail);
+  const canRegister = detail ? canRegisterForTournament(detail) : false;
+  const canUnregister =
+    registered && detail && ['open', 'full', 'countdown'].includes(detail.status);
+  const live = detail ? isLiveTournamentStatus(detail.status) : false;
 
   const onRegister = async () => {
     setActionPending(true);
@@ -111,46 +124,116 @@ const TournamentDetailPage: React.FC = () => {
           <IonTitle>{detail?.title ?? t('tournaments_title')}</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent className="ion-padding">
-        {detail && (
-          <IonCard>
-            <IonCardContent>
-              <IonText>
-                <h2>{detail.title}</h2>
-                <p>{detail.description}</p>
-                <p>{t('tournament_status')}: {detail.status}</p>
-                <p>{t('tournament_buy_in')}: {formatUSD(detail.buyIn)}</p>
-                <p>
-                  {t('tournament_slots')}: {detail.registeredCount}/{detail.maxPlayers}
+      <IonContent
+        style={{ '--background': 'var(--sovereign-bg)' } as React.CSSProperties}
+        className="ion-padding"
+      >
+        <div style={{ maxWidth: '640px', margin: '0 auto', paddingBottom: '120px' }}>
+          {detail && (
+            <>
+              <TournamentCard tournament={detail} showRegisteredBadge={false} />
+
+              {registered && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '16px',
+                    padding: '12px 14px',
+                    borderRadius: '14px',
+                    background: 'rgba(76,175,80,0.12)',
+                    border: '1px solid rgba(76,175,80,0.35)',
+                  }}
+                >
+                  <IonIcon icon={checkmarkCircleOutline} style={{ color: '#81c784', fontSize: '24px' }} />
+                  <div>
+                    <p style={{ margin: 0, color: '#a5d6a7', fontWeight: 800, fontSize: '14px' }}>
+                      {t('tournament_registered_message')}
+                    </p>
+                    {detail.myRegistration?.groupNumber != null && (
+                      <p style={{ margin: '2px 0 0', color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>
+                        {t('tournament_your_group').replace('{{n}}', String(detail.myRegistration.groupNumber))}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '16px',
+                  marginBottom: '16px',
+                  borderRadius: '16px',
+                  background: 'rgba(0,0,0,0.2)',
+                  border: '1px solid var(--sovereign-border)',
+                }}
+              >
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--sovereign-text-muted)', fontWeight: 600 }}>
+                  {live ? t('tournament_floater_live') : t('tournament_countdown')}
                 </p>
-                <p>{t('tournament_turn_timer')}: {detail.turnTimerSeconds}s</p>
-                <p>{t('tournament_countdown')}: {remainingLabel}</p>
+                <p
+                  style={{
+                    margin: '6px 0 0',
+                    fontSize: '36px',
+                    fontWeight: 900,
+                    fontVariantNumeric: 'tabular-nums',
+                    color: live ? '#4caf50' : 'var(--sovereign-gold)',
+                    letterSpacing: '1px',
+                  }}
+                >
+                  {remainingLabel}
+                </p>
+                <p style={{ margin: '8px 0 0', fontSize: '12px', color: 'var(--sovereign-text-muted)' }}>
+                  {t(tournamentStatusKey(detail.status))}
+                </p>
                 {detail.pauseRemainingMs != null && detail.pauseRemainingMs > 0 && (
-                  <p>{t('tournament_pause')}: {Math.ceil(detail.pauseRemainingMs / 1000)}s</p>
+                  <p style={{ margin: '8px 0 0', color: '#ffb74d', fontSize: '13px', fontWeight: 700 }}>
+                    {t('tournament_pause')}: {Math.ceil(detail.pauseRemainingMs / 1000)}s
+                  </p>
                 )}
-                <p>{t('tournament_prize_pool')}: {formatUSD(detail.grossPrizePool)}</p>
-              </IonText>
-              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                {!registered && (detail.status === 'open' || detail.status === 'full') && (
-                  <IonButton onClick={() => void onRegister()} disabled={actionPending}>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {canRegister && (
+                  <SovereignPrimaryButton expand="block" onClick={() => void onRegister()} disabled={actionPending}>
                     {t('tournament_register')}
+                  </SovereignPrimaryButton>
+                )}
+
+                {myMatchRoomId && (
+                  <IonButton expand="block" color="success" onClick={goToMatch}>
+                    <IonIcon icon={playCircleOutline} slot="start" />
+                    {t('tournament_go_to_match')}
                   </IonButton>
                 )}
-                {registered && ['open', 'full', 'countdown'].includes(detail.status) && (
-                  <IonButton color="medium" onClick={() => void onUnregister()} disabled={actionPending}>
+
+                <IonButton
+                  expand="block"
+                  fill="outline"
+                  onClick={() => navigate(`/tournaments/${tournamentId}/bracket`)}
+                >
+                  <IonIcon icon={gitNetworkOutline} slot="start" />
+                  {t('tournament_view_bracket')}
+                </IonButton>
+
+                {canUnregister && (
+                  <IonButton
+                    expand="block"
+                    color="medium"
+                    fill="clear"
+                    onClick={() => void onUnregister()}
+                    disabled={actionPending}
+                  >
+                    <IonIcon icon={removeCircleOutline} slot="start" />
                     {t('tournament_unregister')}
                   </IonButton>
                 )}
-                <IonButton fill="outline" onClick={() => navigate(`/tournaments/${tournamentId}/bracket`)}>
-                  {t('tournament_view_bracket')}
-                </IonButton>
-                {myMatchRoomId && (
-                  <IonButton onClick={goToMatch}>{t('tournament_go_to_match')}</IonButton>
-                )}
               </div>
-            </IonCardContent>
-          </IonCard>
-        )}
+            </>
+          )}
+        </div>
       </IonContent>
     </IonPage>
   );

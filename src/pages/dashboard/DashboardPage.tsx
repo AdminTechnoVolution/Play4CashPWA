@@ -597,6 +597,8 @@ const DashboardPage: React.FC = () => {
             )}
 
             <div style={{ height: '40px' }} />
+            {/* Extra space when tournament floater is visible */}
+            <div style={{ height: '88px' }} />
           </div>
         </IonContent>
 
