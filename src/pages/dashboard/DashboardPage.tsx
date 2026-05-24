@@ -95,6 +95,7 @@ const DashboardPage: React.FC = () => {
 
   const navItems = [
     { icon: gridOutline, label: 'Dashboard', path: '/dashboard' },
+    { icon: trophyOutline, label: t('tournaments_title'), path: '/tournaments' },
     { icon: walletOutline, label: t('add_funds_title'), path: '/add-funds' },
     { icon: arrowDownOutline, label: t('withdrawal_title'), path: '/withdrawal' },
     { icon: timeOutline, label: t('game_history_title'), path: '/history' },

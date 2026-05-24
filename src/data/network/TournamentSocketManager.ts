@@ -1,0 +1,99 @@
+/**
+ * Tournament lobby socket — namespace /tournaments
+ */
+import io from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
+import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
+import { getAccessToken } from '../auth/AuthSessionStore';
+import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
+import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
+import { attachVersionMismatchListener } from './socketVersionListener';
+import { instrumentSocket, releaseSocket } from './socketRegistry';
+
+const NAMESPACE = '/tournaments';
+const EVENT = 'tournament';
+
+export class TournamentSocketManager {
+  private socket: Socket | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private onPayload?: (raw: unknown) => void;
+  private onProxyReconnectedCb?: () => void;
+
+  setOnPayload(cb: (raw: unknown) => void): void {
+    this.onPayload = cb;
+  }
+
+  setOnProxyReconnected(cb: () => void): void {
+    this.onProxyReconnectedCb = cb;
+  }
+
+  connect(tournamentId: string): void {
+    this.disconnect();
+    const token = getAccessToken();
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
+      return;
+    }
+    const lang = acceptLanguageTag();
+    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
+      transports: ['polling', 'websocket'],
+      autoConnect: false,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      timeout: SOCKET_TIMEOUT_MS,
+      forceNew: true,
+      query: { token, appVersion: __APP_VERSION__, lang },
+      auth: { token, appVersion: __APP_VERSION__, lang },
+      extraHeaders: socketIoExtraHeaders(token),
+    });
+    attachVersionMismatchListener(this.socket);
+    instrumentSocket(this.socket, NAMESPACE);
+
+    this.socket.on('connect', () => {
+      this.socket?.emit('tournament:join', { tournament_id: tournamentId });
+      this.startHeartbeat();
+    });
+    this.socket.on('proxy_reconnected', () => {
+      this.onProxyReconnectedCb?.();
+      this.socket?.emit('tournament:join', { tournament_id: tournamentId });
+    });
+    this.socket.on(EVENT, (payload: unknown) => this.onPayload?.(payload));
+    this.socket.on('connect_error', async (err: Error) => {
+      if (isSocketUnauthorizedConnectError(err) && this.socket) {
+        try {
+          await refreshSocketHandshake(this.socket);
+          this.socket.connect();
+        } catch {
+          window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
+        }
+      }
+    });
+    this.socket.connect();
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      this.socket?.emit('tournament:heartbeat', {});
+    }, 20000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  requestState(): void {
+    this.socket?.emit('tournament:getState', {});
+  }
+
+  disconnect(): void {
+    this.stopHeartbeat();
+    this.socket?.off();
+    releaseSocket(NAMESPACE);
+    this.socket?.disconnect();
+    this.socket = null;
+  }
+}

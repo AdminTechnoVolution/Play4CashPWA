@@ -20,6 +20,8 @@ import type {
   RechargeHistoryItem,
   WithdrawalHistoryItem,
   GameHistoryItem,
+  TournamentSummary,
+  TournamentBracketResponse,
 } from '../models/ApiModels';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -369,6 +371,43 @@ export const apiService = {
       opponentName: item.opponent?.username ?? '',
       finishedAt: item.finished_at ?? item.date ?? '',
     }));
+  },
+
+  async getTournaments(): Promise<TournamentSummary[]> {
+    const res = await apiClient.get<ApiResponse<TournamentSummary[]>>('/api/tournaments');
+    return unwrap(res.data) ?? [];
+  },
+
+  async getTournament(id: string): Promise<TournamentSummary> {
+    const res = await apiClient.get<ApiResponse<TournamentSummary>>(`/api/tournaments/${id}`);
+    return unwrap(res.data);
+  },
+
+  async getTournamentBracket(id: string): Promise<TournamentBracketResponse> {
+    const res = await apiClient.get<ApiResponse<TournamentBracketResponse>>(`/api/tournaments/${id}/bracket`);
+    return unwrap(res.data);
+  },
+
+  async registerTournament(id: string): Promise<unknown> {
+    const idempKey =
+      typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const res = await apiClient.post<ApiResponse<unknown>>(`/api/tournaments/${id}/register`, {}, {
+      headers: { 'Idempotency-Key': idempKey },
+    });
+    return unwrap(res.data);
+  },
+
+  async unregisterTournament(id: string): Promise<unknown> {
+    const idempKey =
+      typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const res = await apiClient.post<ApiResponse<unknown>>(`/api/tournaments/${id}/unregister`, {}, {
+      headers: { 'Idempotency-Key': idempKey },
+    });
+    return unwrap(res.data);
   },
 };
 

@@ -378,3 +378,45 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
 }
+
+// ─── Tournaments ─────────────────────────────────────────────────────────────
+export interface TournamentSummary {
+  id: string;
+  title: string;
+  description: string;
+  gameSocketCode: string;
+  status: string;
+  buyIn: number;
+  maxPlayers: number;
+  registeredCount: number;
+  startsAt: string;
+  serverNow: string;
+  remainingMs: number;
+  pauseRemainingMs: number | null;
+  turnTimerSeconds: number;
+  grossPrizePool: number;
+  myRegistration?: { status: string; seed?: number; groupNumber?: number } | null;
+}
+
+export interface TournamentBracketResponse {
+  groups: Array<{ groupNumber: number; status: string; winnerUserId: string | null }>;
+  groupMatches: Array<{
+    id: string;
+    groupNumber: number | null;
+    roundName: string;
+    status: string;
+    playerA: { userId: string; username: string } | null;
+    playerB: { userId: string; username: string } | null;
+    winnerUserId: string | null;
+    roomId: string | null;
+  }>;
+  finalsMatches: Array<{
+    id: string;
+    roundName: string;
+    status: string;
+    playerA: { userId: string; username: string } | null;
+    playerB: { userId: string; username: string } | null;
+    winnerUserId: string | null;
+    roomId: string | null;
+  }>;
+}
