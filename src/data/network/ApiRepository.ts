@@ -20,6 +20,8 @@ import type {
   RechargeHistoryItem,
   WithdrawalHistoryItem,
   GameHistoryItem,
+  TournamentSummary,
+  TournamentBracketResponse,
 } from '../models/ApiModels';
 
 const ACCOUNT_CACHE_TTL_MS = 30_000;
@@ -188,5 +190,25 @@ export const apiRepository = {
 
   async getGameHistory(): Promise<GameHistoryItem[]> {
     return apiService.getGameHistory();
+  },
+
+  async getTournaments(): Promise<TournamentSummary[]> {
+    return apiService.getTournaments();
+  },
+
+  async getTournament(id: string): Promise<TournamentSummary> {
+    return apiService.getTournament(id);
+  },
+
+  async getTournamentBracket(id: string): Promise<TournamentBracketResponse> {
+    return apiService.getTournamentBracket(id);
+  },
+
+  async registerTournament(id: string): Promise<unknown> {
+    return apiService.registerTournament(id);
+  },
+
+  async unregisterTournament(id: string): Promise<unknown> {
+    return apiService.unregisterTournament(id);
   },
 };

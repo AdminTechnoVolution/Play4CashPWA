@@ -23,6 +23,9 @@ import TransactionHistoryPage from './pages/history/TransactionHistoryPage';
 import TermsPage from './pages/legal/TermsPage';
 import PrivacyPage from './pages/legal/PrivacyPage';
 import DataTreatmentPage from './pages/legal/DataTreatmentPage';
+import TournamentsPage from './pages/tournaments/TournamentsPage';
+import TournamentDetailPage from './pages/tournaments/TournamentDetailPage';
+import TournamentBracketPage from './pages/tournaments/TournamentBracketPage';
 import { tryConsumePlayBack } from './util/playBackNavigation';
 
 setupIonicReact({ mode: 'md' });
@@ -82,6 +85,9 @@ export default function App() {
             <Route path="/withdrawal-verify" element={<WithdrawalVerifyPage />} />
             <Route path="/rooms/:gameSocketCode" element={<RoomsPage />} />
             <Route path="/play/:gameSocketCode" element={<PlayPage />} />
+            <Route path="/tournaments" element={<TournamentsPage />} />
+            <Route path="/tournaments/:tournamentId" element={<TournamentDetailPage />} />
+            <Route path="/tournaments/:tournamentId/bracket" element={<TournamentBracketPage />} />
           </Route>
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<RootRedirect />} />
