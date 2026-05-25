@@ -20,6 +20,7 @@ import type {
   RechargeHistoryItem,
   WithdrawalHistoryItem,
   GameHistoryItem,
+  TournamentHistoryItem,
   TournamentSummary,
   TournamentBracketResponse,
 } from '../models/ApiModels';
@@ -190,6 +191,10 @@ export const apiRepository = {
 
   async getGameHistory(): Promise<GameHistoryItem[]> {
     return apiService.getGameHistory();
+  },
+
+  async getTournamentHistory(): Promise<TournamentHistoryItem[]> {
+    return apiService.getTournamentHistory();
   },
 
   async getTournaments(): Promise<TournamentSummary[]> {

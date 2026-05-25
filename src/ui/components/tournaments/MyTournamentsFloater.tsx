@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../store/authStore';
 import { tournamentCountdownMs, useTournamentsStore } from '../../../store/tournamentsStore';
 import { savePlayContext } from '../../../util/routingStorage';
-import { tournamentDebugLog } from '../../../debug/tournamentDebugLog';
 import {
   isMyUpcomingTournament,
   pickPrimaryMyTournament,
@@ -55,20 +54,6 @@ function joinTournamentMatch(
   primary: NonNullable<ReturnType<typeof pickPrimaryMyTournament>>,
   matchRoomId: string,
 ) {
-  // #region agent log
-  tournamentDebugLog(
-    'MyTournamentsFloater.tsx:joinTournamentMatch',
-    'navigating to tournament match',
-    {
-      tournamentId: primary.id,
-      tournamentStatus: primary.status,
-      gameSocketCode: primary.gameSocketCode,
-      roomId: matchRoomId,
-      myActiveMatch: primary.myActiveMatch ?? null,
-    },
-    'H4',
-  );
-  // #endregion
   savePlayContext({
     roomId: matchRoomId,
     betAmount: 0,
@@ -89,8 +74,10 @@ export default function MyTournamentsFloater() {
 
   const inPlay = location.pathname.startsWith('/play/');
   const onDashboard = location.pathname === '/dashboard';
-  const onTournamentDetail =
-    !!primary && location.pathname === `/tournaments/${primary.id}`;
+  const onTournamentLobby =
+    !!primary &&
+    (location.pathname === `/tournaments/${primary.id}` ||
+      location.pathname.startsWith(`/tournaments/${primary.id}/`));
 
   const goToTournament = useCallback(() => {
     if (!primary) return;
@@ -104,7 +91,7 @@ export default function MyTournamentsFloater() {
 
   if (!authHydrated || !user || myTournaments.length === 0 || inPlay || onDashboard) return null;
   if (!primary) return null;
-  if (focusMatch && onTournamentDetail) return null;
+  if (onTournamentLobby) return null;
 
   void clockTick;
   const remaining = tournamentCountdownMs(primary);

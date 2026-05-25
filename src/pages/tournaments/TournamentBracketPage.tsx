@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -7,87 +7,92 @@ import {
   IonContent,
   IonButtons,
   IonBackButton,
-  IonList,
-  IonItem,
-  IonLabel,
-  IonButton,
   IonToast,
 } from '@ionic/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTournamentsStore } from '../../store/tournamentsStore';
+import { useAuthStore } from '../../store/authStore';
 import { useT } from '../../i18n/translations';
 import { apiRepository } from '../../data/network/ApiRepository';
 import { savePlayContext } from '../../util/routingStorage';
-import { canSpectateTournamentMatch } from '../../util/tournamentUtils';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
-
-type BracketMatch = {
-  id: string;
-  groupNumber?: number | null;
-  roundName: string;
-  status: string;
-  playerA: { userId: string; username: string } | null;
-  playerB: { userId: string; username: string } | null;
-  winnerUserId: string | null;
-  roomId: string | null;
-};
-
-function MatchRow({
-  match,
-  onSpectate,
-  spectatingId,
-  t,
-}: {
-  match: BracketMatch;
-  onSpectate: (m: BracketMatch) => void;
-  spectatingId: string | null;
-  t: (key: string) => string;
-}) {
-  const canWatch = canSpectateTournamentMatch(match.status, match.roomId);
-  return (
-    <IonItem key={match.id}>
-      <IonLabel>
-        <p>{match.roundName.replace(/_/g, ' ')}</p>
-        <h3>
-          {match.playerA?.username ?? '—'} vs {match.playerB?.username ?? '—'}
-        </h3>
-        <p>{match.status}</p>
-      </IonLabel>
-      {canWatch && match.roomId && (
-        <IonButton
-          slot="end"
-          fill="outline"
-          size="small"
-          disabled={spectatingId === match.roomId}
-          onClick={() => onSpectate(match)}
-        >
-          {t('tournament_spectate_match')}
-        </IonButton>
-      )}
-    </IonItem>
-  );
-}
+import { isLiveTournamentStatus } from '../../util/tournamentUtils';
+import type { TournamentBracketMatch } from '../../data/models/ApiModels';
+import TournamentBracketView from '../../ui/components/tournaments/TournamentBracketView';
 
 const TournamentBracketPage: React.FC = () => {
   const { tournamentId = '' } = useParams();
   const navigate = useNavigate();
   const t = useT();
-  const { bracket, detail, loadBracket, loadDetail } = useTournamentsStore();
+  const userId = useAuthStore((s) => s.user?.id);
+  const detail = useTournamentsStore((s) => s.detail);
+  const loading = useTournamentsStore((s) => s.loading);
+  const bracket = useTournamentsStore(
+    (s) => s.bracketsById[tournamentId] ?? (s.detail?.id === tournamentId ? s.bracket : null),
+  );
+  const loadBracket = useTournamentsStore((s) => s.loadBracket);
+  const loadDetail = useTournamentsStore((s) => s.loadDetail);
+  const connectSocket = useTournamentsStore((s) => s.connectSocket);
+
+  const [bracketLoading, setBracketLoading] = useState(true);
   const [spectatingId, setSpectatingId] = useState<string | null>(null);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  const tournament = detail?.id === tournamentId ? detail : null;
+
+  const pollMs = useMemo(() => {
+    if (tournament && isLiveTournamentStatus(tournament.status)) return 5000;
+    return 15000;
+  }, [tournament?.status]);
 
   useEffect(() => {
     if (!tournamentId) return;
-    void loadBracket(tournamentId);
-    void loadDetail(tournamentId);
-    const poll = setInterval(() => void loadBracket(tournamentId), 12_000);
-    return () => clearInterval(poll);
-  }, [tournamentId, loadBracket, loadDetail]);
+    let cancelled = false;
 
-  const gameSocketCode = detail?.gameSocketCode ?? '';
-  const tournamentTitle = detail?.title ?? t('tournaments_title');
+    const refresh = async () => {
+      await Promise.all([loadDetail(tournamentId), loadBracket(tournamentId)]);
+      if (!cancelled) setBracketLoading(false);
+    };
 
-  const handleSpectate = async (match: BracketMatch) => {
+    void refresh();
+    const poll = setInterval(() => void loadBracket(tournamentId), pollMs);
+    return () => {
+      cancelled = true;
+      clearInterval(poll);
+    };
+  }, [tournamentId, loadBracket, loadDetail, pollMs]);
+
+  useEffect(() => {
+    if (!tournamentId || !tournament) return;
+    if (isLiveTournamentStatus(tournament.status)) {
+      connectSocket(tournamentId);
+    }
+  }, [tournamentId, tournament?.status, connectSocket, tournament]);
+
+  const gameSocketCode = tournament?.gameSocketCode ?? '';
+  const tournamentTitle = tournament?.title ?? t('tournaments_title');
+
+  const handleJoinMatch = (match: TournamentBracketMatch, roomId: string) => {
+    if (!gameSocketCode) return;
+    setJoiningId(roomId);
+    savePlayContext({
+      roomId,
+      betAmount: 0,
+      roomName: tournamentTitle,
+      opponentName:
+        match.playerA?.userId === userId
+          ? (match.playerB?.username ?? '')
+          : (match.playerA?.username ?? ''),
+      hasOpponent: true,
+      isPlayer1: true,
+      isSpectator: false,
+    });
+    navigate(`/play/${gameSocketCode}`);
+    setJoiningId(null);
+  };
+
+  const handleSpectate = async (match: TournamentBracketMatch) => {
     if (!match.roomId || !gameSocketCode) return;
     setSpectatingId(match.roomId);
     try {
@@ -116,42 +121,20 @@ const TournamentBracketPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref={`/tournaments/${tournamentId}`} />
           </IonButtons>
-          <IonTitle>{t('tournament_bracket_title')}</IonTitle>
+          <IonTitle>{tournamentTitle}</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent>
-        {[1, 2, 3, 4, 5].map((g) => (
-          <IonList key={g}>
-            <IonItem lines="full">
-              <IonLabel>{t('tournament_group_n').replace('%d', String(g))}</IonLabel>
-            </IonItem>
-            {(bracket?.groupMatches ?? [])
-              .filter((m) => m.groupNumber === g)
-              .map((m) => (
-                <MatchRow
-                  key={m.id}
-                  match={m}
-                  onSpectate={handleSpectate}
-                  spectatingId={spectatingId}
-                  t={t}
-                />
-              ))}
-          </IonList>
-        ))}
-        <IonList>
-          <IonItem lines="full">
-            <IonLabel>{t('tournament_finals_phase')}</IonLabel>
-          </IonItem>
-          {(bracket?.finalsMatches ?? []).map((m) => (
-            <MatchRow
-              key={m.id}
-              match={m}
-              onSpectate={handleSpectate}
-              spectatingId={spectatingId}
-              t={t}
-            />
-          ))}
-        </IonList>
+      <IonContent style={{ '--background': 'var(--sovereign-bg)' } as React.CSSProperties}>
+        <TournamentBracketView
+          bracket={bracket}
+          tournament={tournament}
+          userId={userId}
+          loading={bracketLoading || loading}
+          onJoinMatch={handleJoinMatch}
+          onSpectate={handleSpectate}
+          joiningRoomId={joiningId}
+          spectatingRoomId={spectatingId}
+        />
       </IonContent>
       <IonToast
         isOpen={!!toast}

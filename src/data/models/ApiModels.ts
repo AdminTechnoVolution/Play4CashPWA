@@ -198,6 +198,26 @@ export interface GameHistoryItem {
   finishedAt: string;
 }
 
+export interface TournamentHistoryItem {
+  id: string;
+  title: string;
+  gameSocketCode: string;
+  status: string;
+  buyIn: number;
+  maxPlayers: number;
+  registeredCount: number;
+  grossPrizePool: number;
+  houseFeePercent?: number;
+  firstPlacePercent?: number;
+  firstPlaceAmount?: number;
+  secondPlaceAmount?: number;
+  participantStatus: string;
+  finalRank: number | null;
+  prizeAmount: number;
+  finishedAt: string | null;
+  startedAt: string;
+}
+
 // ─── Socket game state ─────────────────────────────────────────────────────────
 export interface GameOverPayload {
   outcome: 'win' | 'lose' | 'draw';
@@ -406,29 +426,32 @@ export interface TournamentSummary {
   pauseRemainingMs: number | null;
   turnTimerSeconds: number;
   grossPrizePool: number;
+  houseFeePercent?: number;
+  firstPlacePercent?: number;
+  secondPlacePercent?: number;
+  firstPlaceAmount?: number;
+  secondPlaceAmount?: number;
   myRegistration?: { status: string; seed?: number; groupNumber?: number } | null;
   myActiveMatch?: TournamentMyActiveMatch | null;
 }
 
+export interface TournamentBracketMatch {
+  id: string;
+  groupNumber: number | null;
+  phase?: string;
+  roundName: string;
+  roundIndex?: number;
+  matchIndex?: number;
+  status: string;
+  playerA: { userId: string; username: string } | null;
+  playerB: { userId: string; username: string } | null;
+  winnerUserId: string | null;
+  roomId: string | null;
+  isBye?: boolean;
+}
+
 export interface TournamentBracketResponse {
   groups: Array<{ groupNumber: number; status: string; winnerUserId: string | null }>;
-  groupMatches: Array<{
-    id: string;
-    groupNumber: number | null;
-    roundName: string;
-    status: string;
-    playerA: { userId: string; username: string } | null;
-    playerB: { userId: string; username: string } | null;
-    winnerUserId: string | null;
-    roomId: string | null;
-  }>;
-  finalsMatches: Array<{
-    id: string;
-    roundName: string;
-    status: string;
-    playerA: { userId: string; username: string } | null;
-    playerB: { userId: string; username: string } | null;
-    winnerUserId: string | null;
-    roomId: string | null;
-  }>;
+  groupMatches: TournamentBracketMatch[];
+  finalsMatches: TournamentBracketMatch[];
 }

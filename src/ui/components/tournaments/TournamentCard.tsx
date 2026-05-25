@@ -1,6 +1,7 @@
 import React from 'react';
 import { IonIcon, IonText } from '@ionic/react';
 import {
+  medalOutline,
   trophyOutline,
   timeOutline,
   peopleOutline,
@@ -16,6 +17,7 @@ import {
   formatTournamentCountdown,
   gameAssetCode,
   isUserRegistered,
+  resolveTournamentPlacePrizes,
   tournamentStatusKey,
   tournamentUrgency,
 } from '../../../util/tournamentUtils';
@@ -41,6 +43,7 @@ export default function TournamentCard({
   const registered = isUserRegistered(tournament);
   const asset = gameAssetCode(tournament.gameSocketCode);
   const fillPct = Math.min(100, Math.round((tournament.registeredCount / tournament.maxPlayers) * 100));
+  const { firstPlace, secondPlace } = resolveTournamentPlacePrizes(tournament);
 
   const urgencyColor =
     urgency === 'live'
@@ -207,7 +210,13 @@ export default function TournamentCard({
           <StatPill icon={timeOutline} label={t('tournament_countdown')} value={formatTournamentCountdown(remaining)} accent={urgencyColor} />
           <StatPill icon={cashOutline} label={t('tournament_buy_in')} value={formatUSD(tournament.buyIn)} />
           <StatPill icon={peopleOutline} label={t('tournament_slots')} value={`${tournament.registeredCount}/${tournament.maxPlayers}`} />
-          <StatPill icon={trophyOutline} label={t('tournament_prize_pool')} value={formatUSD(tournament.grossPrizePool)} />
+          <StatPill icon={trophyOutline} label={t('tournament_first_prize')} value={formatUSD(firstPlace)} accent="var(--sovereign-gold)" />
+          <StatPill
+            icon={medalOutline}
+            label={t('tournament_second_prize')}
+            value={formatUSD(secondPlace)}
+            accent="#b0bec5"
+          />
         </div>
 
         <div style={{ marginTop: '4px' }}>
@@ -244,11 +253,13 @@ function StatPill({
   label,
   value,
   accent,
+  span,
 }: {
   icon: string;
   label: string;
   value: string;
   accent?: string;
+  span?: number;
 }) {
   return (
     <div
@@ -257,6 +268,7 @@ function StatPill({
         borderRadius: '12px',
         background: 'rgba(255,255,255,0.04)',
         border: '1px solid rgba(255,255,255,0.06)',
+        gridColumn: span && span > 1 ? `span ${span}` : undefined,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px' }}>

@@ -21,7 +21,9 @@ import type {
   WithdrawalHistoryItem,
   GameHistoryItem,
   TournamentSummary,
+  TournamentHistoryItem,
   TournamentBracketResponse,
+  TournamentBracketMatch,
 } from '../models/ApiModels';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -383,6 +385,11 @@ export const apiService = {
     return (unwrap(res.data) ?? []).map(normalizeTournament);
   },
 
+  async getTournamentHistory(): Promise<TournamentHistoryItem[]> {
+    const res = await apiClient.get<ApiResponse<TournamentHistoryItem[]>>('/api/tournaments/history');
+    return (unwrap(res.data) ?? []).map(normalizeTournamentHistory);
+  },
+
   async getTournament(id: string): Promise<TournamentSummary> {
     const res = await apiClient.get<ApiResponse<TournamentSummary>>(`/api/tournaments/${id}`);
     return normalizeTournament(unwrap(res.data));
@@ -390,7 +397,7 @@ export const apiService = {
 
   async getTournamentBracket(id: string): Promise<TournamentBracketResponse> {
     const res = await apiClient.get<ApiResponse<TournamentBracketResponse>>(`/api/tournaments/${id}/bracket`);
-    return unwrap(res.data);
+    return normalizeTournamentBracket(unwrap(res.data));
   },
 
   async registerTournament(id: string): Promise<unknown> {
@@ -439,6 +446,11 @@ function normalizeTournament(raw: any): TournamentSummary {
     pauseRemainingMs: raw.pauseRemainingMs ?? raw.pause_remaining_ms ?? null,
     turnTimerSeconds: raw.turnTimerSeconds ?? raw.turn_timer_seconds ?? 30,
     grossPrizePool: raw.grossPrizePool ?? raw.gross_prize_pool ?? 0,
+    houseFeePercent: raw.houseFeePercent ?? raw.house_fee_percent ?? undefined,
+    firstPlacePercent: raw.firstPlacePercent ?? raw.first_place_percent ?? undefined,
+    secondPlacePercent: raw.secondPlacePercent ?? raw.second_place_percent ?? undefined,
+    firstPlaceAmount: raw.firstPlaceAmount ?? raw.first_place_amount ?? undefined,
+    secondPlaceAmount: raw.secondPlaceAmount ?? raw.second_place_amount ?? undefined,
     myRegistration: myReg
       ? {
           status: myReg.status ?? 'registered',
@@ -458,6 +470,69 @@ function normalizeTournament(raw: any): TournamentSummary {
           needsLobby: !!(myMatch.needsLobby ?? myMatch.needs_lobby),
         }
       : null,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeBracketMatch(raw: any): TournamentBracketMatch {
+  const mapPlayer = (p: any) =>
+    p && (p.userId ?? p.user_id)
+      ? {
+          userId: String(p.userId ?? p.user_id),
+          username: p.username ?? '',
+        }
+      : null;
+
+  return {
+    id: String(raw.id ?? raw._id ?? ''),
+    groupNumber: raw.groupNumber ?? raw.group_number ?? null,
+    phase: raw.phase ?? undefined,
+    roundName: raw.roundName ?? raw.round_name ?? '',
+    roundIndex: raw.roundIndex ?? raw.round_index ?? undefined,
+    matchIndex: raw.matchIndex ?? raw.match_index ?? undefined,
+    status: raw.status ?? '',
+    playerA: mapPlayer(raw.playerA ?? raw.player_a),
+    playerB: mapPlayer(raw.playerB ?? raw.player_b),
+    winnerUserId: raw.winnerUserId ?? raw.winner_user_id ?? null,
+    roomId: raw.roomId ?? raw.room_id ?? null,
+    isBye: !!(raw.isBye ?? raw.is_bye),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeTournamentBracket(raw: any): TournamentBracketResponse {
+  const groups = (raw.groups ?? []).map((g: any) => ({
+    groupNumber: g.groupNumber ?? g.group_number ?? 0,
+    status: g.status ?? '',
+    winnerUserId: g.winnerUserId ?? g.winner_user_id ?? null,
+  }));
+  return {
+    groups,
+    groupMatches: (raw.groupMatches ?? raw.group_matches ?? []).map(normalizeBracketMatch),
+    finalsMatches: (raw.finalsMatches ?? raw.finals_matches ?? []).map(normalizeBracketMatch),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeTournamentHistory(raw: any): TournamentHistoryItem {
+  return {
+    id: String(raw.id ?? raw._id ?? ''),
+    title: raw.title ?? '',
+    gameSocketCode: raw.gameSocketCode ?? raw.game_socket_code ?? '',
+    status: raw.status ?? '',
+    buyIn: raw.buyIn ?? raw.buy_in ?? 0,
+    maxPlayers: raw.maxPlayers ?? raw.max_players ?? 0,
+    registeredCount: raw.registeredCount ?? raw.registered_count ?? 0,
+    grossPrizePool: raw.grossPrizePool ?? raw.gross_prize_pool ?? 0,
+    houseFeePercent: raw.houseFeePercent ?? raw.house_fee_percent ?? undefined,
+    firstPlacePercent: raw.firstPlacePercent ?? raw.first_place_percent ?? undefined,
+    firstPlaceAmount: raw.firstPlaceAmount ?? raw.first_place_amount ?? undefined,
+    secondPlaceAmount: raw.secondPlaceAmount ?? raw.second_place_amount ?? undefined,
+    participantStatus: raw.participantStatus ?? raw.participant_status ?? '',
+    finalRank: raw.finalRank ?? raw.final_rank ?? null,
+    prizeAmount: raw.prizeAmount ?? raw.prize_amount ?? 0,
+    finishedAt: raw.finishedAt ?? raw.finished_at ?? null,
+    startedAt: raw.startedAt ?? raw.starts_at ?? raw.started_at ?? '',
   };
 }
 

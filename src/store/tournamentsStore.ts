@@ -3,7 +3,6 @@ import { apiRepository } from '../data/network/ApiRepository';
 import type { TournamentBracketResponse, TournamentSummary } from '../data/models/ApiModels';
 import { TournamentSocketManager } from '../data/network/TournamentSocketManager';
 import { isMyUpcomingTournament, resolveJoinRoomId } from '../util/tournamentUtils';
-import { tournamentDebugLog } from '../debug/tournamentDebugLog';
 import {
   readTrackedTournamentIds,
   trackRegisteredTournament,
@@ -160,7 +159,7 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
     try {
       const bracket = await apiRepository.getTournamentBracket(id);
       set((s) => ({
-        bracket: s.detail?.id === id ? bracket : s.bracket,
+        bracket: s.detail?.id === id || s.bracket === null ? bracket : s.bracket,
         bracketsById: { ...s.bracketsById, [id]: bracket },
       }));
       return bracket;
@@ -239,19 +238,6 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
 
   applyServerState(data) {
     const normalized = { ...data, serverNow: data.serverNow || new Date().toISOString() };
-    // #region agent log
-    tournamentDebugLog(
-      'tournamentsStore.ts:applyServerState',
-      'tournament state pushed',
-      {
-        tournamentId: normalized.id,
-        status: normalized.status,
-        myActiveMatch: normalized.myActiveMatch ?? null,
-        registrationStatus: normalized.myRegistration?.status ?? null,
-      },
-      'H3',
-    );
-    // #endregion
     if (isMyUpcomingTournament(normalized)) trackRegisteredTournament(normalized.id);
     set((s) => ({
       detail:
