@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../store/authStore';
-import { officialRemainingMs, useTournamentsStore } from '../../../store/tournamentsStore';
+import { tournamentCountdownMs, useTournamentsStore } from '../../../store/tournamentsStore';
 import { savePlayContext } from '../../../util/routingStorage';
 import { tournamentDebugLog } from '../../../debug/tournamentDebugLog';
 import {
@@ -107,7 +107,7 @@ export default function MyTournamentsFloater() {
   if (focusMatch && onTournamentDetail) return null;
 
   void clockTick;
-  const remaining = officialRemainingMs(primary);
+  const remaining = tournamentCountdownMs(primary);
 
   return createPortal(
     <div
@@ -171,7 +171,7 @@ export function DashboardTournamentBanner() {
     );
   }
 
-  const remaining = officialRemainingMs(primary);
+  const remaining = tournamentCountdownMs(primary);
 
   return (
     <div style={{ marginBottom: '20px', animation: 'fadeInUp 0.5s ease' }}>

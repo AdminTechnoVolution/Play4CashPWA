@@ -8,7 +8,7 @@ import {
   checkmarkCircleOutline,
 } from 'ionicons/icons';
 import type { TournamentSummary } from '../../../data/models/ApiModels';
-import { officialRemainingMs, useTournamentsStore } from '../../../store/tournamentsStore';
+import { tournamentCountdownMs, useTournamentsStore } from '../../../store/tournamentsStore';
 import { formatUSD } from '../../../util/formatCurrency';
 import { useT } from '../../../i18n/translations';
 import {
@@ -36,7 +36,7 @@ export default function TournamentCard({
   const t = useT();
   const clockTick = useTournamentsStore((s) => s.clockTick);
   void clockTick;
-  const remaining = officialRemainingMs(tournament);
+  const remaining = tournamentCountdownMs(tournament);
   const urgency = tournamentUrgency(remaining);
   const registered = isUserRegistered(tournament);
   const asset = gameAssetCode(tournament.gameSocketCode);

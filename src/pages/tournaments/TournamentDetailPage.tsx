@@ -16,7 +16,7 @@ import {
   gitNetworkOutline,
   removeCircleOutline,
 } from 'ionicons/icons';
-import { useTournamentsStore, officialRemainingMs } from '../../store/tournamentsStore';
+import { useTournamentsStore, tournamentCountdownMs } from '../../store/tournamentsStore';
 import { useT } from '../../i18n/translations';
 import { savePlayContext } from '../../util/routingStorage';
 import { useAuthStore } from '../../store/authStore';
@@ -69,7 +69,7 @@ const TournamentDetailPage: React.FC = () => {
   void clockTick;
   const remainingLabel = useMemo(() => {
     if (!detail) return '';
-    return formatTournamentCountdown(officialRemainingMs(detail));
+    return formatTournamentCountdown(tournamentCountdownMs(detail));
   }, [detail, clockTick]);
 
   const [actionPending, setActionPending] = useState(false);

@@ -7,7 +7,7 @@ import {
   getTournamentMatchUiState,
   isActiveTournamentPlayer,
 } from '../../../util/tournamentUtils';
-import { officialRemainingMs, useTournamentsStore } from '../../../store/tournamentsStore';
+import { officialPauseRemainingMs, useTournamentsStore } from '../../../store/tournamentsStore';
 
 type Props = {
   tournament: TournamentSummary;
@@ -99,7 +99,14 @@ export default function TournamentMatchJoinPanel({ tournament, myMatch, roomId, 
       {!canJoin && !needsLobby && tournament.status === 'between_rounds' && (
         <p style={{ margin: 0, fontSize: '13px', color: 'var(--sovereign-text-muted)' }}>
           {t('tournament_between_rounds_wait')}{' '}
-          {formatTournamentCountdown(officialRemainingMs(tournament))}
+          {formatTournamentCountdown(officialPauseRemainingMs(tournament) ?? 0)}
+        </p>
+      )}
+
+      {!canJoin && !needsLobby && tournament.status === 'finals_pending' && (
+        <p style={{ margin: 0, fontSize: '13px', color: 'var(--sovereign-text-muted)' }}>
+          {t('tournament_finals_starts_in')}{' '}
+          {formatTournamentCountdown(officialPauseRemainingMs(tournament) ?? 0)}
         </p>
       )}
     </div>
