@@ -1,5 +1,6 @@
-import { IonButton, IonIcon, IonSkeletonText, IonSpinner } from '@ionic/react';
+import { IonButton, IonIcon, IonSegment, IonSegmentButton, IonSkeletonText, IonSpinner } from '@ionic/react';
 import { checkmarkCircleOutline, eyeOutline, playCircleOutline, trophyOutline } from 'ionicons/icons';
+import { useState } from 'react';
 import type { TournamentBracketMatch, TournamentBracketResponse, TournamentSummary } from '../../../data/models/ApiModels';
 import { useT } from '../../../i18n/translations';
 import {
@@ -12,6 +13,7 @@ import {
   sortedBracketGroups,
   usernameForUserId,
 } from '../../../util/tournamentUtils';
+import TournamentBracketTreeView from './TournamentBracketTreeView';
 
 type Props = {
   bracket: TournamentBracketResponse | null;
@@ -175,6 +177,7 @@ export default function TournamentBracketView({
   spectatingRoomId,
 }: Props) {
   const t = useT();
+  const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
 
   const groups = bracket ? sortedBracketGroups(bracket) : [];
   const hasContent =
@@ -224,12 +227,33 @@ export default function TournamentBracketView({
   const finalsRounds = groupMatchesByRound(bracket.finalsMatches);
 
   return (
-    <div style={{ padding: '12px 16px 32px', maxWidth: '640px', margin: '0 auto' }}>
+    <div
+      style={{
+        padding: viewMode === 'tree' ? '12px 8px 32px' : '12px 16px 32px',
+        maxWidth: viewMode === 'tree' ? 'none' : '640px',
+        margin: '0 auto',
+      }}
+    >
       {loading && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--sovereign-text-muted)' }}>
           <IonSpinner name="crescent" style={{ width: 18, height: 18 }} />
           <span style={{ fontSize: '12px' }}>{t('tournament_bracket_refreshing')}</span>
         </div>
+      )}
+
+      {hasContent && (
+        <IonSegment
+          value={viewMode}
+          onIonChange={(e) => setViewMode((e.detail.value as 'tree' | 'list') ?? 'tree')}
+          style={{ marginBottom: '14px', '--background': 'rgba(255,255,255,0.04)' } as React.CSSProperties}
+        >
+          <IonSegmentButton value="tree">
+            <span style={{ fontSize: '12px', fontWeight: 700 }}>{t('tournament_bracket_view_tree')}</span>
+          </IonSegmentButton>
+          <IonSegmentButton value="list">
+            <span style={{ fontSize: '12px', fontWeight: 700 }}>{t('tournament_bracket_view_list')}</span>
+          </IonSegmentButton>
+        </IonSegment>
       )}
 
       {!hasContent && (
@@ -238,6 +262,20 @@ export default function TournamentBracketView({
         </div>
       )}
 
+      {hasContent && viewMode === 'tree' && (
+        <TournamentBracketTreeView
+          bracket={bracket}
+          tournament={tournament}
+          userId={userId}
+          onJoinMatch={onJoinMatch}
+          onSpectate={onSpectate}
+          joiningRoomId={joiningRoomId}
+          spectatingRoomId={spectatingRoomId}
+        />
+      )}
+
+      {hasContent && viewMode === 'list' && (
+        <>
       {groupSections.map(({ group, matches, winnerName }) => (
         <section key={group.groupNumber} style={{ marginBottom: '24px' }}>
           <div
@@ -308,6 +346,8 @@ export default function TournamentBracketView({
             </div>
           ))}
         </section>
+      )}
+        </>
       )}
     </div>
   );
