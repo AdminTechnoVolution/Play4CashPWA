@@ -13,6 +13,7 @@ interface TournamentsStore {
   list: TournamentSummary[];
   myList: TournamentSummary[];
   detail: TournamentSummary | null;
+  detailsById: Record<string, TournamentSummary>;
   bracket: TournamentBracketResponse | null;
   bracketsById: Record<string, TournamentBracketResponse>;
   matchRoomsById: Record<string, string | null>;
@@ -111,6 +112,7 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
   list: [],
   myList: [],
   detail: null,
+  detailsById: {},
   bracket: null,
   bracketsById: {},
   matchRoomsById: {},
@@ -141,6 +143,7 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
       set((s) => ({
         detail,
         loading: false,
+        detailsById: { ...s.detailsById, [id]: detail },
         list: patchListItem(s.list, id, detail),
         myList: isMyUpcomingTournament(detail)
           ? mergeMyList(s.myList, [detail])
