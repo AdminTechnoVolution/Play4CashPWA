@@ -1,5 +1,6 @@
 import type { TournamentBracketResponse, TournamentSummary } from '../data/models/ApiModels';
 import { officialRemainingMs } from '../store/tournamentsStore';
+import { tournamentDebugLog } from '../debug/tournamentDebugLog';
 
 const LIVE_STATUSES = new Set([
   'countdown',
@@ -79,6 +80,40 @@ export function gameAssetCode(socketCode: string): string {
   return socketCode;
 }
 
+export function getTournamentMatchUiState(
+  tournament: TournamentSummary | null | undefined,
+): 'none' | 'lobby' | 'ready' {
+  if (!isActiveTournamentPlayer(tournament)) return 'none';
+  const m = tournament?.myActiveMatch;
+  if (!m) return 'none';
+  if (m.needsLobby) return 'lobby';
+  if (m.canJoin && m.roomId) return 'ready';
+  return 'none';
+}
+
+export function shouldShowTournamentMatchPanel(
+  tournament: TournamentSummary | null | undefined,
+): boolean {
+  const state = getTournamentMatchUiState(tournament);
+  // #region agent log
+  if (tournament?.myActiveMatch || state !== 'none') {
+    tournamentDebugLog(
+      'tournamentUtils.ts:getTournamentMatchUiState',
+      'match ui state evaluated',
+      {
+        tournamentId: tournament?.id ?? null,
+        tournamentStatus: tournament?.status ?? null,
+        registrationStatus: tournament?.myRegistration?.status ?? null,
+        uiState: state,
+        myActiveMatch: tournament?.myActiveMatch ?? null,
+      },
+      'H1',
+    );
+  }
+  // #endregion
+  return state !== 'none';
+}
+
 export function findMyMatchRoomId(
   bracket: TournamentBracketResponse | null | undefined,
   userId: string | undefined,
@@ -109,38 +144,39 @@ export function pickPrimaryMyTournament(list: TournamentSummary[]): TournamentSu
 
 export function resolveJoinRoomId(
   tournament: TournamentSummary | null | undefined,
-  bracket: TournamentBracketResponse | null | undefined,
-  userId: string | undefined,
 ): string | null {
   if (!isActiveTournamentPlayer(tournament)) return null;
-  if (tournament?.myActiveMatch?.canJoin && tournament.myActiveMatch.roomId) {
-    return tournament.myActiveMatch.roomId;
-  }
-  return findMyMatchRoomId(bracket, userId, tournament);
+  const m = tournament?.myActiveMatch;
+  const roomId = m?.canJoin && m.roomId ? m.roomId : null;
+  // #region agent log
+  tournamentDebugLog(
+    'tournamentUtils.ts:resolveJoinRoomId',
+    'join room resolved',
+    {
+      tournamentId: tournament?.id ?? null,
+      roomId,
+      canJoin: m?.canJoin ?? false,
+      matchStatus: m?.status ?? null,
+      matchId: m?.matchId ?? null,
+    },
+    'H2',
+  );
+  // #endregion
+  return roomId;
 }
 
 export function isTournamentMatchReady(
   tournament: TournamentSummary | null | undefined,
-  roomId: string | null | undefined,
 ): boolean {
-  if (!isActiveTournamentPlayer(tournament)) return false;
-  if (!tournament) return false;
-  if (tournament.myActiveMatch?.canJoin && tournament.myActiveMatch.roomId) return true;
-  return !!roomId && !!tournament.myActiveMatch?.canJoin;
+  return getTournamentMatchUiState(tournament) === 'ready';
 }
 
-/** Live match UI (ready, lobby, or pending) — hide duplicate countdown/reminder cards. */
+/** Live match UI (ready or lobby) — hide duplicate countdown/reminder cards. */
 export function shouldFocusTournamentMatch(
   tournament: TournamentSummary | null | undefined,
-  roomId: string | null | undefined,
 ): boolean {
-  if (!isActiveTournamentPlayer(tournament)) return false;
   if (!tournament || !isLiveTournamentStatus(tournament.status)) return false;
-  const m = tournament.myActiveMatch;
-  if (m?.canJoin) return true;
-  if (m?.needsLobby) return true;
-  if (m && roomId) return true;
-  return false;
+  return shouldShowTournamentMatchPanel(tournament);
 }
 
 export function tournamentStatusKey(status: string): string {

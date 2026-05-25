@@ -5,6 +5,7 @@ import { officialRemainingMs } from '../../../store/tournamentsStore';
 import { useT } from '../../../i18n/translations';
 import {
   formatTournamentCountdown,
+  getTournamentMatchUiState,
   isActiveTournamentPlayer,
   isLiveTournamentStatus,
   tournamentUrgency,
@@ -32,7 +33,7 @@ export default function TournamentReminderPanel({
   const live = isLiveTournamentStatus(tournament.status);
   const canJoin =
     isActiveTournamentPlayer(tournament) &&
-    !!(tournament.myActiveMatch?.canJoin && (matchRoomId ?? tournament.myActiveMatch.roomId));
+    getTournamentMatchUiState(tournament) === 'ready';
 
   const accent =
     canJoin ? '#4caf50' : urgency === 'imminent' ? '#ff9800' : urgency === 'soon' ? '#e8c96b' : 'var(--sovereign-gold)';

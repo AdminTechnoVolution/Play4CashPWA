@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { apiRepository } from '../data/network/ApiRepository';
 import type { TournamentBracketResponse, TournamentSummary } from '../data/models/ApiModels';
 import { TournamentSocketManager } from '../data/network/TournamentSocketManager';
-import { isMyUpcomingTournament } from '../util/tournamentUtils';
+import { isMyUpcomingTournament, resolveJoinRoomId } from '../util/tournamentUtils';
+import { tournamentDebugLog } from '../debug/tournamentDebugLog';
 import {
   readTrackedTournamentIds,
   trackRegisteredTournament,
@@ -119,6 +120,10 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
         myList: isMyUpcomingTournament(detail)
           ? mergeMyList(s.myList, [detail])
           : s.myList.filter((t) => t.id !== id),
+        matchRoomsById: {
+          ...s.matchRoomsById,
+          [id]: detail.myActiveMatch?.canJoin ? detail.myActiveMatch.roomId ?? null : null,
+        },
       }));
     } catch {
       set({ loading: false, error: 'tournament_load_error' });
@@ -139,20 +144,13 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
     }
   },
 
-  async loadMatchRoom(tournamentId, userId) {
-    const cached = get().matchRoomsById[tournamentId];
-    if (cached) return cached;
-
-    const bracket = get().bracketsById[tournamentId] ?? (await get().loadBracket(tournamentId));
-    if (!bracket) return null;
-    const all = [...bracket.groupMatches, ...bracket.finalsMatches];
-    const mine = all.find(
-      (m) =>
-        (m.playerA?.userId === userId || m.playerB?.userId === userId) &&
-        m.roomId &&
-        ['ready', 'started', 'waiting_presence'].includes(m.status),
-    );
-    const roomId = mine?.roomId ?? null;
+  async loadMatchRoom(tournamentId, _userId) {
+    const tournament =
+      get().detail?.id === tournamentId
+        ? get().detail
+        : get().myList.find((t) => t.id === tournamentId) ??
+          get().list.find((t) => t.id === tournamentId);
+    const roomId = tournament ? resolveJoinRoomId(tournament) : null;
     set((s) => ({
       matchRoomsById: { ...s.matchRoomsById, [tournamentId]: roomId },
     }));
@@ -215,19 +213,46 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
 
   applyServerState(data) {
     const normalized = { ...data, serverNow: data.serverNow || new Date().toISOString() };
+    // #region agent log
+    tournamentDebugLog(
+      'tournamentsStore.ts:applyServerState',
+      'tournament state pushed',
+      {
+        tournamentId: normalized.id,
+        status: normalized.status,
+        myActiveMatch: normalized.myActiveMatch ?? null,
+        registrationStatus: normalized.myRegistration?.status ?? null,
+      },
+      'H3',
+    );
+    // #endregion
     if (isMyUpcomingTournament(normalized)) trackRegisteredTournament(normalized.id);
     set((s) => ({
       detail:
         s.detail?.id === normalized.id
-          ? { ...s.detail, ...normalized, myRegistration: normalized.myRegistration ?? s.detail.myRegistration }
+          ? {
+              ...s.detail,
+              ...normalized,
+              myRegistration: normalized.myRegistration ?? s.detail.myRegistration ?? null,
+              myActiveMatch: normalized.myActiveMatch ?? null,
+            }
           : s.detail,
       list: patchListItem(s.list, normalized.id, {
         ...normalized,
-        myRegistration: normalized.myRegistration ?? s.list.find((t) => t.id === normalized.id)?.myRegistration,
+        myRegistration: normalized.myRegistration ?? s.list.find((t) => t.id === normalized.id)?.myRegistration ?? null,
+        myActiveMatch: normalized.myActiveMatch ?? null,
       }),
       myList: isMyUpcomingTournament(normalized)
-        ? mergeMyList(s.myList, [{ ...normalized, myRegistration: normalized.myRegistration ?? { status: 'registered' } }])
+        ? mergeMyList(s.myList, [{
+            ...normalized,
+            myRegistration: normalized.myRegistration ?? { status: 'registered' },
+            myActiveMatch: normalized.myActiveMatch ?? null,
+          }])
         : s.myList.filter((t) => t.id !== normalized.id),
+      matchRoomsById: {
+        ...s.matchRoomsById,
+        [normalized.id]: resolveJoinRoomId(normalized),
+      },
     }));
   },
 
@@ -290,19 +315,13 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
           ),
         )
         .map(async (t) => {
-          await get().loadBracket(t.id);
-          if (!userId) return;
-          const bracket = get().bracketsById[t.id];
-          if (!bracket) return;
-          const all = [...bracket.groupMatches, ...bracket.finalsMatches];
-          const match = all.find(
-            (m) =>
-              (m.playerA?.userId === userId || m.playerB?.userId === userId) &&
-              m.roomId &&
-              ['ready', 'started', 'waiting_presence'].includes(m.status),
-          );
+          await get().loadDetail(t.id);
+          const fresh = get().myList.find((x) => x.id === t.id) ?? get().detail;
           set((s) => ({
-            matchRoomsById: { ...s.matchRoomsById, [t.id]: match?.roomId ?? null },
+            matchRoomsById: {
+              ...s.matchRoomsById,
+              [t.id]: fresh?.id === t.id ? resolveJoinRoomId(fresh) : resolveJoinRoomId(t),
+            },
           }));
         }),
     );

@@ -4,6 +4,7 @@ import { apiRepository } from '../data/network/ApiRepository';
 import type { BattleshipCell, GameOverPayload, ShipPlacement } from '../data/models/ApiModels';
 
 import { SpectatorPayload } from '../util/SpectatorPayload';
+import { tournamentDebugLog } from '../debug/tournamentDebugLog';
 
 const EMPTY_BOARD = (): BattleshipCell[][] =>
   Array.from({ length: 10 }, () => Array(10).fill('empty') as BattleshipCell[]);
@@ -245,6 +246,14 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
 
   // ── initGame ────────────────────────────────────────────────────────────────
   initGame(roomId, myUsername, hasOpponent = false, initialOpponentName = '', isSpectator = false) {
+    // #region agent log
+    tournamentDebugLog(
+      'battleshipStore.ts:initGame',
+      'battleship socket connect',
+      { roomId, hasOpponent, isSpectator, myUsernameLen: myUsername.length },
+      'H4',
+    );
+    // #endregion
     console.log('[SPECTATOR][7] battleshipStore.initGame → roomId:', roomId, '| myUsername:', myUsername, '| isSpectator:', isSpectator, '| hasOpponent:', hasOpponent, '| initialOpponentName:', initialOpponentName);
     clearBattleshipOpponentPoll();
 
@@ -311,7 +320,19 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
 
       // ── API / socket error ──────────────────────────────────────────────────
       if (!success) {
-        const msgs = (data.messages ?? data.errorMessages ?? data.userMessages) as string[] | undefined;
+        const msgs = (envelope.messages ?? data.messages ?? data.errorMessages ?? data.userMessages) as string[] | undefined;
+        // #region agent log
+        tournamentDebugLog(
+          'battleshipStore.ts:onGameUpdate',
+          'naval-battle join/error',
+          {
+            roomId,
+            errorMessage: msgs?.[0] ?? null,
+            envelopeKeys: Object.keys(envelope),
+          },
+          'H5',
+        );
+        // #endregion
         set({ error: msgs?.[0] ?? 'Game error — please reconnect' });
         return;
       }

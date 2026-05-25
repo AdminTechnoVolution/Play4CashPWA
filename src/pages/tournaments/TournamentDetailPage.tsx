@@ -41,7 +41,6 @@ const TournamentDetailPage: React.FC = () => {
   const t = useT();
   const {
     detail,
-    bracket,
     clockTick,
     bumpClock,
     loadDetail,
@@ -75,10 +74,7 @@ const TournamentDetailPage: React.FC = () => {
 
   const [actionPending, setActionPending] = useState(false);
 
-  const joinRoomId = useMemo(
-    () => resolveJoinRoomId(detail, bracket, user?.id),
-    [detail, bracket, user?.id],
-  );
+  const joinRoomId = useMemo(() => resolveJoinRoomId(detail), [detail, clockTick]);
 
   const registered = isUserRegistered(detail);
   const canRegister = detail ? canRegisterForTournament(detail) : false;
@@ -86,8 +82,8 @@ const TournamentDetailPage: React.FC = () => {
     registered && detail && ['open', 'full', 'countdown'].includes(detail.status);
   const live = detail ? isLiveTournamentStatus(detail.status) : false;
   const eliminated = detail ? isUserEliminatedFromTournament(detail) : false;
-  const matchReady = detail ? isTournamentMatchReady(detail, joinRoomId) : false;
-  const focusMatch = detail ? shouldFocusTournamentMatch(detail, joinRoomId) : false;
+  const matchReady = detail ? isTournamentMatchReady(detail) : false;
+  const focusMatch = detail ? shouldFocusTournamentMatch(detail) : false;
 
   const onRegister = async () => {
     setActionPending(true);

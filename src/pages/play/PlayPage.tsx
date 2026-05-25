@@ -21,6 +21,7 @@ import { useConnectFourStore, ConnectFourPhase } from '../../store/connectFourSt
 import { getPlayContext, clearPlayContext } from '../../util/routingStorage';
 import { formatUSD } from '../../util/formatCurrency';
 import { useAuthStore } from '../../store/authStore';
+import { useTournamentsStore } from '../../store/tournamentsStore';
 import {
   tryConsumePlayBack,
   PLAY_BACK_TRAP_KEY,
@@ -135,6 +136,15 @@ export default function PlayPage() {
 
   const roomId = playCtx?.roomId ?? '';
   const isSpectator = playCtx?.isSpectator ?? false;
+  const isTournamentPlay = (playCtx?.betAmount ?? 0) === 0 && !isSpectator;
+
+  useEffect(() => {
+    return () => {
+      if (!isTournamentPlay) return;
+      const userId = useAuthStore.getState().user?.id;
+      void useTournamentsStore.getState().refreshMyTournaments(userId);
+    };
+  }, [roomId, isTournamentPlay]);
 
   const leaveSnapKey = useSyncExternalStore(
     (onChange) => subscribeActiveGameStoreSafe(gameSocketCode, onChange),
