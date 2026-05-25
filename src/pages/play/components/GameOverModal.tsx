@@ -11,6 +11,7 @@ import {
   applyWsMessagePlaceholders
 } from '../../../i18n/ApiMessageDisplay';
 import { formatUSD } from '../../../util/formatCurrency';
+import { getPlayContext } from '../../../util/routingStorage';
 
 const DEFEAT_DELAY_MS = 5000;
 
@@ -56,6 +57,10 @@ const GameOverModal: React.FC<GameOverModalProps> = ({
 
   const t = useT();
   if (!gameOver) return null;
+
+  const playCtx = getPlayContext();
+  const isTournamentPlayer = !isSpectator && (playCtx?.betAmount ?? 0) === 0;
+  if (isTournamentPlayer) return null;
 
   const isWin  = !isSpectator && gameOver.youWon;
   const isDraw = gameOver.isDraw;

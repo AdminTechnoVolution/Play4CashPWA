@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   IonPage,
   IonHeader,
@@ -21,6 +22,7 @@ import {
   RefresherEventDetail,
 } from '@ionic/react';
 import {
+  medalOutline,
   trophyOutline,
   arrowDownOutline,
   arrowUpOutline,
@@ -32,27 +34,32 @@ import {
 import { apiRepository } from '../../data/network/ApiRepository';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import '../../ui/theme/variables.css';
-import type { RechargeHistoryItem, WithdrawalHistoryItem, GameHistoryItem } from '../../data/models/ApiModels';
+import type { RechargeHistoryItem, WithdrawalHistoryItem, GameHistoryItem, TournamentHistoryItem } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
 import { formatUSD } from '../../util/formatCurrency';
+import { tournamentHistoryOutcomeStyle } from '../../util/tournamentUtils';
 
-type Tab = 'deposits' | 'withdrawals' | 'games';
+type Tab = 'deposits' | 'withdrawals' | 'games' | 'tournaments';
 
 const TransactionHistoryPage: React.FC = () => {
   const t = useT();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('deposits');
 
   const [deposits, setDeposits] = useState<RechargeHistoryItem[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalHistoryItem[]>([]);
   const [games, setGames] = useState<GameHistoryItem[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentHistoryItem[]>([]);
 
   const [depositsLoading, setDepositsLoading] = useState(false);
   const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
   const [gamesLoading, setGamesLoading] = useState(false);
+  const [tournamentsLoading, setTournamentsLoading] = useState(false);
 
   const [depositsLoaded, setDepositsLoaded] = useState(false);
   const [withdrawalsLoaded, setWithdrawalsLoaded] = useState(false);
   const [gamesLoaded, setGamesLoaded] = useState(false);
+  const [tournamentsLoaded, setTournamentsLoaded] = useState(false);
 
   const loadDeposits = useCallback(async () => {
     setDepositsLoading(true);
@@ -93,6 +100,19 @@ const TransactionHistoryPage: React.FC = () => {
     }
   }, []);
 
+  const loadTournaments = useCallback(async () => {
+    setTournamentsLoading(true);
+    try {
+      const data = await apiRepository.getTournamentHistory();
+      setTournaments(data);
+      setTournamentsLoaded(true);
+    } catch (err: any) {
+      console.error(formatApiMessageForDisplay(err));
+    } finally {
+      setTournamentsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadDeposits();
   }, []);
@@ -100,12 +120,14 @@ const TransactionHistoryPage: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'withdrawals' && !withdrawalsLoaded) loadWithdrawals();
     if (activeTab === 'games' && !gamesLoaded) loadGames();
+    if (activeTab === 'tournaments' && !tournamentsLoaded) loadTournaments();
   }, [activeTab]);
 
   const handleRefresh = async (event: CustomEvent<RefresherEventDetail>) => {
     if (activeTab === 'deposits') await loadDeposits();
     if (activeTab === 'withdrawals') await loadWithdrawals();
     if (activeTab === 'games') await loadGames();
+    if (activeTab === 'tournaments') await loadTournaments();
     event.detail.complete();
   };
 
@@ -206,13 +228,16 @@ const TransactionHistoryPage: React.FC = () => {
             style={{ '--background': 'var(--sovereign-surface)', borderRadius: '10px' } as React.CSSProperties}
           >
             <IonSegmentButton value="deposits">
-              <IonLabel style={{ fontSize: '12px', textTransform: 'none' }}>{t('history_tab_deposits')}</IonLabel>
+              <IonLabel style={{ fontSize: '11px', textTransform: 'none' }}>{t('history_tab_deposits')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="withdrawals">
-              <IonLabel style={{ fontSize: '12px', textTransform: 'none' }}>{t('history_tab_withdrawals')}</IonLabel>
+              <IonLabel style={{ fontSize: '11px', textTransform: 'none' }}>{t('history_tab_withdrawals')}</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="games">
-              <IonLabel style={{ fontSize: '12px', textTransform: 'none' }}>{t('history_tab_games')}</IonLabel>
+              <IonLabel style={{ fontSize: '11px', textTransform: 'none' }}>{t('history_tab_games')}</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="tournaments">
+              <IonLabel style={{ fontSize: '11px', textTransform: 'none' }}>{t('history_tab_tournaments')}</IonLabel>
             </IonSegmentButton>
           </IonSegment>
         </div>
@@ -473,6 +498,133 @@ const TransactionHistoryPage: React.FC = () => {
                           <IonText>
                             <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>
                               {formatDate(item.finishedAt)}
+                            </span>
+                          </IonText>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </IonList>
+              )}
+            </>
+          )}
+
+          {/* TOURNAMENTS TAB */}
+          {activeTab === 'tournaments' && (
+            <>
+              {tournamentsLoading ? (
+                [0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)
+              ) : tournaments.length === 0 ? (
+                <EmptyState icon={trophyOutline} message={t('tournament_history_empty')} />
+              ) : (
+                <IonList style={{ background: 'transparent' }}>
+                  {tournaments.map((item) => {
+                    const outcome = tournamentHistoryOutcomeStyle(item);
+                    const icon = item.participantStatus === 'runner_up' ? medalOutline : trophyOutline;
+                    const when = item.finishedAt ?? item.startedAt;
+                    return (
+                      <div
+                        key={item.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => navigate(`/tournaments/${item.id}/bracket`)}
+                        onKeyDown={(e) => e.key === 'Enter' && navigate(`/tournaments/${item.id}/bracket`)}
+                        style={{
+                          background: 'var(--sovereign-surface)',
+                          border: '1px solid var(--sovereign-border)',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          marginBottom: '8px',
+                          animation: 'fadeInUp 0.4s ease',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                            <div
+                              style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '10px',
+                                background: outcome.bg,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <IonIcon icon={icon} style={{ color: outcome.color, fontSize: '18px' }} />
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <IonText>
+                                <p
+                                  style={{
+                                    color: 'var(--sovereign-text)',
+                                    fontWeight: '700',
+                                    fontSize: '14px',
+                                    margin: '0 0 2px 0',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {item.title}
+                                </p>
+                              </IonText>
+                              <IonText>
+                                <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: 0 }}>
+                                  {item.gameSocketCode.replace(/-/g, ' ')} · {item.registeredCount}/{item.maxPlayers}
+                                </p>
+                              </IonText>
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right', marginLeft: '8px', flexShrink: 0 }}>
+                            <IonBadge
+                              style={{
+                                background: outcome.bg,
+                                color: outcome.color,
+                                border: `1px solid ${outcome.color}40`,
+                                borderRadius: '6px',
+                                padding: '4px 10px',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                display: 'block',
+                                marginBottom: '4px',
+                              }}
+                            >
+                              {t(outcome.labelKey)}
+                            </IonBadge>
+                            {item.prizeAmount > 0 && (
+                              <IonText>
+                                <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '13px' }}>
+                                  +${formatUSD(item.prizeAmount)}
+                                </span>
+                              </IonText>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <IonIcon icon={timeOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }} />
+                            <IonText>
+                              <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>
+                                {when ? formatDate(when) : '—'}
+                              </span>
+                            </IonText>
+                          </div>
+                          <IonText>
+                            <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '11px' }}>
+                              {t('tournament_history_buy_in')}: ${formatUSD(item.buyIn)}
                             </span>
                           </IonText>
                         </div>
