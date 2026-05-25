@@ -1054,5 +1054,6 @@
   "tournament_placement_body_second": "Ótima campanha — você chegou à final e garantiu o 2º lugar!",
   "tournament_placement_prize_label": "Prêmio creditado no seu saldo",
   "tournament_status_cancelled": "Cancelado",
-  "tournament_status_draft": "Rascunho"
+  "tournament_status_draft": "Rascunho",
+  "tournament_eliminated_watch_hint": "Abra a chave, escolha um grupo e toque em Assistir numa partida ao vivo para acompanhar como espectador."
 }

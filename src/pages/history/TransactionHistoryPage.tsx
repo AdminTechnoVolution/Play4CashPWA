@@ -527,8 +527,13 @@ const TransactionHistoryPage: React.FC = () => {
                         key={item.id}
                         role="button"
                         tabIndex={0}
-                        onClick={() => navigate(`/tournaments/${item.id}/bracket`)}
-                        onKeyDown={(e) => e.key === 'Enter' && navigate(`/tournaments/${item.id}/bracket`)}
+                        onClick={() =>
+                          navigate(`/tournaments/${item.id}/bracket`, { state: { tournament: item } })
+                        }
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' &&
+                          navigate(`/tournaments/${item.id}/bracket`, { state: { tournament: item } })
+                        }
                         style={{
                           background: 'var(--sovereign-surface)',
                           border: '1px solid var(--sovereign-border)',

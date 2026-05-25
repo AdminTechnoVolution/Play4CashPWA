@@ -18,6 +18,7 @@ type Props = {
   tournament: TournamentSummary | null;
   userId?: string;
   loading?: boolean;
+  loadFailed?: boolean;
   onJoinMatch: (match: TournamentBracketMatch, roomId: string) => void;
   onSpectate: (match: TournamentBracketMatch) => void;
   joiningRoomId?: string | null;
@@ -167,12 +168,19 @@ export default function TournamentBracketView({
   tournament,
   userId,
   loading,
+  loadFailed,
   onJoinMatch,
   onSpectate,
   joiningRoomId,
   spectatingRoomId,
 }: Props) {
   const t = useT();
+
+  const groups = bracket ? sortedBracketGroups(bracket) : [];
+  const hasContent =
+    !!bracket &&
+    (groups.some((g) => bracket.groupMatches.some((m) => m.groupNumber === g.groupNumber)) ||
+      bracket.finalsMatches.length > 0);
 
   if (loading && !bracket) {
     return (
@@ -187,7 +195,7 @@ export default function TournamentBracketView({
     );
   }
 
-  if (!bracket) {
+  if (loadFailed && !bracket) {
     return (
       <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--sovereign-text-muted)' }}>
         <IonIcon icon={trophyOutline} style={{ fontSize: '48px', marginBottom: '12px' }} />
@@ -196,7 +204,15 @@ export default function TournamentBracketView({
     );
   }
 
-  const groups = sortedBracketGroups(bracket);
+  if (!bracket) {
+    return (
+      <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--sovereign-text-muted)' }}>
+        <IonIcon icon={trophyOutline} style={{ fontSize: '48px', marginBottom: '12px' }} />
+        <p style={{ margin: 0 }}>{t('tournament_bracket_empty')}</p>
+      </div>
+    );
+  }
+
   const groupSections = groups.map((group) => {
     const matches = bracket.groupMatches
       .filter((m) => m.groupNumber === group.groupNumber)
@@ -206,8 +222,6 @@ export default function TournamentBracketView({
   });
 
   const finalsRounds = groupMatchesByRound(bracket.finalsMatches);
-
-  const hasContent = groupSections.some((g) => g.matches.length > 0) || finalsRounds.length > 0;
 
   return (
     <div style={{ padding: '12px 16px 32px', maxWidth: '640px', margin: '0 auto' }}>
