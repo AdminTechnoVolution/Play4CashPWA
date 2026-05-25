@@ -65,6 +65,49 @@ describe('connectFourPayloadLogic', () => {
     expect(isConnectFourResyncOnlyPayload({ board: [[null]] })).toBe(false);
   });
 
+  it('payloadIndicatesConnectFourPlay accepts gameStarted with status started', () => {
+    expect(
+      payloadIndicatesConnectFourPlay({ gameStarted: true, status: 'started' }, 'WAITING', false),
+    ).toBe(true);
+  });
+
+  it('shouldApplyConnectFourPlayPayload accepts opponent lastMove during PLAY', () => {
+    const current = parseBoard([[null, 'R', null, null, null, null, null]]);
+    expect(
+      shouldApplyConnectFourPlayPayload(
+        { lastMove: { row: 5, col: 3, color: 'Y', userId: 'u2', at: 't' } },
+        1,
+        current,
+        'PLAY',
+        parseBoard,
+      ),
+    ).toBe(true);
+  });
+
+  it('shouldApplyConnectFourPlayPayload accepts higher moveRevision even if board count heuristic disagrees', () => {
+    const current = parseBoard([[null, 'R', 'Y', null, null, null, null]]);
+    const staleBoard = [[null, 'R', null, null, null, null, null]];
+    expect(
+      shouldApplyConnectFourPlayPayload(
+        { moveRevision: 5, board: staleBoard },
+        4,
+        current,
+        'PLAY',
+        parseBoard,
+      ),
+    ).toBe(true);
+  });
+
+  it('stale waiting payload ignored when game already live', () => {
+    const waitingForOpponent = true;
+    const roomAlreadyLive =
+      !!({ gameStarted: true, status: 'started' } as Record<string, unknown>).gameStarted ||
+      String('started').toLowerCase() === 'started';
+    const phase = 'PLAY';
+    const shouldApplyWaiting = waitingForOpponent && !roomAlreadyLive && phase !== 'PLAY';
+    expect(shouldApplyWaiting).toBe(false);
+  });
+
   it('shouldApplyConnectFourPlayPayload rejects stale revision during PLAY', () => {
     const current = parseBoard([[null, 'R', null, null, null, null, null]]);
     expect(

@@ -175,10 +175,18 @@ export function shouldApplyConnectFourPlayPayload(
     return true;
   }
 
+  const hasLastMove =
+    Object.prototype.hasOwnProperty.call(data, 'lastMove') ||
+    Object.prototype.hasOwnProperty.call(data, 'last_move');
+  if (phase === 'PLAY' && hasLastMove) {
+    return true;
+  }
+
   if (phase === 'PLAY' && Object.prototype.hasOwnProperty.call(data, 'board')) {
     const rawCount = countDiscsInRawBoard(data.board);
     if (rawCount != null) {
       const currentCount = countConnectFourDiscs(currentBoard);
+      if (rawCount > currentCount) return true;
       if (rawCount < currentCount) return false;
     }
     if (Array.isArray(data.board)) {

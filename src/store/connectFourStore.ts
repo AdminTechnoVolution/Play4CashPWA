@@ -22,7 +22,6 @@ import {
   connectFourPlayStatusMessage,
   connectFourTurnHolderUsername,
   deriveConnectFourOpponentName,
-  isConnectFourResyncOnlyPayload,
   payloadIndicatesConnectFourPlay,
   parseConnectFourMoveRevision,
   resolveAppliedConnectFourMoveRevision,
@@ -88,7 +87,6 @@ function parseLastMove(raw: unknown): ConnectFourMove | null {
 
 let turnTimer: ReturnType<typeof setInterval> | null = null;
 let statusPollTimer: ReturnType<typeof setInterval> | null = null;
-let playHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let chatOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastGreetingSentAtMs = 0;
 let disconnectConnectFourSocketTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -188,24 +186,6 @@ function stopStatusPolling() {
     clearInterval(statusPollTimer);
     statusPollTimer = null;
   }
-}
-
-function stopPlayHeartbeat() {
-  if (playHeartbeatTimer) {
-    clearInterval(playHeartbeatTimer);
-    playHeartbeatTimer = null;
-  }
-}
-
-function startPlayHeartbeat(roomId: string, get: () => ConnectFourStore) {
-  stopPlayHeartbeat();
-  const tick = () => {
-    const st = get();
-    if (st.phase !== ConnectFourPhase.PLAY || st.isSpectator || st.isMovePending) return;
-    const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
-    socket?.requestSync(roomId);
-  };
-  playHeartbeatTimer = setInterval(tick, 12000);
 }
 
 function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
@@ -462,7 +442,6 @@ function applyPlayPayload(
   }
 
   stopLobbyWatchdog();
-  startPlayHeartbeat(get().roomId, get);
 }
 
 function handleConnectFourPayload(
@@ -555,7 +534,6 @@ function handleConnectFourPayload(
   if (gameEnded || terminalOutcomes.has(outcomeRaw.toLowerCase())) {
     stopTurnTimer();
     stopStatusPolling();
-    stopPlayHeartbeat();
     stopLobbyWatchdog();
     const spectating = get().isSpectator;
     const reasonNorm = normalizedGameEndReason(data);
@@ -613,26 +591,7 @@ function handleConnectFourPayload(
     return;
   }
 
-  if (isConnectFourResyncOnlyPayload(data)) {
-    stopStatusPolling();
-    (window as any).connectFourSocket?.requestSync(get().roomId);
-    return;
-  }
-
   if (payloadIndicatesPlay(data, get().phase, hadMoveInFlight)) {
-    const hasBoard = data?.board != null;
-    if (
-      !hasBoard &&
-      (!!data?.gameStarted ||
-        !!data?.game_started ||
-        String(data?.status || '').toLowerCase() === 'started')
-    ) {
-      stopStatusPolling();
-      stopLobbyWatchdog();
-      (window as any).connectFourSocket?.requestSync(get().roomId);
-      return;
-    }
-
     const phaseStr = get().phase;
     if (
       !shouldApplyConnectFourPlayPayload(
@@ -664,7 +623,6 @@ function handleConnectFourPayload(
   if (opponentLeft && waitingForOpponent) {
     stopTurnTimer();
     stopStatusPolling();
-    stopPlayHeartbeat();
     stopLobbyWatchdog();
     set({
       phase: ConnectFourPhase.WAITING,
@@ -688,7 +646,12 @@ function handleConnectFourPayload(
     }
   }
 
-  if (waitingForOpponent && get().phase !== ConnectFourPhase.PLAY) {
+  const roomAlreadyLive =
+    !!data?.gameStarted ||
+    !!data?.game_started ||
+    String(data?.status || '').toLowerCase() === 'started';
+
+  if (waitingForOpponent && !roomAlreadyLive && get().phase !== ConnectFourPhase.PLAY) {
     set({
       phase: ConnectFourPhase.WAITING,
       statusMessage: get().isSpectator
@@ -758,7 +721,6 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   initGame(roomId, myUsername, myUserId, betAmount, hasOpponent, initialOpponentName, isSpectator) {
     stopTurnTimer();
     stopStatusPolling();
-    stopPlayHeartbeat();
     teardownConnectFourSocket();
     const epoch = connectFourSocketEpoch;
 
@@ -804,10 +766,6 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
       if (hasOpponent && !isSpectator) {
         apiRepository.roomReady(roomId).catch(() => {});
       }
-      const phase = get().phase;
-      if (get().roomId === roomId && (phase === ConnectFourPhase.WAITING || phase === ConnectFourPhase.PLAY)) {
-        socketManager.requestSync(roomId);
-      }
       if (isSpectator) {
         setTimeout(() => {
           if (epoch !== connectFourSocketEpoch) return;
@@ -845,7 +803,6 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   cleanup() {
     stopTurnTimer();
     stopStatusPolling();
-    stopPlayHeartbeat();
     stopLobbyWatchdog();
     if (chatOverlayTimeout) clearTimeout(chatOverlayTimeout);
     teardownConnectFourSocket();

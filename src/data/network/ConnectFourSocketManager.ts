@@ -60,7 +60,7 @@ export class ConnectFourSocketManager {
     const lang = acceptLanguageTag();
 
     this.socket = io(`${BASE_URL}${NAMESPACE}`, {
-      transports: ['polling', 'websocket'],
+      transports: ['polling'],
       autoConnect: false,
       reconnection: true,
       reconnectionAttempts: Infinity,
