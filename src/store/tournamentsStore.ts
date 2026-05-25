@@ -57,6 +57,32 @@ export function officialRemainingMs(t: TournamentSummary): number {
   return Math.max(0, starts - now);
 }
 
+/** Countdown until the next round/final activates (server-synced). */
+export function officialPauseRemainingMs(t: TournamentSummary): number | null {
+  if (t.pauseRemainingMs == null || !Number.isFinite(t.pauseRemainingMs) || t.pauseRemainingMs < 0) {
+    return null;
+  }
+  const fetchedAt = Date.parse(t.serverNow);
+  if (Number.isFinite(fetchedAt)) {
+    const elapsed = Date.now() - fetchedAt;
+    return Math.max(0, t.pauseRemainingMs - elapsed);
+  }
+  return t.pauseRemainingMs;
+}
+
+/** Primary countdown for cards/floater: pause between rounds when active, else start time. */
+export function tournamentCountdownMs(t: TournamentSummary): number {
+  const pause = officialPauseRemainingMs(t);
+  if (
+    pause != null &&
+    pause > 0 &&
+    (t.status === 'between_rounds' || t.status === 'finals_pending')
+  ) {
+    return pause;
+  }
+  return officialRemainingMs(t);
+}
+
 function patchListItem(list: TournamentSummary[], id: string, patch: Partial<TournamentSummary>): TournamentSummary[] {
   return list.map((item) => (item.id === id ? { ...item, ...patch } : item));
 }

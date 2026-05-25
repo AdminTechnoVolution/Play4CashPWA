@@ -1,7 +1,7 @@
 import { IonIcon } from '@ionic/react';
 import { playCircleOutline, trophyOutline } from 'ionicons/icons';
 import type { TournamentSummary } from '../../../data/models/ApiModels';
-import { officialRemainingMs } from '../../../store/tournamentsStore';
+import { officialPauseRemainingMs } from '../../../store/tournamentsStore';
 import { useT } from '../../../i18n/translations';
 import {
   formatTournamentCountdown,
@@ -34,6 +34,13 @@ export default function TournamentReminderPanel({
   const canJoin =
     isActiveTournamentPlayer(tournament) &&
     getTournamentMatchUiState(tournament) === 'ready';
+  const pauseMs = officialPauseRemainingMs(tournament);
+  const inRoundPause =
+    live &&
+    !canJoin &&
+    pauseMs != null &&
+    pauseMs > 0 &&
+    (tournament.status === 'between_rounds' || tournament.status === 'finals_pending');
 
   const accent =
     canJoin ? '#4caf50' : urgency === 'imminent' ? '#ff9800' : urgency === 'soon' ? '#e8c96b' : 'var(--sovereign-gold)';
@@ -41,11 +48,18 @@ export default function TournamentReminderPanel({
   const countdownLabel = live
     ? canJoin
       ? t('tournament_floater_match_ready')
-      : t('tournament_floater_live')
+      : inRoundPause
+        ? tournament.status === 'finals_pending'
+          ? t('tournament_floater_finals_in')
+          : t('tournament_floater_next_round_in')
+        : t('tournament_floater_live')
     : t('tournament_floater_starts_in');
 
-  const countdownValue =
-    live && !canJoin ? t('tournament_floater_waiting') : formatTournamentCountdown(countdownMs);
+  const countdownValue = inRoundPause
+    ? formatTournamentCountdown(pauseMs)
+    : live && !canJoin
+      ? t('tournament_floater_waiting')
+      : formatTournamentCountdown(countdownMs);
 
   return (
     <div
