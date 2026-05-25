@@ -2,7 +2,11 @@ import { IonButton, IonIcon } from '@ionic/react';
 import { playCircleOutline, radioButtonOnOutline, timeOutline } from 'ionicons/icons';
 import type { TournamentMyActiveMatch, TournamentSummary } from '../../../data/models/ApiModels';
 import { useT } from '../../../i18n/translations';
-import { formatTournamentCountdown, isActiveTournamentPlayer } from '../../../util/tournamentUtils';
+import {
+  formatTournamentCountdown,
+  getTournamentMatchUiState,
+  isActiveTournamentPlayer,
+} from '../../../util/tournamentUtils';
 import { officialRemainingMs, useTournamentsStore } from '../../../store/tournamentsStore';
 
 type Props = {
@@ -18,10 +22,13 @@ export default function TournamentMatchJoinPanel({ tournament, myMatch, roomId, 
   void clockTick;
 
   if (!isActiveTournamentPlayer(tournament)) return null;
-  if (!myMatch && !roomId) return null;
 
-  const canJoin = myMatch?.canJoin || !!roomId;
-  const needsLobby = myMatch?.needsLobby && !canJoin;
+  const uiState = getTournamentMatchUiState(tournament);
+  if (uiState === 'none') return null;
+
+  const canJoin = uiState === 'ready';
+  const needsLobby = uiState === 'lobby';
+  const joinRoomId = canJoin ? (roomId ?? myMatch?.roomId ?? null) : null;
   const presenceMs = myMatch?.presenceCheckAt
     ? Math.max(0, Date.parse(myMatch.presenceCheckAt) - Date.now())
     : 0;
@@ -77,7 +84,7 @@ export default function TournamentMatchJoinPanel({ tournament, myMatch, roomId, 
         </>
       )}
 
-      {canJoin && (
+      {canJoin && joinRoomId && (
         <>
           <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#a5d6a7' }}>
             {t('tournament_join_match_now')}

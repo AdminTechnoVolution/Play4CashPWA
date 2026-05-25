@@ -4,8 +4,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../store/authStore';
 import { officialRemainingMs, useTournamentsStore } from '../../../store/tournamentsStore';
 import { savePlayContext } from '../../../util/routingStorage';
+import { tournamentDebugLog } from '../../../debug/tournamentDebugLog';
 import {
-  isLiveTournamentStatus,
   isMyUpcomingTournament,
   pickPrimaryMyTournament,
   resolveJoinRoomId,
@@ -19,11 +19,9 @@ function useTournamentBannerData() {
   const {
     myList,
     list,
-    bracketsById,
     clockTick,
     bumpClock,
     refreshMyTournaments,
-    loadMatchRoom,
   } = useTournamentsStore();
 
   useEffect(() => {
@@ -43,16 +41,11 @@ function useTournamentBannerData() {
   const primary = useMemo(() => pickPrimaryMyTournament(sourceList), [sourceList, clockTick]);
 
   const matchRoomId = useMemo(() => {
-    if (!primary || !user) return null;
-    return resolveJoinRoomId(primary, bracketsById[primary.id], user.id);
-  }, [primary, user, bracketsById, clockTick]);
+    if (!primary) return null;
+    return resolveJoinRoomId(primary);
+  }, [primary, clockTick]);
 
-  useEffect(() => {
-    if (!primary || !user || !isLiveTournamentStatus(primary.status)) return;
-    void loadMatchRoom(primary.id, user.id);
-  }, [primary?.id, primary?.status, user, loadMatchRoom]);
-
-  const focusMatch = shouldFocusTournamentMatch(primary, matchRoomId);
+  const focusMatch = shouldFocusTournamentMatch(primary);
 
   return { authHydrated, user, myTournaments, primary, matchRoomId, focusMatch, clockTick };
 }
@@ -62,6 +55,20 @@ function joinTournamentMatch(
   primary: NonNullable<ReturnType<typeof pickPrimaryMyTournament>>,
   matchRoomId: string,
 ) {
+  // #region agent log
+  tournamentDebugLog(
+    'MyTournamentsFloater.tsx:joinTournamentMatch',
+    'navigating to tournament match',
+    {
+      tournamentId: primary.id,
+      tournamentStatus: primary.status,
+      gameSocketCode: primary.gameSocketCode,
+      roomId: matchRoomId,
+      myActiveMatch: primary.myActiveMatch ?? null,
+    },
+    'H4',
+  );
+  // #endregion
   savePlayContext({
     roomId: matchRoomId,
     betAmount: 0,
