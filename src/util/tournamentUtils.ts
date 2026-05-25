@@ -54,6 +54,15 @@ export function isLiveTournamentStatus(status: string): boolean {
   return LIVE_STATUSES.has(status);
 }
 
+/** Shown on the public tournaments catalog (excludes finished/cancelled/draft). */
+export function isCatalogTournamentStatus(status: string): boolean {
+  return status !== 'finished' && status !== 'cancelled' && status !== 'draft';
+}
+
+export function filterCatalogTournaments(list: TournamentSummary[]): TournamentSummary[] {
+  return list.filter((t) => isCatalogTournamentStatus(t.status));
+}
+
 export function isMyUpcomingTournament(t: TournamentSummary): boolean {
   if (!isUserRegistered(t)) return false;
   if (t.status === 'finished' || t.status === 'cancelled' || t.status === 'draft') return false;

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { apiRepository } from '../data/network/ApiRepository';
 import type { TournamentBracketResponse, TournamentSummary } from '../data/models/ApiModels';
 import { TournamentSocketManager } from '../data/network/TournamentSocketManager';
-import { isMyUpcomingTournament, resolveJoinRoomId } from '../util/tournamentUtils';
+import { isMyUpcomingTournament, resolveJoinRoomId, filterCatalogTournaments, isCatalogTournamentStatus } from '../util/tournamentUtils';
 import {
   readTrackedTournamentIds,
   trackRegisteredTournament,
@@ -128,7 +128,7 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
   async loadList() {
     set({ loading: true, error: null });
     try {
-      const list = await apiRepository.getTournaments();
+      const list = filterCatalogTournaments(await apiRepository.getTournaments());
       set({ list, loading: false });
     } catch {
       set({ loading: false, error: 'tournament_load_error' });
@@ -144,7 +144,9 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
         detail,
         loading: false,
         detailsById: { ...s.detailsById, [id]: detail },
-        list: patchListItem(s.list, id, detail),
+        list: isCatalogTournamentStatus(detail.status)
+          ? patchListItem(s.list, id, detail)
+          : filterCatalogTournaments(s.list),
         myList: isMyUpcomingTournament(detail)
           ? mergeMyList(s.myList, [detail])
           : s.myList.filter((t) => t.id !== id),
@@ -252,11 +254,13 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
               myActiveMatch: normalized.myActiveMatch ?? null,
             }
           : s.detail,
-      list: patchListItem(s.list, normalized.id, {
-        ...normalized,
-        myRegistration: normalized.myRegistration ?? s.list.find((t) => t.id === normalized.id)?.myRegistration ?? null,
-        myActiveMatch: normalized.myActiveMatch ?? null,
-      }),
+      list: isCatalogTournamentStatus(normalized.status)
+        ? patchListItem(s.list, normalized.id, {
+            ...normalized,
+            myRegistration: normalized.myRegistration ?? s.list.find((t) => t.id === normalized.id)?.myRegistration ?? null,
+            myActiveMatch: normalized.myActiveMatch ?? null,
+          })
+        : filterCatalogTournaments(s.list.filter((t) => t.id !== normalized.id)),
       myList: isMyUpcomingTournament(normalized)
         ? mergeMyList(s.myList, [{
             ...normalized,
@@ -320,7 +324,10 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
     }
 
     for (const t of mine) trackRegisteredTournament(t.id);
-    set({ myList: mine, list: mergeMyList(get().list, mine) });
+    set({
+      myList: mine,
+      list: filterCatalogTournaments(mergeMyList(get().list, mine)),
+    });
 
     await Promise.all(
       mine

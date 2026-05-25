@@ -14,6 +14,7 @@ import {
 } from '@ionic/react';
 import { useNavigate } from 'react-router-dom';
 import { trophyOutline } from 'ionicons/icons';
+import { filterCatalogTournaments } from '../../util/tournamentUtils';
 import { useTournamentsStore } from '../../store/tournamentsStore';
 import { useT } from '../../i18n/translations';
 import TournamentCard from '../../ui/components/tournaments/TournamentCard';
@@ -27,7 +28,7 @@ const TournamentsPage: React.FC = () => {
     void loadList();
   }, [loadList]);
 
-  const sorted = [...list].sort(
+  const sorted = filterCatalogTournaments(list).sort(
     (a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt),
   );
 
