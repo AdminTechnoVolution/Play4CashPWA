@@ -3,18 +3,20 @@
  */
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
+import { BASE_URL } from '../../config/api.config';
 import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
+import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
 
 const NAMESPACE = '/tournaments';
 const EVENT = 'tournament';
 
 export class TournamentSocketManager {
   private socket: Socket | null = null;
+  private sessionTournamentId: string | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private onPayload?: (raw: unknown) => void;
   private onProxyReconnectedCb?: () => void;
@@ -35,27 +37,28 @@ export class TournamentSocketManager {
       return;
     }
     const lang = acceptLanguageTag();
+    this.sessionTournamentId = tournamentId;
+
     this.socket = io(`${BASE_URL}${NAMESPACE}`, {
-      transports: ['polling', 'websocket'],
-      autoConnect: false,
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      timeout: SOCKET_TIMEOUT_MS,
-      forceNew: true,
+      ...SOCKET_IO_CLIENT_DEFAULTS,
       query: { token, appVersion: __APP_VERSION__, lang },
       auth: { token, appVersion: __APP_VERSION__, lang },
       extraHeaders: socketIoExtraHeaders(token),
     });
     attachVersionMismatchListener(this.socket);
-    instrumentSocket(this.socket, NAMESPACE);
+    instrumentSocket(this.socket, NAMESPACE, {
+      onResync: () => {
+        if (this.sessionTournamentId) {
+          this.socket?.emit('tournament:join', { tournament_id: this.sessionTournamentId });
+          this.requestState();
+          this.onProxyReconnectedCb?.();
+        }
+      },
+    });
 
     this.socket.on('connect', () => {
       this.socket?.emit('tournament:join', { tournament_id: tournamentId });
       this.startHeartbeat();
-    });
-    this.socket.on('proxy_reconnected', () => {
-      this.onProxyReconnectedCb?.();
-      this.socket?.emit('tournament:join', { tournament_id: tournamentId });
     });
     this.socket.on(EVENT, (payload: unknown) => this.onPayload?.(payload));
     this.socket.on('connect_error', async (err: Error) => {
@@ -90,10 +93,11 @@ export class TournamentSocketManager {
   }
 
   disconnect(): void {
+    this.sessionTournamentId = null;
     this.stopHeartbeat();
     this.socket?.off();
-    releaseSocket(NAMESPACE);
     this.socket?.disconnect();
     this.socket = null;
+    releaseSocket(NAMESPACE);
   }
 }

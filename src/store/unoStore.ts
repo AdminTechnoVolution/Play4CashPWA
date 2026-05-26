@@ -5,6 +5,16 @@ import type { GameOverPayload, UnoCardCode, UnoColor, UnoGamePayload, GreetingRe
 import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
 import { hasKey, t } from '../i18n/translations';
 import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
+import {
+  applyIncomingStateVersion,
+  createStateVersionTracker,
+  resetStateVersionTracker,
+} from '../data/network/socketStateVersion';
+
+let unoActiveRoomId: string | null = null;
+const unoStateVersionTracker = createStateVersionTracker(() => {
+  if (unoActiveRoomId) (window as any).unoSocket?.requestSync(unoActiveRoomId);
+});
 
 export enum UnoPhase {
   WAITING = 'WAITING',
@@ -263,6 +273,8 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
 
   initGame(roomId, myUsername, opts = {}) {
     if (!roomId) return;
+    unoActiveRoomId = roomId;
+    resetStateVersionTracker(unoStateVersionTracker);
     const isSpectator = !!opts.isSpectator;
     const hasOpponent = !!opts.hasOpponent;
     const initialOpponentName = opts.initialOpponentName ?? '';
@@ -338,6 +350,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     }
 
     const data = (json?.data && typeof json.data === 'object' ? (json.data as Partial<UnoGamePayload>) : (json as Partial<UnoGamePayload>));
+    applyIncomingStateVersion(unoStateVersionTracker, data as { stateVersion?: number | null });
     const messages = Array.isArray(json?.messages) ? (json.messages as string[]) : [];
     const primaryMsg = messages[0] || null;
 

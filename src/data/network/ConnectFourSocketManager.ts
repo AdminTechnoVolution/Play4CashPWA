@@ -6,18 +6,20 @@
  */
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
+import { BASE_URL } from '../../config/api.config';
 import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
+import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
 
 const NAMESPACE = '/connect-four';
 const EVENT = 'connect-four';
 
 export class ConnectFourSocketManager {
   private socket: Socket | null = null;
+  private sessionRoomId: string | null = null;
   private onPayload?: (raw: unknown) => void;
   private onConnectedCb?: () => void;
   private onConnectionErrorCb?: (msg: string) => void;
@@ -58,23 +60,24 @@ export class ConnectFourSocketManager {
     }
 
     const lang = acceptLanguageTag();
+    this.sessionRoomId = roomId;
 
     this.socket = io(`${BASE_URL}${NAMESPACE}`, {
-      transports: ['polling'],
-      autoConnect: false,
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: SOCKET_TIMEOUT_MS,
-      forceNew: true,
+      ...SOCKET_IO_CLIENT_DEFAULTS,
       query: { token, appVersion: __APP_VERSION__, lang },
       auth: { token, appVersion: __APP_VERSION__, lang },
       extraHeaders: socketIoExtraHeaders(token),
     });
 
     attachVersionMismatchListener(this.socket);
-    instrumentSocket(this.socket, NAMESPACE);
+    instrumentSocket(this.socket, NAMESPACE, {
+      onResync: () => {
+        if (this.sessionRoomId) {
+          this.requestSync(this.sessionRoomId);
+          this.onProxyReconnectedCb?.();
+        }
+      },
+    });
 
     this.socket.on('connect', () => {
       this.onConnectedCb?.();
@@ -87,10 +90,6 @@ export class ConnectFourSocketManager {
 
     this.socket.on(EVENT, (payload: unknown) => {
       this.onPayload?.(payload);
-    });
-
-    this.socket.on('proxy_reconnected', () => {
-      this.onProxyReconnectedCb?.();
     });
 
     this.socket.on('connect_error', async (err: Error) => {
@@ -109,7 +108,6 @@ export class ConnectFourSocketManager {
     this.socket.connect();
   }
 
-  /** Re-emit join to resync state or re-attempt start when both players are in the room. */
   requestSync(roomId: string): void {
     this.socket?.emit('join', { room_id: roomId });
   }
@@ -126,6 +124,7 @@ export class ConnectFourSocketManager {
   }
 
   disconnect(): void {
+    this.sessionRoomId = null;
     this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;

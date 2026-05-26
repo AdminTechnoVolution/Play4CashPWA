@@ -183,3 +183,25 @@ the forced-update flow silently breaks.
    `none` if cross-site), `NODE_ENV=production`.
 7. Bump `PWA_MIN_VERSION` only when the new build is **not** backward compatible with older
    PWA bundles. Otherwise leave it as-is and let the SW prompt flow handle the rollout.
+
+## 11. WebSocket stability (realtime)
+
+Aligned across PWA, Gateway, and API after the WhatsApp-principles hardening pass.
+
+| Variable / setting | PWA | Gateway | API | Notes |
+|--------------------|-----|---------|-----|-------|
+| Transport default | WS-first (`websocket,polling`) | `websocket,polling` | same | Avoid polling-only game namespaces. |
+| Engine.IO ping | client defaults | `pingInterval=25000`, `pingTimeout=20000` | same via `RedisIoAdapter` | Keep below Azure idle timeout. |
+| `SOCKET_IO_REDIS_ADAPTER` | — | — | **required in prod** | API throws at boot if `NODE_ENV=production` and flag is false. |
+| Gateway upstream reconnect | — | `reconnectionAttempts: Infinity` | — | Brief API flaps no longer kill browser sessions. |
+| Azure App Service | — | WebSockets **On**, ARR Affinity **On** until Redis adapter proven | same | Idle timeout ≥ 240s recommended. |
+| `VITE_VAPID_PUBLIC_KEY` | optional | — | — | Enables Web Push registration after login (`useWebPush`). |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | — | — | optional | Required to **send** push; storing subscriptions works without them. |
+
+**Multiplex vs direct WS (decision):** defer a single `/realtime` multiplex namespace. Current
+phase keeps per-game namespaces but unifies client defaults, central resync (`socketRegistry`),
+Gateway join replay (`join` / `subscribe` / `tournament:join`), and mandatory Redis adapter in
+production. Revisit multiplex when concurrent namespace count or Gateway CPU becomes the bottleneck.
+
+**Web Push:** PWA registers via `POST /api/user/push-subscription` after login. Service worker
+`public/sw-push.js` handles `push` + `notificationclick` (foreground sync still uses WS/resync).

@@ -1,17 +1,16 @@
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
+import { BASE_URL } from '../../config/api.config';
 import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
+import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
 import type { RoomResponse, RoomPlayer } from '../models/ApiModels';
 
 const NAMESPACE = '/rooms';
 
-// Normalize raw backend room payload (snake_case → camelCase RoomResponse)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeRoom(raw: any): RoomResponse {
   const players: RoomPlayer[] = (raw.players ?? []).map((p: any) => {
     const ref = p.playerId ?? p.user ?? p;
@@ -35,35 +34,35 @@ function normalizeRoom(raw: any): RoomResponse {
 
 export class LobbySocketManager {
   private socket: Socket | null = null;
+  private sessionGameId: string | null = null;
   private onConnectCb?: () => void;
 
   connect(gameId: string): void {
+    this.disconnect();
+
     const token = getAccessToken();
     if (!token) {
       window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
       return;
     }
 
+    this.sessionGameId = gameId;
+
     this.socket = io(`${BASE_URL}${NAMESPACE}`, {
-      transports: ['polling'],
-      autoConnect: false,
-      forceNew: true,
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: SOCKET_TIMEOUT_MS,
+      ...SOCKET_IO_CLIENT_DEFAULTS,
       auth: { token, appVersion: __APP_VERSION__ },
       query: { token, appVersion: __APP_VERSION__ },
       extraHeaders: socketIoExtraHeaders(token),
     });
 
     attachVersionMismatchListener(this.socket);
-    // Phase D: register with global connection store.
-    instrumentSocket(this.socket, NAMESPACE);
+    instrumentSocket(this.socket, NAMESPACE, {
+      onResync: () => {
+        if (this.sessionGameId) this.resubscribe(this.sessionGameId);
+      },
+    });
 
     this.socket.on('connect', () => {
-      // Android: emit "subscribe" with game_id to receive room events for this game
       this.socket?.emit('subscribe', { game_id: gameId });
       this.onConnectCb?.();
     });
@@ -82,7 +81,13 @@ export class LobbySocketManager {
     this.socket.connect();
   }
 
+  resubscribe(gameId: string): void {
+    this.socket?.emit('subscribe', { game_id: gameId });
+  }
+
   disconnect(): void {
+    this.sessionGameId = null;
+    this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;
     releaseSocket(NAMESPACE);
@@ -92,17 +97,14 @@ export class LobbySocketManager {
     this.onConnectCb = cb;
   }
 
-  // Android: "roomCreated" → full Room JSON
   onRoomCreated(cb: (room: RoomResponse) => void): void {
     this.socket?.on('roomCreated', (raw: unknown) => cb(normalizeRoom(raw)));
   }
 
-  // Android: "roomUpdated" → full Room JSON
   onRoomUpdated(cb: (room: RoomResponse) => void): void {
     this.socket?.on('roomUpdated', (raw: unknown) => cb(normalizeRoom(raw)));
   }
 
-  // Android: "roomDeleted" → { "id": "<room_id>" }
   onRoomDeleted(cb: (roomId: string) => void): void {
     this.socket?.on('roomDeleted', (raw: unknown) => {
       const payload = raw as { id?: string } | string;

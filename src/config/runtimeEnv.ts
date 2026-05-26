@@ -1,5 +1,5 @@
 /** Keys injected at runtime via `/env-config.js` (Azure App Service Application Settings). */
-export type RuntimeEnvKey = 'VITE_API_URL' | 'VITE_GOOGLE_CLIENT_ID';
+export type RuntimeEnvKey = 'VITE_API_URL' | 'VITE_GOOGLE_CLIENT_ID' | 'VITE_VAPID_PUBLIC_KEY';
 
 declare global {
   interface Window {

@@ -421,6 +421,21 @@ export const apiService = {
     });
     return unwrap(res.data);
   },
+
+  async savePushSubscription(sub: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+  }): Promise<void> {
+    await apiClient.post('/api/user/push-subscription', {
+      endpoint: sub.endpoint,
+      p256dh: sub.keys.p256dh,
+      auth: sub.keys.auth,
+    });
+  },
+
+  async removePushSubscription(endpoint: string): Promise<void> {
+    await apiClient.post('/api/user/push-subscription/remove', { endpoint });
+  },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

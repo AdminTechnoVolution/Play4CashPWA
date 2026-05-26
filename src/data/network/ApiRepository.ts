@@ -220,4 +220,15 @@ export const apiRepository = {
   async unregisterTournament(id: string): Promise<unknown> {
     return apiService.unregisterTournament(id);
   },
+
+  async savePushSubscription(sub: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+  }): Promise<void> {
+    return apiService.savePushSubscription(sub);
+  },
+
+  async removePushSubscription(endpoint: string): Promise<void> {
+    return apiService.removePushSubscription(endpoint);
+  },
 };
