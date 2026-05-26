@@ -73,6 +73,7 @@ const TournamentBracketPage: React.FC = () => {
 
   const pollMs = useMemo(() => {
     if (tournament && isLiveTournamentStatus(tournament.status)) return 5000;
+    if (tournament && ['open', 'full', 'countdown'].includes(tournament.status)) return 5000;
     return 15000;
   }, [tournament?.status]);
 

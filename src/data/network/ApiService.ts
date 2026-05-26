@@ -505,6 +505,12 @@ function normalizeTournamentBracket(raw: any): TournamentBracketResponse {
     groupNumber: g.groupNumber ?? g.group_number ?? 0,
     status: g.status ?? '',
     winnerUserId: g.winnerUserId ?? g.winner_user_id ?? null,
+    participants: (g.participants ?? []).map((p: any) => ({
+      userId: String(p.userId ?? p.user_id ?? ''),
+      username: p.username ?? '',
+      seed: p.seed ?? undefined,
+      status: p.status ?? undefined,
+    })),
   }));
   return {
     groups,

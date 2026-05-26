@@ -1,4 +1,5 @@
 import type {
+  TournamentBracketGroup,
   TournamentBracketMatch,
   TournamentBracketResponse,
   TournamentHistoryItem,
@@ -274,20 +275,33 @@ export function formatTournamentRoundName(roundName: string, t: (key: string) =>
   return key ? t(key) : roundName.replace(/_/g, ' ');
 }
 
-export function sortedBracketGroups(bracket: TournamentBracketResponse | null | undefined): Array<{
-  groupNumber: number;
-  status: string;
-  winnerUserId: string | null;
-}> {
+export function sortedBracketGroups(bracket: TournamentBracketResponse | null | undefined): TournamentBracketGroup[] {
   if (!bracket?.groups?.length) {
     const fromMatches = new Set(
       (bracket?.groupMatches ?? []).map((m) => m.groupNumber).filter((n): n is number => n != null),
     );
     return [...fromMatches]
       .sort((a, b) => a - b)
-      .map((groupNumber) => ({ groupNumber, status: 'pending', winnerUserId: null }));
+      .map((groupNumber) => ({ groupNumber, status: 'pending', winnerUserId: null, participants: [] }));
   }
   return [...bracket.groups].sort((a, b) => a.groupNumber - b.groupNumber);
+}
+
+export function bracketHasMatchContent(bracket: TournamentBracketResponse | null | undefined): boolean {
+  if (!bracket) return false;
+  return bracket.groupMatches.length > 0 || bracket.finalsMatches.length > 0;
+}
+
+export function bracketHasVisibleContent(bracket: TournamentBracketResponse | null | undefined): boolean {
+  if (!bracket) return false;
+  if (bracketHasMatchContent(bracket)) return true;
+  return (bracket.groups ?? []).some((g) => (g.participants?.length ?? 0) > 0);
+}
+
+export function groupParticipantsFor(
+  group: TournamentBracketGroup | null | undefined,
+): NonNullable<TournamentBracketGroup['participants']> {
+  return group?.participants ?? [];
 }
 
 export function groupMatchesByRound(matches: TournamentBracketMatch[]): Array<{
@@ -315,6 +329,10 @@ export function usernameForUserId(
   userId: string | null | undefined,
 ): string | null {
   if (!bracket || !userId) return null;
+  for (const g of bracket.groups ?? []) {
+    const p = g.participants?.find((x) => x.userId === userId);
+    if (p) return p.username;
+  }
   const all = [...bracket.groupMatches, ...bracket.finalsMatches];
   for (const m of all) {
     if (m.playerA?.userId === userId) return m.playerA.username;
