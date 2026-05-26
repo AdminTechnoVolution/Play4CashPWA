@@ -38,6 +38,9 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
       const next = { ...s.statuses };
       if (status === undefined) delete next[namespace];
       else next[namespace] = status;
+      // #region agent log
+      fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'connectionStore.ts:setStatus',message:'status_change',data:{namespace,status,allStatuses:next},timestamp:Date.now(),hypothesisId:'H1-H3-H4'})}).catch(()=>{});
+      // #endregion
       return { statuses: next };
     }),
   recordResync: (namespace) =>

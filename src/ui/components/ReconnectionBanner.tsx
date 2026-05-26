@@ -27,6 +27,14 @@ export default function ReconnectionBanner() {
     return () => window.clearTimeout(id);
   }, [isAnyReconnecting]);
 
+  useEffect(() => {
+    if (!show) return;
+    // #region agent log
+    const statuses = useConnectionStore.getState().statuses;
+    fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'ReconnectionBanner.tsx:show',message:'banner_visible',data:{statuses,isAnyReconnecting},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
+  }, [show, isAnyReconnecting]);
+
   if (!show) return null;
 
   return (
