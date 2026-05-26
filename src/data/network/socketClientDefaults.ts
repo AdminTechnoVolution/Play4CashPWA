@@ -1,14 +1,16 @@
 import { SOCKET_TIMEOUT_MS } from '../../config/api.config';
 
-/** Aligned with Gateway/API Engine.IO ping (see docs/SECURITY-ENV.md §11). */
-export const SOCKET_IO_PING_OPTIONS = {
-  pingInterval: 25_000,
-  pingTimeout: 20_000,
-} as const;
-
-/** Shared Socket.IO client options — WebSocket-first with polling fallback. */
+/**
+ * Shared Socket.IO client options.
+ *
+ * Transport: polling first, then upgrade to WebSocket when stable. Forcing
+ * WebSocket-first breaks Vite dev proxy / double-hop Gateway setups — the WS
+ * handshake succeeds then drops with "transport error" within milliseconds
+ * (see debug session 83380c). Server pingInterval/pingTimeout are negotiated
+ * from the Engine.IO OPEN packet; do NOT set them on the client.
+ */
 export const SOCKET_IO_CLIENT_DEFAULTS = {
-  transports: ['websocket', 'polling'] as ('websocket' | 'polling')[],
+  transports: ['polling', 'websocket'] as ('websocket' | 'polling')[],
   autoConnect: false as const,
   forceNew: true,
   reconnection: true,
@@ -16,5 +18,4 @@ export const SOCKET_IO_CLIENT_DEFAULTS = {
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
   timeout: SOCKET_TIMEOUT_MS,
-  ...SOCKET_IO_PING_OPTIONS,
 };
