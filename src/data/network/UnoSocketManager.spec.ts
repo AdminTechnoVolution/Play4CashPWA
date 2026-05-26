@@ -1,9 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 // io() is heavy and pulls in real network. We capture every emit on a single fake socket.
-const fakeSocket: { emit: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn>; connect: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn> } = {
+const fakeSocket: {
+  emit: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
+  off: ReturnType<typeof vi.fn>;
+  connect: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+} = {
   emit: vi.fn(),
   on: vi.fn(),
+  off: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
 };
@@ -42,6 +49,7 @@ describe('UnoSocketManager', () => {
   beforeEach(() => {
     fakeSocket.emit.mockClear();
     fakeSocket.on.mockClear();
+    fakeSocket.off.mockClear();
     fakeSocket.connect.mockClear();
     fakeSocket.disconnect.mockClear();
   });
