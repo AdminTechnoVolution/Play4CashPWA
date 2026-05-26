@@ -1,14 +1,17 @@
 import { IonButton, IonIcon, IonSegment, IonSegmentButton, IonSkeletonText, IonSpinner } from '@ionic/react';
-import { checkmarkCircleOutline, eyeOutline, playCircleOutline, trophyOutline } from 'ionicons/icons';
-import { useState } from 'react';
-import type { TournamentBracketMatch, TournamentBracketResponse, TournamentSummary } from '../../../data/models/ApiModels';
+import { checkmarkCircleOutline, eyeOutline, peopleOutline, playCircleOutline, trophyOutline } from 'ionicons/icons';
+import { useEffect, useState } from 'react';
+import type { TournamentBracketGroup, TournamentBracketMatch, TournamentBracketResponse, TournamentSummary } from '../../../data/models/ApiModels';
 import { useT } from '../../../i18n/translations';
 import {
+  bracketHasMatchContent,
+  bracketHasVisibleContent,
   canJoinBracketMatch,
   canSpectateTournamentMatch,
   formatTournamentMatchStatus,
   formatTournamentRoundName,
   groupMatchesByRound,
+  groupParticipantsFor,
   isMyBracketMatch,
   sortedBracketGroups,
   usernameForUserId,
@@ -165,6 +168,75 @@ function MatchCard({
   );
 }
 
+function GroupRoster({
+  group,
+  userId,
+  t,
+}: {
+  group: TournamentBracketGroup;
+  userId?: string;
+  t: (key: string) => string;
+}) {
+  const players = groupParticipantsFor(group);
+  if (players.length === 0) {
+    return (
+      <p style={{ margin: 0, fontSize: '13px', color: 'var(--sovereign-text-muted)' }}>
+        {t('tournament_bracket_group_empty')}
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {players.map((p) => {
+        const isMe = !!userId && p.userId === userId;
+        return (
+          <div
+            key={p.userId}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              padding: '10px 12px',
+              borderRadius: '12px',
+              border: isMe ? '1px solid rgba(232,201,107,0.45)' : '1px solid rgba(255,255,255,0.08)',
+              background: isMe ? 'rgba(232,201,107,0.08)' : 'rgba(255,255,255,0.03)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <IonIcon icon={peopleOutline} style={{ fontSize: 16, color: 'var(--sovereign-text-muted)', flexShrink: 0 }} />
+              <span
+                style={{
+                  color: isMe ? 'var(--sovereign-gold)' : 'var(--sovereign-text)',
+                  fontWeight: isMe ? 800 : 600,
+                  fontSize: '14px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {p.username}
+                {isMe && (
+                  <span style={{ color: 'var(--sovereign-text-muted)', fontWeight: 600, fontSize: '11px' }}>
+                    {' '}
+                    ({t('tournament_bracket_you')})
+                  </span>
+                )}
+              </span>
+            </div>
+            {p.seed != null && (
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--sovereign-text-muted)', flexShrink: 0 }}>
+                #{p.seed}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TournamentBracketView({
   bracket,
   tournament,
@@ -177,13 +249,18 @@ export default function TournamentBracketView({
   spectatingRoomId,
 }: Props) {
   const t = useT();
-  const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
+  const hasMatches = bracketHasMatchContent(bracket);
+  const [viewMode, setViewMode] = useState<'tree' | 'list'>(() => (hasMatches ? 'tree' : 'list'));
+
+  useEffect(() => {
+    if (bracket && !bracketHasMatchContent(bracket)) {
+      setViewMode('list');
+    }
+  }, [bracket]);
 
   const groups = bracket ? sortedBracketGroups(bracket) : [];
-  const hasContent =
-    !!bracket &&
-    (groups.some((g) => bracket.groupMatches.some((m) => m.groupNumber === g.groupNumber)) ||
-      bracket.finalsMatches.length > 0);
+  const hasContent = bracketHasVisibleContent(bracket);
+  const registrationPhase = !!bracket && hasContent && !hasMatches;
 
   if (loading && !bracket) {
     return (
@@ -241,7 +318,24 @@ export default function TournamentBracketView({
         </div>
       )}
 
-      {hasContent && (
+      {registrationPhase && (
+        <p
+          style={{
+            margin: '0 0 14px',
+            padding: '10px 12px',
+            borderRadius: '12px',
+            background: 'rgba(232,201,107,0.08)',
+            border: '1px solid rgba(232,201,107,0.25)',
+            fontSize: '13px',
+            color: 'var(--sovereign-text-muted)',
+            lineHeight: 1.45,
+          }}
+        >
+          {t('tournament_bracket_registration_phase')}
+        </p>
+      )}
+
+      {hasContent && hasMatches && (
         <IonSegment
           value={viewMode}
           onIonChange={(e) => setViewMode((e.detail.value as 'tree' | 'list') ?? 'tree')}
@@ -262,7 +356,7 @@ export default function TournamentBracketView({
         </div>
       )}
 
-      {hasContent && viewMode === 'tree' && (
+      {hasContent && hasMatches && viewMode === 'tree' && (
         <TournamentBracketTreeView
           bracket={bracket}
           tournament={tournament}
@@ -297,9 +391,7 @@ export default function TournamentBracketView({
             )}
           </div>
           {matches.length === 0 ? (
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--sovereign-text-muted)' }}>
-              {t('tournament_bracket_no_matches')}
-            </p>
+            <GroupRoster group={group} userId={userId} t={t} />
           ) : (
             matches.map((m) => (
               <MatchCard

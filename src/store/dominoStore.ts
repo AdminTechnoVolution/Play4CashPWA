@@ -24,6 +24,7 @@ import {
   parseLobbyRequiredCount,
   sumOpponentHandCounts,
 } from '../pages/play/domino/dominoGameLogic';
+import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 
 export enum DominoPhase {
@@ -429,6 +430,7 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
     }
 
     if (opponentLeft && waitingForOpponent) {
+      if (!canAcceptWaitingLobby(get().phase, get().gameOver)) return;
       const player = String(data?.playerLeft || data?.player_left || '').trim();
       const hasRem = data?.playersRemaining !== undefined || data?.players_remaining !== undefined;
       const hasReq = data?.playersRequired !== undefined || data?.players_required !== undefined;
@@ -487,6 +489,7 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
     }
 
     if (waitingForOpponent) {
+      if (!canAcceptWaitingLobby(get().phase, get().gameOver)) return;
       const sub = buildDominoWaitingLobbySubtitle(json, data);
       if (isSpectatorJoin) {
         set({

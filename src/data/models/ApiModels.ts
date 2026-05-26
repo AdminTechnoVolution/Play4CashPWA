@@ -450,8 +450,22 @@ export interface TournamentBracketMatch {
   isBye?: boolean;
 }
 
+export interface TournamentBracketParticipant {
+  userId: string;
+  username: string;
+  seed?: number;
+  status?: string;
+}
+
+export interface TournamentBracketGroup {
+  groupNumber: number;
+  status: string;
+  winnerUserId: string | null;
+  participants?: TournamentBracketParticipant[];
+}
+
 export interface TournamentBracketResponse {
-  groups: Array<{ groupNumber: number; status: string; winnerUserId: string | null }>;
+  groups: TournamentBracketGroup[];
   groupMatches: TournamentBracketMatch[];
   finalsMatches: TournamentBracketMatch[];
 }

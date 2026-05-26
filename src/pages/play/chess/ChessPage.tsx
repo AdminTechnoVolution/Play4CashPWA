@@ -226,7 +226,7 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
           message={incomingGreetingMessage}
           active={store.phase === ChessPhase.PLAY && !isSpectator}
         />
-        {store.phase === ChessPhase.WAITING && (
+        {store.phase === ChessPhase.WAITING && !store.gameOver && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}>
             <IonCard style={{ width: '85%', maxWidth: '340px', '--background': '#1a2940', borderRadius: '24px', textAlign: 'center', border: '2px solid rgba(255,255,255,0.1)' }}>
               <IonCardContent style={{ padding: '32px 24px' }}>

@@ -14,6 +14,7 @@ import { GameOverPayload, GreetingResponse } from '../data/models/ApiModels';
 import { SpectatorPayload } from '../util/SpectatorPayload';
 import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
+import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 
 export enum ChessPhase { WAITING = 'WAITING', PLAY = 'PLAY', GAME_OVER = 'GAME_OVER' }
 export enum ChessPieceType { KING = 'KING', QUEEN = 'QUEEN', ROOK = 'ROOK', BISHOP = 'BISHOP', KNIGHT = 'KNIGHT', PAWN = 'PAWN' }
@@ -631,6 +632,7 @@ function handleChessMessage(json: any, set: any, get: any) {
 
     syncCountdownAfterTimerUpdate(prev, nextLeft, yourTurn, remainingFromServer !== null, set, get);
   } else if (waitingForOpponent || opponentJoined) {
+    if (!canAcceptWaitingLobby(get().phase, get().gameOver)) return;
     set({
       phase: ChessPhase.WAITING,
       gameEndYouWon: null,

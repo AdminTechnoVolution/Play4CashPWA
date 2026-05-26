@@ -1030,6 +1030,8 @@
   "tournament_load_error": "No se pudieron cargar los torneos.",
   "tournament_bracket_error": "No se pudo cargar el cuadro.",
   "tournament_bracket_empty": "El cuadro aún no está disponible.",
+  "tournament_bracket_registration_phase": "Los grupos se están formando. Las partidas aparecerán cuando comience el torneo.",
+  "tournament_bracket_group_empty": "Aún no hay jugadores inscritos en este grupo.",
   "tournament_bracket_no_matches": "Aún no hay partidas en este grupo.",
   "tournament_bracket_group_winner": "Ganador",
   "tournament_bracket_you": "tú",

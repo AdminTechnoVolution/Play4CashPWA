@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -16,9 +16,9 @@ import { useT } from '../../i18n/translations';
 import { apiRepository } from '../../data/network/ApiRepository';
 import { savePlayContext } from '../../util/routingStorage';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
-import { isLiveTournamentStatus } from '../../util/tournamentUtils';
 import type { TournamentBracketMatch, TournamentHistoryItem, TournamentSummary } from '../../data/models/ApiModels';
 import TournamentBracketView from '../../ui/components/tournaments/TournamentBracketView';
+import { useTournamentSyncFocus } from '../../ui/components/tournaments/TournamentSyncProvider';
 
 const TournamentBracketPage: React.FC = () => {
   const { tournamentId = '' } = useParams();
@@ -33,7 +33,6 @@ const TournamentBracketPage: React.FC = () => {
   );
   const loadBracket = useTournamentsStore((s) => s.loadBracket);
   const loadDetail = useTournamentsStore((s) => s.loadDetail);
-  const connectSocket = useTournamentsStore((s) => s.connectSocket);
 
   const [bracketLoading, setBracketLoading] = useState(true);
   const [bracketError, setBracketError] = useState(false);
@@ -71,10 +70,7 @@ const TournamentBracketPage: React.FC = () => {
             }
           : null);
 
-  const pollMs = useMemo(() => {
-    if (tournament && isLiveTournamentStatus(tournament.status)) return 5000;
-    return 15000;
-  }, [tournament?.status]);
+  useTournamentSyncFocus({ kind: 'bracket', tournamentId });
 
   useEffect(() => {
     if (!tournamentId) return;
@@ -93,19 +89,10 @@ const TournamentBracketPage: React.FC = () => {
     };
 
     void refresh();
-    const poll = setInterval(() => void loadBracket(tournamentId), pollMs);
     return () => {
       cancelled = true;
-      clearInterval(poll);
     };
-  }, [tournamentId, loadBracket, loadDetail, pollMs]);
-
-  useEffect(() => {
-    if (!tournamentId || !tournament) return;
-    if (isLiveTournamentStatus(tournament.status)) {
-      connectSocket(tournamentId);
-    }
-  }, [tournamentId, tournament?.status, connectSocket, tournament]);
+  }, [tournamentId, loadBracket, loadDetail]);
 
   const gameSocketCode = tournament?.gameSocketCode ?? '';
   const tournamentTitle = tournament?.title ?? t('tournaments_title');

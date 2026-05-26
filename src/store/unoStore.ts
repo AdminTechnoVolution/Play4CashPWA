@@ -4,6 +4,7 @@ import { apiRepository } from '../data/network/ApiRepository';
 import type { GameOverPayload, UnoCardCode, UnoColor, UnoGamePayload, GreetingResponse } from '../data/models/ApiModels';
 import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
 import { hasKey, t } from '../i18n/translations';
+import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 
 export enum UnoPhase {
   WAITING = 'WAITING',
@@ -453,6 +454,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     const joinedName = String((data as { opponentName?: string })?.opponentName ?? '').trim();
 
     if (opponentJoined) {
+      if (!canAcceptWaitingLobby(get().phase, get().gameOver)) return;
       stopBetweenRoundResync();
       set({
         phase: UnoPhase.WAITING,
@@ -467,6 +469,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     }
 
     if (waitingForOpponent) {
+      if (!canAcceptWaitingLobby(get().phase, get().gameOver)) return;
       stopBetweenRoundResync();
       set({ phase: UnoPhase.WAITING, statusMessage: primaryMsg || 'uno_status_waiting_opponent' });
       return;

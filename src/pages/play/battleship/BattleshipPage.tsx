@@ -1655,7 +1655,7 @@ export default function BattleshipPage({
 
       {store.phase === 'placement'
         ? renderPlacement()
-        : store.phase === 'waiting'
+        : store.phase === 'waiting' && !store.gameOver
           ? renderWaiting()
           : renderBattle()}
 

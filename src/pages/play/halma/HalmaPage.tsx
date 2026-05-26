@@ -209,7 +209,7 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
           message={incomingGreetingMessage}
           active={store.phase === HalmaPhase.PLAY && !isSpectator}
         />
-        {store.phase === HalmaPhase.WAITING && renderWaiting()}
+        {store.phase === HalmaPhase.WAITING && !store.gameOver && renderWaiting()}
 
         <div style={{ padding: '16px', opacity: store.phase === HalmaPhase.WAITING ? 0.3 : 1 }}>
           {store.isSpectator && <SpectatorBadge />}

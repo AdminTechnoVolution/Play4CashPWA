@@ -1027,6 +1027,8 @@
   "tournament_load_error": "Could not load tournaments.",
   "tournament_bracket_error": "Could not load bracket.",
   "tournament_bracket_empty": "The bracket is not available yet.",
+  "tournament_bracket_registration_phase": "Groups are forming. Match pairings appear when the tournament starts.",
+  "tournament_bracket_group_empty": "No players registered in this group yet.",
   "tournament_bracket_no_matches": "No matches scheduled in this group yet.",
   "tournament_bracket_group_winner": "Winner",
   "tournament_bracket_you": "you",

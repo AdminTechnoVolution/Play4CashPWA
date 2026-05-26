@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { apiRepository } from '../data/network/ApiRepository';
 import type { TournamentBracketResponse, TournamentSummary } from '../data/models/ApiModels';
 import { TournamentSocketManager } from '../data/network/TournamentSocketManager';
-import { isMyUpcomingTournament, resolveJoinRoomId, filterCatalogTournaments, isCatalogTournamentStatus } from '../util/tournamentUtils';
+import { isMyUpcomingTournament, resolveJoinRoomId, filterCatalogTournaments, isCatalogTournamentStatus, pickPrimaryMyTournament } from '../util/tournamentUtils';
 import {
   readTrackedTournamentIds,
   trackRegisteredTournament,
@@ -21,20 +21,33 @@ interface TournamentsStore {
   error: string | null;
   clockTick: number;
   lobbyTournamentId: string | null;
-  loadList: () => Promise<void>;
-  loadDetail: (id: string) => Promise<void>;
-  loadBracket: (id: string) => Promise<TournamentBracketResponse | null>;
+  loadList: (opts?: { silent?: boolean }) => Promise<void>;
+  loadDetail: (id: string, opts?: { silent?: boolean }) => Promise<void>;
+  loadBracket: (id: string, opts?: { silent?: boolean }) => Promise<TournamentBracketResponse | null>;
   loadMatchRoom: (tournamentId: string, userId: string) => Promise<string | null>;
   register: (id: string) => Promise<void>;
   unregister: (id: string) => Promise<void>;
   applyServerState: (data: TournamentSummary) => void;
+  applyServerBracket: (id: string, bracket: TournamentBracketResponse) => void;
   connectSocket: (id: string) => void;
   disconnectSocket: () => void;
   bumpClock: () => void;
-  refreshMyTournaments: (userId?: string) => Promise<void>;
+  refreshMyTournaments: (userId?: string, opts?: { liveDetailMode?: 'none' | 'primary' | 'all' }) => Promise<void>;
 }
 
 let socketManager: TournamentSocketManager | null = null;
+
+const inflight = new Map<string, Promise<unknown>>();
+
+function dedupe<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const existing = inflight.get(key);
+  if (existing) return existing as Promise<T>;
+  const p = fn().finally(() => {
+    if (inflight.get(key) === p) inflight.delete(key);
+  });
+  inflight.set(key, p);
+  return p;
+}
 
 function serverOffsetMs(serverNow: string): number {
   const parsed = Date.parse(serverNow);
@@ -125,53 +138,59 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
     set((s) => ({ clockTick: s.clockTick + 1 }));
   },
 
-  async loadList() {
-    set({ loading: true, error: null });
-    try {
-      const list = filterCatalogTournaments(await apiRepository.getTournaments());
-      set({ list, loading: false });
-    } catch {
-      set({ loading: false, error: 'tournament_load_error' });
-    }
+  async loadList(opts?: { silent?: boolean }) {
+    return dedupe('tournament:list', async () => {
+      if (!opts?.silent) set({ loading: true, error: null });
+      try {
+        const list = filterCatalogTournaments(await apiRepository.getTournaments());
+        set({ list, loading: false });
+      } catch {
+        set({ loading: false, error: opts?.silent ? get().error : 'tournament_load_error' });
+      }
+    });
   },
 
-  async loadDetail(id) {
-    set({ loading: true, error: null });
-    try {
-      const detail = await apiRepository.getTournament(id);
-      if (isMyUpcomingTournament(detail)) trackRegisteredTournament(id);
-      set((s) => ({
-        detail,
-        loading: false,
-        detailsById: { ...s.detailsById, [id]: detail },
-        list: isCatalogTournamentStatus(detail.status)
-          ? patchListItem(s.list, id, detail)
-          : filterCatalogTournaments(s.list),
-        myList: isMyUpcomingTournament(detail)
-          ? mergeMyList(s.myList, [detail])
-          : s.myList.filter((t) => t.id !== id),
-        matchRoomsById: {
-          ...s.matchRoomsById,
-          [id]: detail.myActiveMatch?.canJoin ? detail.myActiveMatch.roomId ?? null : null,
-        },
-      }));
-    } catch {
-      set({ loading: false, error: 'tournament_load_error' });
-    }
+  async loadDetail(id, opts?: { silent?: boolean }) {
+    return dedupe(`tournament:detail:${id}`, async () => {
+      if (!opts?.silent) set({ loading: true, error: null });
+      try {
+        const detail = await apiRepository.getTournament(id);
+        if (isMyUpcomingTournament(detail)) trackRegisteredTournament(id);
+        set((s) => ({
+          detail,
+          loading: false,
+          detailsById: { ...s.detailsById, [id]: detail },
+          list: isCatalogTournamentStatus(detail.status)
+            ? patchListItem(s.list, id, detail)
+            : filterCatalogTournaments(s.list),
+          myList: isMyUpcomingTournament(detail)
+            ? mergeMyList(s.myList, [detail])
+            : s.myList.filter((t) => t.id !== id),
+          matchRoomsById: {
+            ...s.matchRoomsById,
+            [id]: detail.myActiveMatch?.canJoin ? detail.myActiveMatch.roomId ?? null : null,
+          },
+        }));
+      } catch {
+        set({ loading: false, error: opts?.silent ? get().error : 'tournament_load_error' });
+      }
+    });
   },
 
-  async loadBracket(id): Promise<TournamentBracketResponse | null> {
-    try {
-      const bracket = await apiRepository.getTournamentBracket(id);
-      set((s) => ({
-        bracket: s.detail?.id === id || s.bracket === null ? bracket : s.bracket,
-        bracketsById: { ...s.bracketsById, [id]: bracket },
-      }));
-      return bracket;
-    } catch {
-      set({ error: 'tournament_bracket_error' });
-      return null;
-    }
+  async loadBracket(id, opts?: { silent?: boolean }): Promise<TournamentBracketResponse | null> {
+    return dedupe(`tournament:bracket:${id}`, async () => {
+      try {
+        const bracket = await apiRepository.getTournamentBracket(id);
+        set((s) => ({
+          bracket: s.detail?.id === id || s.bracket === null ? bracket : s.bracket,
+          bracketsById: { ...s.bracketsById, [id]: bracket },
+        }));
+        return bracket;
+      } catch {
+        if (!opts?.silent) set({ error: 'tournament_bracket_error' });
+        return null;
+      }
+    });
   },
 
   async loadMatchRoom(tournamentId, _userId) {
@@ -275,16 +294,30 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
     }));
   },
 
+  applyServerBracket(id, bracket) {
+    set((s) => ({
+      bracket: s.detail?.id === id || s.bracket === null ? bracket : s.bracket,
+      bracketsById: { ...s.bracketsById, [id]: bracket },
+    }));
+  },
+
   connectSocket(id) {
     if (socketManager && get().lobbyTournamentId === id) return;
     get().disconnectSocket();
     set({ lobbyTournamentId: id });
     socketManager = new TournamentSocketManager();
     socketManager.setOnPayload((raw) => {
-      const json = raw as { event?: string; data?: TournamentSummary };
+      const json = raw as {
+        event?: string;
+        data?: TournamentSummary & { tournamentId?: string; bracket?: TournamentBracketResponse };
+      };
       if (json?.event === 'tournament:bracketUpdated') {
-        void get().loadBracket(id);
-        void get().loadDetail(id);
+        const tid = json.data?.tournamentId ?? id;
+        if (json.data?.bracket) {
+          get().applyServerBracket(tid, json.data.bracket);
+        } else {
+          void get().loadBracket(tid, { silent: true });
+        }
         return;
       }
       if (json?.event === 'tournament:state' && json?.data) {
@@ -305,38 +338,52 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
     set({ lobbyTournamentId: null });
   },
 
-  async refreshMyTournaments(userId?: string) {
-    let mine: TournamentSummary[] = [];
-    try {
-      mine = await apiRepository.getMyTournaments();
-    } catch {
-      /* endpoint may be unavailable on older API builds */
-    }
+  async refreshMyTournaments(userId?: string, opts?: { liveDetailMode?: 'none' | 'primary' | 'all' }) {
+    const liveDetailMode = opts?.liveDetailMode ?? 'primary';
+    return dedupe(`tournament:mine:${userId ?? 'anon'}:${liveDetailMode}`, async () => {
+      let mine: TournamentSummary[] = [];
+      try {
+        mine = await apiRepository.getMyTournaments();
+      } catch {
+        /* endpoint may be unavailable on older API builds */
+      }
 
-    if (mine.length === 0 && userId) {
-      const fromTracked = await hydrateTrackedDetails(userId);
-      mine = fromTracked.length > 0 ? fromTracked : get().list.filter(isMyUpcomingTournament);
-    }
+      if (mine.length === 0 && userId) {
+        const fromTracked = await hydrateTrackedDetails(userId);
+        mine = fromTracked.length > 0 ? fromTracked : get().list.filter(isMyUpcomingTournament);
+      }
 
-    if (mine.length === 0) {
-      await get().loadList();
-      mine = get().list.filter(isMyUpcomingTournament);
-    }
+      if (mine.length === 0) {
+        await get().loadList({ silent: liveDetailMode === 'none' });
+        mine = get().list.filter(isMyUpcomingTournament);
+      }
 
-    for (const t of mine) trackRegisteredTournament(t.id);
-    set({
-      myList: mine,
-      list: filterCatalogTournaments(mergeMyList(get().list, mine)),
-    });
+      for (const t of mine) trackRegisteredTournament(t.id);
+      set({
+        myList: mine,
+        list: filterCatalogTournaments(mergeMyList(get().list, mine)),
+      });
 
-    await Promise.all(
-      mine
-        .filter((t) =>
-          ['running', 'between_rounds', 'finals_running', 'finals_pending', 'locking', 'countdown'].includes(
-            t.status,
-          ),
-        )
-        .map(async (t) => {
+      if (liveDetailMode === 'none') return;
+
+      const live = mine.filter((t) =>
+        ['running', 'between_rounds', 'finals_running', 'finals_pending', 'locking', 'countdown'].includes(
+          t.status,
+        ),
+      );
+
+      const targets =
+        liveDetailMode === 'all'
+          ? live
+          : liveDetailMode === 'primary'
+            ? (() => {
+                const p = pickPrimaryMyTournament(mine);
+                return p && live.some((t) => t.id === p.id) ? [p] : live.slice(0, 1);
+              })()
+            : [];
+
+      await Promise.all(
+        targets.map(async (t) => {
           await get().loadDetail(t.id);
           const fresh = get().myList.find((x) => x.id === t.id) ?? get().detail;
           set((s) => ({
@@ -346,6 +393,7 @@ export const useTournamentsStore = create<TournamentsStore>((set, get) => ({
             },
           }));
         }),
-    );
+      );
+    });
   },
 }));

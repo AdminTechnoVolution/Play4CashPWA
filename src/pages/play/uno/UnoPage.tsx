@@ -262,7 +262,7 @@ export default function UnoPage(props: UnoPageProps) {
           message={incomingGreetingMessage}
           active={phase === UnoPhase.PLAY && !props.isSpectator}
         />
-        {phase === UnoPhase.WAITING && (
+        {phase === UnoPhase.WAITING && !gameOver && (
           <div
             style={{
               display: 'flex',
