@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../store/authStore';
 import { apiRepository } from '../../../data/network/ApiRepository';
 import type { TournamentSummary } from '../../../data/models/ApiModels';
@@ -9,6 +10,12 @@ import {
   hasTournamentPlacementShown,
   markTournamentPlacementShown,
 } from '../../../util/tournamentPlacementStorage';
+import {
+  gameSocketCodeFromPlayPath,
+  beginPlaySessionTeardown,
+  teardownPlaySession,
+} from '../../../util/playBackNavigation';
+import { getPlayContext } from '../../../util/routingStorage';
 import TournamentPlacementModal, {
   type TournamentPlacementPayload,
 } from './TournamentPlacementModal';
@@ -35,6 +42,7 @@ function resolvePlacement(t: TournamentSummary): TournamentPlacementPayload | nu
  * Surfaces a celebratory podium modal when the user finishes 1st or 2nd in a tournament.
  */
 export default function TournamentPlacementManager() {
+  const navigate = useNavigate();
   const { user, authHydrated } = useAuthStore();
   const detail = useTournamentsStore((s) => s.detail);
   const myList = useTournamentsStore((s) => s.myList);
@@ -81,10 +89,22 @@ export default function TournamentPlacementManager() {
   }, [authHydrated, user, payload, consider]);
 
   const onDismiss = () => {
+    const tournamentId = payload?.tournamentId;
+    const onPlayRoute = window.location.pathname.startsWith('/play/');
+    const playCtx = getPlayContext();
+    const gameCode = gameSocketCodeFromPlayPath();
+
     if (payload) {
       markTournamentPlacementShown(payload.tournamentId);
     }
     setPayload(null);
+
+    if (onPlayRoute) {
+      beginPlaySessionTeardown();
+      teardownPlaySession(gameCode, playCtx?.roomId);
+      navigate(tournamentId ? `/tournaments/${tournamentId}` : '/tournaments', { replace: true });
+    }
+
     void useAuthStore.getState().loadSession();
     void useTournamentsStore.getState().refreshMyTournaments(user?.id);
   };

@@ -26,6 +26,11 @@ import {
   tryConsumePlayBack,
   PLAY_BACK_TRAP_KEY,
   consumePlayBackTrapThenNavigate,
+  beginPlaySessionTeardown,
+  subscribePlaySessionTeardown,
+  resetPlaySessionTeardown,
+  teardownPlaySession,
+  isPlaySessionTearingDown,
 } from '../../util/playBackNavigation';
 
 /** Defer clearing play context until after navigation unmounts PlayPage (avoids one frame of blank UI). */
@@ -158,6 +163,16 @@ export default function PlayPage() {
   const needsForfeitBackTrap =
     !snapOver && !isSpectator && snapOpp && snapPast;
 
+  const tearingDown = useSyncExternalStore(
+    subscribePlaySessionTeardown,
+    isPlaySessionTearingDown,
+    () => false,
+  );
+
+  useEffect(() => {
+    resetPlaySessionTeardown();
+  }, [roomId, gameSocketCode]);
+
   // ── Leave state ─────────────────────────────────────────────────────────────
   const [checkingLeave,    setCheckingLeave]    = useState(false);
   const [showForfeit,      setShowForfeit]      = useState(false);
@@ -233,7 +248,12 @@ export default function PlayPage() {
     // Use an explicit rooms route instead of history.back() so we never land on an empty
     // stack / odd back-trap state after UNO (and other games) dismiss their end modal.
     if (gameIsOver) {
-      await doLeave(true, { explicitPath: `/rooms/${encodeURIComponent(gameSocketCode)}` });
+      const dest = `/rooms/${encodeURIComponent(gameSocketCode)}`;
+      beginPlaySessionTeardown();
+      teardownPlaySession(gameSocketCode, roomId);
+      consumePlayBackTrapThenNavigate(() => {
+        navigate(dest, { replace: true });
+      });
       return;
     }
 
@@ -346,14 +366,14 @@ export default function PlayPage() {
 
   return (
     <>
-      {gameSocketCode === 'chess'  && <ChessPage  {...gameProps} />}
-      {gameSocketCode === 'halma'  && <HalmaPage  {...gameProps} />}
-      {gameSocketCode === 'domino' && <DominoPage {...gameProps} />}
-      {gameSocketCode === 'uno'    && (
+      {!tearingDown && gameSocketCode === 'chess'  && <ChessPage  {...gameProps} />}
+      {!tearingDown && gameSocketCode === 'halma'  && <HalmaPage  {...gameProps} />}
+      {!tearingDown && gameSocketCode === 'domino' && <DominoPage {...gameProps} />}
+      {!tearingDown && gameSocketCode === 'uno'    && (
         <UnoPage {...gameProps} catalogUnoMatchTarget={catalogUnoMatchTarget} />
       )}
-      {gameSocketCode === 'connect-four' && <ConnectFourPage {...gameProps} />}
-      {!['chess', 'halma', 'domino', 'uno', 'connect-four'].includes(gameSocketCode) && (
+      {!tearingDown && gameSocketCode === 'connect-four' && <ConnectFourPage {...gameProps} />}
+      {!tearingDown && !['chess', 'halma', 'domino', 'uno', 'connect-four'].includes(gameSocketCode) && (
         <BattleshipPage {...gameProps} />
       )}
 
@@ -420,7 +440,12 @@ export default function PlayPage() {
             text: t('ok'),
             handler: () => {
               setShowFinished(false);
-              void doLeave(true, { explicitPath: `/rooms/${encodeURIComponent(gameSocketCode)}` });
+              const dest = `/rooms/${encodeURIComponent(gameSocketCode)}`;
+              beginPlaySessionTeardown();
+              teardownPlaySession(gameSocketCode, roomId);
+              consumePlayBackTrapThenNavigate(() => {
+                navigate(dest, { replace: true });
+              });
             },
           },
         ]}

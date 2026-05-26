@@ -179,14 +179,26 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
   // Helper functions ported from Android
   const isDarkSquare = (row: number, col: number) => (row + col) % 2 !== 0;
 
+  const flipDisplayCoord = (row: number, col: number) => ({
+    row: HALMA_BOARD_SIZE - 1 - row,
+    col: HALMA_BOARD_SIZE - 1 - col,
+  });
+
+  const flipDisplayBoard = (board: HalmaCellState[][]) =>
+    [...board].reverse().map((row) => [...row].reverse());
+
+  /** Server P1 starts rows 0–2 (top); P2 rows 5–7 (bottom). Each player sees own pieces at the bottom. */
+  const orientBoardForViewer = (raw: HalmaCellState[][]) =>
+    isPlayerOne ? flipDisplayBoard(raw) : raw;
+
   const toRawCoord = (displayRow: number, displayCol: number): { row: number, col: number } => {
-    if (isPlayerOne) return { row: displayRow, col: displayCol };
-    return { row: HALMA_BOARD_SIZE - 1 - displayRow, col: HALMA_BOARD_SIZE - 1 - displayCol };
+    if (isPlayerOne) return flipDisplayCoord(displayRow, displayCol);
+    return { row: displayRow, col: displayCol };
   };
 
   const rawToDisplayCoord = (rawRow: number, rawCol: number): { row: number, col: number } => {
-    if (isPlayerOne) return { row: rawRow, col: rawCol };
-    return { row: HALMA_BOARD_SIZE - 1 - rawRow, col: HALMA_BOARD_SIZE - 1 - rawCol };
+    if (isPlayerOne) return flipDisplayCoord(rawRow, rawCol);
+    return { row: rawRow, col: rawCol };
   };
 
   const findLandedCell = (oldBoard: HalmaCellState[][], newBoard: HalmaCellState[][]) => {
@@ -224,7 +236,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
         }
       });
     });
-    return isPlayerOne ? raw : [...raw].reverse().map(row => [...row].reverse());
+    return orientBoardForViewer(raw);
   };
 
   const getNormalPieceMoves = (fromRow: number, fromCol: number, board: HalmaCellState[][]) => {
@@ -448,8 +460,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
             // Android 417: continuingJump
             const rawR = jumpingPiece.row !== undefined ? jumpingPiece.row : jumpingPiece.r;
             const rawC = jumpingPiece.col !== undefined ? jumpingPiece.col : jumpingPiece.c;
-            const r = isPlayerOne ? rawR : 7 - rawR;
-            const c = isPlayerOne ? rawC : 7 - rawC;
+            const { row: r, col: c } = rawToDisplayCoord(rawR, rawC);
 
             if (r >= 0 && r < 8 && c >= 0 && c < 8) {
               const piece = newBoard[r][c];

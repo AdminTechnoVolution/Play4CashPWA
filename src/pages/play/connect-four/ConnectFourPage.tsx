@@ -289,7 +289,7 @@ export default function ConnectFourPage({
           message={incomingGreetingMessage}
           active={store.phase === ConnectFourPhase.PLAY && !isSpectator}
         />
-        {store.phase === ConnectFourPhase.WAITING && (
+        {store.phase === ConnectFourPhase.WAITING && !store.gameOver && (
           <div
             style={{
               display: 'flex',

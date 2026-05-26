@@ -4,6 +4,7 @@ import { apiRepository } from '../data/network/ApiRepository';
 import type { BattleshipCell, GameOverPayload, ShipPlacement } from '../data/models/ApiModels';
 
 import { SpectatorPayload } from '../util/SpectatorPayload';
+import { canAcceptWaitingLobby, isMatchTerminalPhase } from '../util/playPhaseGuards';
 
 const EMPTY_BOARD = (): BattleshipCell[][] =>
   Array.from({ length: 10 }, () => Array(10).fill('empty') as BattleshipCell[]);
@@ -319,6 +320,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       // ── Opponent left pre-game (check BEFORE waitingForOpponent — payload has both) ──
       // Android payload: { "opponentLeft": true, "waitingForOpponent": true }
       if (data.opponentLeft === true) {
+        if (!canAcceptWaitingLobby(get().phase, get().gameOver)) return;
         // Spectators are unaffected by opponent-left events
         if (get().isSpectator) return;
         const { phase } = get();
@@ -346,6 +348,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
 
       // ── Waiting for a second player to join ─────────────────────────────────
       if (data.waitingForOpponent === true) {
+        if (isMatchTerminalPhase(get().phase) || get().gameOver) return;
         // Stay in placement — UI will show "Waiting for opponent to join"
         return;
       }

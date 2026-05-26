@@ -9,6 +9,7 @@ import {
   resolveConnectFourYourTurn,
   shouldApplyConnectFourPlayPayload,
 } from './connectFourPayloadLogic';
+import { canAcceptWaitingLobby } from '../../../util/playPhaseGuards';
 import type { ConnectFourCell } from '../../../data/models/connectFourModels';
 
 function parseBoard(raw: unknown): ConnectFourCell[][] {
@@ -104,8 +105,14 @@ describe('connectFourPayloadLogic', () => {
       !!({ gameStarted: true, status: 'started' } as Record<string, unknown>).gameStarted ||
       String('started').toLowerCase() === 'started';
     const phase = 'PLAY';
-    const shouldApplyWaiting = waitingForOpponent && !roomAlreadyLive && phase !== 'PLAY';
+    const shouldApplyWaiting =
+      waitingForOpponent && !roomAlreadyLive && canAcceptWaitingLobby(phase);
     expect(shouldApplyWaiting).toBe(false);
+  });
+
+  it('stale waiting payload ignored after game over', () => {
+    expect(canAcceptWaitingLobby('GAME_OVER')).toBe(false);
+    expect(canAcceptWaitingLobby('PLAY', { outcome: 'win' })).toBe(false);
   });
 
   it('shouldApplyConnectFourPlayPayload rejects stale revision during PLAY', () => {

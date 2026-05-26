@@ -31,6 +31,7 @@ import {
   resolveConnectFourYourTurn,
   shouldApplyConnectFourPlayPayload,
 } from '../pages/play/connect-four/connectFourPayloadLogic';
+import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 
 export enum ConnectFourPhase {
   WAITING = 'WAITING',
@@ -621,6 +622,7 @@ function handleConnectFourPayload(
   }
 
   if (opponentLeft && waitingForOpponent) {
+    if (!canAcceptWaitingLobby(get().phase, get().gameOver)) return;
     stopTurnTimer();
     stopStatusPolling();
     stopLobbyWatchdog();
@@ -651,7 +653,7 @@ function handleConnectFourPayload(
     !!data?.game_started ||
     String(data?.status || '').toLowerCase() === 'started';
 
-  if (waitingForOpponent && !roomAlreadyLive && get().phase !== ConnectFourPhase.PLAY) {
+  if (waitingForOpponent && !roomAlreadyLive && canAcceptWaitingLobby(get().phase, get().gameOver)) {
     set({
       phase: ConnectFourPhase.WAITING,
       statusMessage: get().isSpectator
