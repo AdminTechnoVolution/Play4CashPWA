@@ -5,6 +5,16 @@ import type { BattleshipCell, GameOverPayload, ShipPlacement } from '../data/mod
 
 import { SpectatorPayload } from '../util/SpectatorPayload';
 import { canAcceptWaitingLobby, isMatchTerminalPhase } from '../util/playPhaseGuards';
+import {
+  applyIncomingStateVersion,
+  createStateVersionTracker,
+  resetStateVersionTracker,
+} from '../data/network/socketStateVersion';
+
+let battleshipActiveRoomId: string | null = null;
+const battleshipStateVersionTracker = createStateVersionTracker(() => {
+  if (battleshipActiveRoomId) (window as any).battleshipSocket?.requestSync(battleshipActiveRoomId);
+});
 
 const EMPTY_BOARD = (): BattleshipCell[][] =>
   Array.from({ length: 10 }, () => Array(10).fill('empty') as BattleshipCell[]);
@@ -246,6 +256,8 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
 
   // ── initGame ────────────────────────────────────────────────────────────────
   initGame(roomId, myUsername, hasOpponent = false, initialOpponentName = '', isSpectator = false) {
+    battleshipActiveRoomId = roomId;
+    resetStateVersionTracker(battleshipStateVersionTracker);
     console.log('[SPECTATOR][7] battleshipStore.initGame → roomId:', roomId, '| myUsername:', myUsername, '| isSpectator:', isSpectator, '| hasOpponent:', hasOpponent, '| initialOpponentName:', initialOpponentName);
     clearBattleshipOpponentPoll();
 
@@ -274,6 +286,8 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
           ? envelope.data
           : envelope
       ) as Record<string, unknown>;
+
+      applyIncomingStateVersion(battleshipStateVersionTracker, data);
 
       // ── Spectator count (broadcast on every event — mirrors Android applySpectatorBroadcast) ──
       const sc = typeof data.spectatorsCount === 'number' ? data.spectatorsCount

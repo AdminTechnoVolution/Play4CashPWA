@@ -15,6 +15,18 @@ import { SpectatorPayload } from '../util/SpectatorPayload';
 import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetingModels';
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
+import {
+  applyIncomingStateVersion,
+  createStateVersionTracker,
+  resetStateVersionTracker,
+} from '../data/network/socketStateVersion';
+
+let disconnectChessSocketTimeout: ReturnType<typeof setTimeout> | null = null;
+let chessActiveRoomId: string | null = null;
+
+const chessStateVersionTracker = createStateVersionTracker(() => {
+  if (chessActiveRoomId) (window as any).chessSocket?.requestSync(chessActiveRoomId);
+});
 
 export enum ChessPhase { WAITING = 'WAITING', PLAY = 'PLAY', GAME_OVER = 'GAME_OVER' }
 export enum ChessPieceType { KING = 'KING', QUEEN = 'QUEEN', ROOK = 'ROOK', BISHOP = 'BISHOP', KNIGHT = 'KNIGHT', PAWN = 'PAWN' }
@@ -122,7 +134,6 @@ let statusPollingInterval: any = null;
 let chatOverlayTimeout: any = null;
 /** Android ChessViewModel lastGreetingSentAtMs — 5s throttle on sendGreeting */
 let lastGreetingSentAtMs = 0;
-let disconnectChessSocketTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export const useChessStore = create<ChessState>((set, get) => ({
   phase: ChessPhase.WAITING,
@@ -177,6 +188,8 @@ export const useChessStore = create<ChessState>((set, get) => ({
   greetings: [],
 
   initGame: (roomId, myUsername, betAmount, hasOpponent, initialOpponentName, isSpectator) => {
+    resetStateVersionTracker(chessStateVersionTracker);
+    chessActiveRoomId = roomId;
     set({
       myUsername,
       betAmount,
@@ -421,6 +434,8 @@ function handleChessMessage(json: any, set: any, get: any) {
     typeof rawData === 'object' &&
     !Array.isArray(rawData);
   const data = hasDataObject ? rawData : json;
+
+  if (hasDataObject) applyIncomingStateVersion(chessStateVersionTracker, data);
 
   applySpectatorBroadcast(data, set);
   mergeSpectatorChessLabels(data, state, set);

@@ -6,6 +6,16 @@ import type { GameOverPayload } from '../data/models/ApiModels';
 import { SpectatorPayload } from '../util/SpectatorPayload';
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 import { playerGameEndReasonFallback } from '../i18n/ApiMessageDisplay';
+import {
+  applyIncomingStateVersion,
+  createStateVersionTracker,
+  resetStateVersionTracker,
+} from '../data/network/socketStateVersion';
+
+let halmaActiveRoomId: string | null = null;
+const halmaStateVersionTracker = createStateVersionTracker(() => {
+  if (halmaActiveRoomId) (window as any).halmaSocket?.requestSync(halmaActiveRoomId);
+});
 
 // Mirroring Android: HalmaViewModel.kt
 const HALMA_BOARD_SIZE = 8;
@@ -321,6 +331,8 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
 
     initGame(roomId, myUsername, bet, hasOpponent, initialOpponentName, isSpectator) {
       isPlayerOne = true;
+      halmaActiveRoomId = roomId;
+      resetStateVersionTracker(halmaStateVersionTracker);
       set({ 
         ...INITIAL_STATE, 
         betAmount: bet, 
@@ -360,6 +372,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
       
       socketManager.onGameUpdate((json: any) => {
         const data = json.data || json;
+        applyIncomingStateVersion(halmaStateVersionTracker, data);
 
         // ── Spectator refresh: extract player names + turn holder from every event ──
         // Mirrors Android update (Battleship/Halma parity)

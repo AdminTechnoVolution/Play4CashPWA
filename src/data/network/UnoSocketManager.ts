@@ -1,26 +1,19 @@
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { BASE_URL, SOCKET_TIMEOUT_MS } from '../../config/api.config';
+import { BASE_URL } from '../../config/api.config';
 import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
+import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
 import type { UnoColor } from '../models/ApiModels';
 
 const NAMESPACE = '/uno';
 
-/**
- * Socket.IO client for the `/uno` namespace. Mirrors `DominoSocketManager` shape so the
- * lifecycle (connect → join → payload → disconnect) matches every other game and the
- * gateway/auth-refresh wiring is identical.
- *
- * Server emits the `uno` event for every state change (success or failure). Outgoing
- * events: `join`, `play_card`, `draw_one`, `pass`, `take_draw_stack`, `call_uno`,
- * `challenge_uno_miss`.
- */
 export class UnoSocketManager {
   private socket: Socket | null = null;
+  private sessionRoomId: string | null = null;
   private onPayload?: (raw: unknown) => void;
   private onConnectedCb?: () => void;
 
@@ -33,29 +26,29 @@ export class UnoSocketManager {
   }
 
   connect(roomId: string): void {
+    this.disconnect();
+
     const token = getAccessToken();
     if (!token) {
       window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
       return;
     }
 
+    this.sessionRoomId = roomId;
+
     this.socket = io(`${BASE_URL}${NAMESPACE}`, {
-      transports: ['polling'],
-      autoConnect: false,
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: SOCKET_TIMEOUT_MS,
+      ...SOCKET_IO_CLIENT_DEFAULTS,
       query: { token, appVersion: __APP_VERSION__ },
       auth: { token, appVersion: __APP_VERSION__ },
       extraHeaders: socketIoExtraHeaders(token),
     });
 
     attachVersionMismatchListener(this.socket);
-    // Phase D: register with the global connection store so <ReconnectionBanner />
-    // and `useVisibilityReconnect` can react to transport flaps.
-    instrumentSocket(this.socket, NAMESPACE);
+    instrumentSocket(this.socket, NAMESPACE, {
+      onResync: () => {
+        if (this.sessionRoomId) this.requestSync(this.sessionRoomId);
+      },
+    });
 
     this.socket.on('connect', () => {
       this.onConnectedCb?.();
@@ -81,21 +74,17 @@ export class UnoSocketManager {
   }
 
   disconnect(): void {
+    this.sessionRoomId = null;
+    this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;
     releaseSocket(NAMESPACE);
   }
 
-  /** Re-emit join to resync state (used after polling sees room.status === 'started'). */
   requestSync(roomId: string): void {
     this.socket?.emit('join', { room_id: roomId });
   }
 
-  /**
-   * Plays a card. Pass `callUno: true` atomically when this card will leave you at 1
-   * card so you don't open a challenge window on yourself. `chosenColor` is required
-   * for Wild ('W') and Wild +4 ('W4').
-   */
   playCard(
     roomId: string,
     cardIndex: number,
@@ -119,21 +108,14 @@ export class UnoSocketManager {
     this.socket?.emit('take_draw_stack', { room_id: roomId });
   }
 
-  /** Reactive UNO declaration when you forgot to set `call_uno` on the play. Only
-   *  succeeds while the server still has `pendingUnoOffender === self`. */
   callUno(roomId: string): void {
     this.socket?.emit('call_uno', { room_id: roomId });
   }
 
-  /** Accuse another player of failing to declare UNO. Server validates the window. */
   challengeUnoMiss(roomId: string, offenderId: string): void {
     this.socket?.emit('challenge_uno_miss', { room_id: roomId, offender_id: offenderId });
   }
 
-  /**
-   * Tap "ready" on the between-rounds scoreboard. The server skips the auto-start
-   * countdown when every active player has signalled ready.
-   */
   startNextRound(roomId: string): void {
     this.socket?.emit('start_next_round', { room_id: roomId });
   }

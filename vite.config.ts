@@ -124,6 +124,7 @@ export default defineConfig(({ mode }) => {
           // on the open tab and eager reload can race activation (stale chunks until another tap).
           clientsClaim: true,
           skipWaiting: false,
+          importScripts: ['sw-push.js'],
           runtimeCaching: [
             {
               urlPattern: /\/env-config\.js$/,

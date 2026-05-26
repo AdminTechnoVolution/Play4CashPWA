@@ -32,6 +32,16 @@ import {
   shouldApplyConnectFourPlayPayload,
 } from '../pages/play/connect-four/connectFourPayloadLogic';
 import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
+import {
+  applyIncomingStateVersion,
+  createStateVersionTracker,
+} from '../data/network/socketStateVersion';
+
+const connectFourStateVersionTracker = createStateVersionTracker(() => {
+  if (connectFourActiveRoomId) (window as any).connectFourSocket?.requestSync(connectFourActiveRoomId);
+});
+
+let connectFourActiveRoomId: string | null = null;
 
 export enum ConnectFourPhase {
   WAITING = 'WAITING',
@@ -462,6 +472,8 @@ function handleConnectFourPayload(
 
   if (!payloadTargetsCurrentRoom(data, get)) return;
 
+  applyIncomingStateVersion(connectFourStateVersionTracker, data);
+
   const success = envelope?.success !== false;
   const hadMoveInFlight = get().isMovePending;
   const myUserId = get().myUserId;
@@ -721,6 +733,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
   greetings: [],
 
   initGame(roomId, myUsername, myUserId, betAmount, hasOpponent, initialOpponentName, isSpectator) {
+    connectFourActiveRoomId = roomId;
     stopTurnTimer();
     stopStatusPolling();
     teardownConnectFourSocket();

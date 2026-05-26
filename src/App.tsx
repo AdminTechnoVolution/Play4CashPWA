@@ -13,6 +13,7 @@ import TournamentPlacementManager from './ui/components/tournaments/TournamentPl
 import ReconnectionBanner from './ui/components/ReconnectionBanner';
 import AppUpdateModal from './pwa/AppUpdateModal';
 import { useVisibilityReconnect } from './hooks/useVisibilityReconnect';
+import { useWebPush } from './hooks/useWebPush';
 
 import LoginPage from './pages/login/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -40,6 +41,7 @@ export default function App() {
   // Phase D: forces socket.io to retry connect() the moment the tab regains
   // visibility/focus so mobile users don't see stale states after backgrounding.
   useVisibilityReconnect();
+  useWebPush();
 
   useEffect(() => {
     loadSession();

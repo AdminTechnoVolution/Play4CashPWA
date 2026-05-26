@@ -24,8 +24,18 @@ import {
   parseLobbyRequiredCount,
   sumOpponentHandCounts,
 } from '../pages/play/domino/dominoGameLogic';
+import {
+  applyIncomingStateVersion,
+  createStateVersionTracker,
+  resetStateVersionTracker,
+} from '../data/network/socketStateVersion';
 import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
+
+let dominoActiveRoomId: string | null = null;
+const dominoStateVersionTracker = createStateVersionTracker(() => {
+  if (dominoActiveRoomId) (window as any).dominoSocket?.requestSync(dominoActiveRoomId);
+});
 
 export enum DominoPhase {
   WAITING = 'WAITING',
@@ -307,6 +317,8 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
 
   initGame(roomId, myUsername, opts = {}) {
     if (!roomId) return;
+    dominoActiveRoomId = roomId;
+    resetStateVersionTracker(dominoStateVersionTracker);
     const isSpectator = !!opts.isSpectator;
     const hasOpponent = !!opts.hasOpponent;
     const initialOpponentName = opts.initialOpponentName ?? '';
@@ -393,6 +405,7 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
     const json = typeof payload === 'string' ? (JSON.parse(payload) as any) : payload;
     const data =
       json?.data && typeof json.data === 'object' && !Array.isArray(json.data) ? json.data : json;
+    applyIncomingStateVersion(dominoStateVersionTracker, data);
     const success = json?.success !== false;
 
     const st = get();

@@ -17,14 +17,22 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'di
 interface ConnectionStore {
   /** namespace → current status. */
   statuses: Record<string, ConnectionStatus>;
+  /** namespace → resync count (proxy_reconnected / manager reconnect). */
+  resyncCounts: Record<string, number>;
+  /** namespace → last resync timestamp (ms). */
+  lastResyncAt: Record<string, number>;
   /** Sets the status for a namespace. `undefined` clears it (manager torn down). */
   setStatus: (namespace: string, status: ConnectionStatus | undefined) => void;
+  /** Increment resync telemetry for a namespace. */
+  recordResync: (namespace: string) => void;
   /** Convenience: true when any tracked namespace is `connecting`/`reconnecting`. */
   isAnyReconnecting: () => boolean;
 }
 
 export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   statuses: {},
+  resyncCounts: {},
+  lastResyncAt: {},
   setStatus: (namespace, status) =>
     set((s) => {
       const next = { ...s.statuses };
@@ -32,6 +40,14 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
       else next[namespace] = status;
       return { statuses: next };
     }),
+  recordResync: (namespace) =>
+    set((s) => ({
+      resyncCounts: {
+        ...s.resyncCounts,
+        [namespace]: (s.resyncCounts[namespace] ?? 0) + 1,
+      },
+      lastResyncAt: { ...s.lastResyncAt, [namespace]: Date.now() },
+    })),
   isAnyReconnecting: () => {
     const values = Object.values(get().statuses);
     return values.some((v) => v === 'connecting' || v === 'reconnecting');

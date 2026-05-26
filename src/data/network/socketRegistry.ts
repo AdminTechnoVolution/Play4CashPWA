@@ -13,33 +13,57 @@ import { attachAuthExpiredListener } from './socketAuthExpiredListener';
  *  2. Bridges socket lifecycle events into `useConnectionStore` so the global
  *     `<ReconnectionBanner />` shows up the moment any namespace starts retrying.
  *
+ *  3. Central `proxy_reconnected` / manager `reconnect` → registered resync handlers
+ *     so every namespace re-joins without per-manager duplicate wiring.
+ *
  * Every `SocketManager.connect()` should call `instrumentSocket(socket, namespace)` right
  * after creating the socket, and `releaseSocket(namespace)` from `disconnect()`.
  */
 
 const liveSockets = new Map<string, Socket>();
+const resyncHandlers = new Map<string, () => void>();
+
+export function registerSocketResync(namespace: string, handler: () => void): () => void {
+  resyncHandlers.set(namespace, handler);
+  return () => {
+    if (resyncHandlers.get(namespace) === handler) resyncHandlers.delete(namespace);
+  };
+}
+
+function triggerSocketResync(namespace: string): void {
+  try {
+    resyncHandlers.get(namespace)?.();
+  } catch {
+    /* handler owns error surfacing */
+  }
+  useConnectionStore.getState().recordResync(namespace);
+}
+
+export type InstrumentSocketOptions = {
+  onResync?: () => void;
+};
 
 /**
  * Wire status/registry listeners onto a freshly created Socket.IO client.
  * Idempotent per-namespace: replaces any previous binding.
  */
-export function instrumentSocket(socket: Socket, namespace: string): void {
-  // If a previous socket was registered for this namespace, drop it from the
-  // registry first to avoid leaks (the SocketManager owns its lifecycle).
+export function instrumentSocket(
+  socket: Socket,
+  namespace: string,
+  options?: InstrumentSocketOptions,
+): void {
   liveSockets.set(namespace, socket);
   const setStatus = useConnectionStore.getState().setStatus;
 
-  setStatus(namespace, 'connecting');
+  if (options?.onResync) {
+    registerSocketResync(namespace, options.onResync);
+  }
 
-  // Phase E: every socket needs the auth-expired bridge so a Gateway revalidation
-  // sweep can trigger a silent token refresh from anywhere in the app without
-  // each SocketManager having to wire it independently.
+  setStatus(namespace, 'connecting');
   attachAuthExpiredListener(socket);
 
   socket.on('connect', () => setStatus(namespace, 'connected'));
 
-  // Either side closed the transport. `io server disconnect` is final (server kicked us);
-  // anything else is a transient drop and socket.io will retry on its own.
   socket.on('disconnect', (reason: string) => {
     if (reason === 'io client disconnect' || reason === 'io server disconnect') {
       setStatus(namespace, 'disconnected');
@@ -48,13 +72,17 @@ export function instrumentSocket(socket: Socket, namespace: string): void {
     }
   });
 
-  // socket.io manager events for reconnect attempts (best-effort: some envs strip them).
-  // We attach via the underlying io manager so the events fire even when no listener
-  // is on the socket itself.
+  socket.on('proxy_reconnected', () => {
+    triggerSocketResync(namespace);
+  });
+
   const ioManager = (socket as unknown as { io?: { on: (ev: string, cb: () => void) => void } }).io;
   if (ioManager) {
     ioManager.on('reconnect_attempt', () => setStatus(namespace, 'reconnecting'));
-    ioManager.on('reconnect', () => setStatus(namespace, 'connected'));
+    ioManager.on('reconnect', () => {
+      setStatus(namespace, 'connected');
+      triggerSocketResync(namespace);
+    });
     ioManager.on('reconnect_failed', () => setStatus(namespace, 'disconnected'));
   }
 }
@@ -65,6 +93,7 @@ export function instrumentSocket(socket: Socket, namespace: string): void {
  */
 export function releaseSocket(namespace: string): void {
   liveSockets.delete(namespace);
+  resyncHandlers.delete(namespace);
   useConnectionStore.getState().setStatus(namespace, undefined);
 }
 
