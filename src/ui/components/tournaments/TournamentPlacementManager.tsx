@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../store/authStore';
-import { apiRepository } from '../../../data/network/ApiRepository';
 import type { TournamentSummary } from '../../../data/models/ApiModels';
 import { useTournamentsStore } from '../../../store/tournamentsStore';
-import { readTrackedTournamentIds } from '../../../util/tournamentRegistrationStorage';
 import { resolveTournamentPlacePrizes } from '../../../util/tournamentUtils';
 import {
   hasTournamentPlacementShown,
   markTournamentPlacementShown,
 } from '../../../util/tournamentPlacementStorage';
+import { TOURNAMENT_PLACEMENT_CHECK_EVENT } from '../../../tournaments/tournamentSyncEvents';
 import {
   gameSocketCodeFromPlayPath,
   beginPlaySessionTeardown,
@@ -65,27 +64,13 @@ export default function TournamentPlacementManager() {
   useEffect(() => {
     if (!authHydrated || !user || payload) return;
 
-    const poll = async () => {
+    const onPlacementCheck = (ev: Event) => {
       if (payloadRef.current) return;
-      const ids = readTrackedTournamentIds();
-      if (ids.length === 0) return;
-
-      await Promise.all(
-        ids.map(async (id) => {
-          if (payloadRef.current) return;
-          try {
-            const t = await apiRepository.getTournament(id);
-            consider(t);
-          } catch {
-            /* ignore */
-          }
-        }),
-      );
+      consider((ev as CustomEvent<TournamentSummary>).detail);
     };
 
-    void poll();
-    const timer = setInterval(() => void poll(), 2500);
-    return () => clearInterval(timer);
+    window.addEventListener(TOURNAMENT_PLACEMENT_CHECK_EVENT, onPlacementCheck);
+    return () => window.removeEventListener(TOURNAMENT_PLACEMENT_CHECK_EVENT, onPlacementCheck);
   }, [authHydrated, user, payload, consider]);
 
   const onDismiss = () => {

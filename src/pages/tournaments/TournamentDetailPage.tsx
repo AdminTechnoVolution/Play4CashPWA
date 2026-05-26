@@ -22,6 +22,7 @@ import { savePlayContext } from '../../util/routingStorage';
 import { useAuthStore } from '../../store/authStore';
 import TournamentCard from '../../ui/components/tournaments/TournamentCard';
 import TournamentMatchJoinPanel from '../../ui/components/tournaments/TournamentMatchJoinPanel';
+import { useTournamentSyncFocus } from '../../ui/components/tournaments/TournamentSyncProvider';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import {
   canRegisterForTournament,
@@ -50,15 +51,12 @@ const TournamentDetailPage: React.FC = () => {
   } = useTournamentsStore();
   const { user } = useAuthStore();
 
+  useTournamentSyncFocus({ kind: 'detail', tournamentId });
+
   useEffect(() => {
     if (!tournamentId) return;
     void loadDetail(tournamentId);
     void loadBracket(tournamentId);
-    const poll = setInterval(() => {
-      void loadDetail(tournamentId);
-      void loadBracket(tournamentId);
-    }, 5_000);
-    return () => clearInterval(poll);
   }, [tournamentId, loadDetail, loadBracket]);
 
   useEffect(() => {

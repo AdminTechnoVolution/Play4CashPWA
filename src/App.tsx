@@ -8,7 +8,7 @@ import { usePWAInstallStore } from './store/pwaInstallStore';
 import PWAInstallBanner from './ui/components/PWAInstallBanner';
 import ActiveRoomBanner from './ui/components/ActiveRoomBanner';
 import MyTournamentsFloater from './ui/components/tournaments/MyTournamentsFloater';
-import TournamentLobbyManager from './ui/components/tournaments/TournamentLobbyManager';
+import TournamentSyncProvider from './ui/components/tournaments/TournamentSyncProvider';
 import TournamentPlacementManager from './ui/components/tournaments/TournamentPlacementManager';
 import ReconnectionBanner from './ui/components/ReconnectionBanner';
 import AppUpdateModal from './pwa/AppUpdateModal';
@@ -74,6 +74,7 @@ export default function App() {
   return (
     <IonApp>
       <BrowserRouter>
+        <TournamentSyncProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/terms" element={<TermsPage />} />
@@ -97,9 +98,9 @@ export default function App() {
         </Routes>
         {/* Phase C: needs useNavigate/useLocation, so it lives inside the router. */}
         <ActiveRoomBanner />
-        <TournamentLobbyManager />
         <TournamentPlacementManager />
         <MyTournamentsFloater />
+        </TournamentSyncProvider>
       </BrowserRouter>
       <PWAInstallBanner />
       {/* Phase D: surfaces any in-flight socket reconnect attempt globally. */}

@@ -20,15 +20,7 @@ function useTournamentBannerData() {
     list,
     clockTick,
     bumpClock,
-    refreshMyTournaments,
   } = useTournamentsStore();
-
-  useEffect(() => {
-    if (!authHydrated || !user) return;
-    void refreshMyTournaments(user.id);
-    const poll = setInterval(() => void refreshMyTournaments(user.id), 15_000);
-    return () => clearInterval(poll);
-  }, [authHydrated, user, refreshMyTournaments]);
 
   useEffect(() => {
     const timer = setInterval(() => bumpClock(), 1000);
