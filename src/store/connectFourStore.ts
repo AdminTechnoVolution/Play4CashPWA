@@ -203,7 +203,7 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
   stopStatusPolling();
   const tick = async () => {
     const st = get();
-    if (st.phase !== ConnectFourPhase.WAITING || st.isSpectator) {
+    if (st.isSpectator || (st.phase !== ConnectFourPhase.WAITING && st.phase !== ConnectFourPhase.PLAY)) {
       stopStatusPolling();
       return;
     }
@@ -215,7 +215,15 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
       socket?.requestSync(roomId);
 
       const status = await apiRepository.getRoomStatus(roomId);
-      if (status.status?.toLowerCase() === 'started') {
+      const roomStatus = status.status?.toLowerCase();
+      // #region agent log
+      fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'connectFourStore.ts:startStatusPolling',message:'room_status_poll',data:{roomId,phase:st.phase,roomStatus},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+      if (st.phase === ConnectFourPhase.WAITING && roomStatus === 'started') {
+        socket?.requestSync(roomId);
+        stopStatusPolling();
+      }
+      if (st.phase === ConnectFourPhase.PLAY && roomStatus === 'finished') {
         socket?.requestSync(roomId);
         stopStatusPolling();
       }
@@ -224,7 +232,7 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
     }
   };
   void tick();
-  statusPollTimer = setInterval(tick, 5000);
+  statusPollTimer = setInterval(tick, 2500);
 }
 
 let timeoutWarned = false;
@@ -448,6 +456,7 @@ function applyPlayPayload(
     if (turnChanged || timerJump || turnTimer == null) {
       syncTurnCountdown(set, get);
     }
+    if (afterPlay.roomId) startStatusPolling(afterPlay.roomId, get);
   } else if (spect) {
     stopTurnTimer();
   }

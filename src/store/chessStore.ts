@@ -646,6 +646,9 @@ function handleChessMessage(json: any, set: any, get: any) {
     });
 
     syncCountdownAfterTimerUpdate(prev, nextLeft, yourTurn, remainingFromServer !== null, set, get);
+
+    const roomId = (window as any).currentRoomId;
+    if (roomId) startStatusPolling(roomId, set, get);
   } else if (waitingForOpponent || opponentJoined) {
     if (!canAcceptWaitingLobby(get().phase, get().gameOver)) return;
     set({
@@ -1016,16 +1019,25 @@ function sendMove(roomId: string, fromRow: number, fromCol: number, toRow: numbe
 function startStatusPolling(roomId: string, set: any, get: any) {
   if (statusPollingInterval) clearInterval(statusPollingInterval);
   statusPollingInterval = setInterval(async () => {
-    if (get().phase !== ChessPhase.WAITING) {
+    const phase = get().phase;
+    if (phase !== ChessPhase.WAITING && phase !== ChessPhase.PLAY) {
       clearInterval(statusPollingInterval);
       return;
     }
     try {
       const status = await apiRepository.getRoomStatus(roomId);
-      if (status.status === 'started') {
+      const roomStatus = status.status?.toLowerCase();
+      // #region agent log
+      fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'chessStore.ts:startStatusPolling',message:'room_status_poll',data:{roomId,phase,roomStatus},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+      if (phase === ChessPhase.WAITING && roomStatus === 'started') {
+        (window as any).chessSocket?.requestSync(roomId);
+        clearInterval(statusPollingInterval);
+      }
+      if (phase === ChessPhase.PLAY && roomStatus === 'finished') {
         (window as any).chessSocket?.requestSync(roomId);
         clearInterval(statusPollingInterval);
       }
     } catch {}
-  }, 5000);
+  }, 2500);
 }
