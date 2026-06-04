@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { IonContent, IonPage, IonSpinner } from '@ionic/react';
 import { useAuthStore } from '../store/authStore';
 import { hasValidSession } from '../data/auth/AuthSessionStore';
+import { refreshAccessTokenWithLock } from '../data/network/ApiClient';
 
 function AuthLoadingScreen() {
   return (
@@ -25,10 +26,35 @@ function AuthLoadingScreen() {
  * Layout route: waits for initial session resolution, then requires a logged-in user.
  */
 export function RequireAuth() {
-  const { user, authHydrated, isLoading } = useAuthStore();
+  const { user, authHydrated, isLoading, loadSession } = useAuthStore();
   const location = useLocation();
+  const [sessionRefreshDone, setSessionRefreshDone] = useState(false);
+  const [sessionRefreshing, setSessionRefreshing] = useState(false);
 
-  if (!authHydrated || isLoading) {
+  const needsTokenRefresh = !!user && !hasValidSession();
+
+  useEffect(() => {
+    if (!authHydrated || isLoading || sessionRefreshDone || !needsTokenRefresh) return;
+
+    setSessionRefreshing(true);
+    void (async () => {
+      try {
+        await refreshAccessTokenWithLock();
+        await loadSession();
+      } catch {
+        // loadSession / auth-failure listener will clear state if refresh is dead
+      } finally {
+        setSessionRefreshing(false);
+        setSessionRefreshDone(true);
+      }
+    })();
+  }, [authHydrated, isLoading, sessionRefreshDone, needsTokenRefresh, loadSession]);
+
+  if (!authHydrated || isLoading || (needsTokenRefresh && !sessionRefreshDone)) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (sessionRefreshing) {
     return <AuthLoadingScreen />;
   }
 
