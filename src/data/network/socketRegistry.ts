@@ -63,22 +63,10 @@ export function instrumentSocket(
   attachAuthExpiredListener(socket);
 
   socket.on('connect', () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'socketRegistry.ts:connect',message:'socket_connected',data:{namespace,transport:(socket as any).io?.engine?.transport?.name,socketId:socket.id},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
     setStatus(namespace, 'connected');
   });
 
-  socket.on('connect_error', (err: Error) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'socketRegistry.ts:connect_error',message:'connect_error',data:{namespace,error:err?.message,type:(err as any)?.type},timestamp:Date.now(),hypothesisId:'H1-H2'})}).catch(()=>{});
-    // #endregion
-  });
-
   socket.on('disconnect', (reason: string) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'socketRegistry.ts:disconnect',message:'socket_disconnect',data:{namespace,reason},timestamp:Date.now(),hypothesisId:'H2-H3'})}).catch(()=>{});
-    // #endregion
     if (reason === 'io client disconnect' || reason === 'io server disconnect') {
       setStatus(namespace, 'disconnected');
     } else {

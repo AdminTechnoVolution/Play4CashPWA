@@ -5,6 +5,7 @@ import type { BattleshipCell, GameOverPayload, ShipPlacement } from '../data/mod
 
 import { SpectatorPayload } from '../util/SpectatorPayload';
 import { canAcceptWaitingLobby, isMatchTerminalPhase } from '../util/playPhaseGuards';
+import { setGameEndInProgress } from '../util/playRoomSession';
 import {
   applyIncomingStateVersion,
   createStateVersionTracker,
@@ -391,6 +392,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
       if (outcome) {
         // ── Game-over outcomes ────────────────────────────────────────────────
         if (GAME_OVER_OUTCOMES.has(outcome)) {
+          setGameEndInProgress(true);
           const { isSpectator: spec, myUsername, spectatorBoardOwner: boardOwner, hasPendingFire } = get();
           const gameOver = SpectatorPayload.resolveStandardGameOver(data, myUsername, spec, 'BATTLESHIP');
           

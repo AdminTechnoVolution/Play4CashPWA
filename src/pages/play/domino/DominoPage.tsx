@@ -22,6 +22,7 @@ import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStreng
 import { BoardTileViz, EndIndicatorViz, HandTileViz, END_LEFT, END_RIGHT } from './DominoTileViews';
 import GameSound from '../../../ui/game/GameSound';
 import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
+import { shouldSuppressRoomNotFound } from '../../../util/playRoomSession';
 
 function tilesEqual(t1: DominoTile, t2: DominoTile) {
   return (t1.a === t2.a && t1.b === t2.b) || (t1.a === t2.b && t1.b === t2.a);
@@ -363,7 +364,7 @@ export default function DominoPage({
   }, [store.chatErrorToast]);
 
   useEffect(() => {
-    if (store.matchCancelledMessage) {
+    if (store.matchCancelledMessage && !shouldSuppressRoomNotFound()) {
       present({ message: store.matchCancelledMessage, duration: 2500, position: 'bottom' });
       store.clearMatchCancelledToast();
     }
@@ -718,7 +719,7 @@ export default function DominoPage({
       />
 
       <GenericErrorModal
-        isOpen={!!store.apiErrorRawMessage}
+        isOpen={!!store.apiErrorRawMessage && !shouldSuppressRoomNotFound()}
         message={formatApiMessageForDisplay(store.apiErrorRawMessage, '')}
         onDismiss={() => store.clearGenericError()}
       />

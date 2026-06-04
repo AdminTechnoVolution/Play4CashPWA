@@ -16,6 +16,11 @@ import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetin
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 import {
+  isRoomGoneMessageRaw,
+  setGameEndInProgress,
+  shouldSuppressRoomNotFound,
+} from '../util/playRoomSession';
+import {
   applyIncomingStateVersion,
   createStateVersionTracker,
   resetStateVersionTracker,
@@ -460,8 +465,10 @@ function handleChessMessage(json: any, set: any, get: any) {
         t('chess_invalid_move_toast')
       : null;
 
+    const suppressGone = shouldSuppressRoomNotFound() && isRoomGoneMessageRaw(raw);
     set({
-      apiErrorRawMessage: isInformationalNonBlockingSocketRaw(raw) ? null : raw,
+      apiErrorRawMessage:
+        suppressGone || isInformationalNonBlockingSocketRaw(raw) ? null : raw,
       isMovePending: false,
       board: revert || state.board,
       boardBeforePendingCastle: null,
@@ -534,6 +541,7 @@ function handleChessMessage(json: any, set: any, get: any) {
   ]);
 
   if (gameEnded || terminalOutcomes.has(outcome)) {
+    setGameEndInProgress(true);
     if (countdownInterval) clearInterval(countdownInterval);
     const spectating = state.isSpectator;
     // ── Exact port of Android ChessViewModel.kt lines 473-511 ──
@@ -1027,9 +1035,6 @@ function startStatusPolling(roomId: string, set: any, get: any) {
     try {
       const status = await apiRepository.getRoomStatus(roomId);
       const roomStatus = status.status?.toLowerCase();
-      // #region agent log
-      fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'chessStore.ts:startStatusPolling',message:'room_status_poll',data:{roomId,phase,roomStatus},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
-      // #endregion
       if (phase === ChessPhase.WAITING && roomStatus === 'started') {
         (window as any).chessSocket?.requestSync(roomId);
         clearInterval(statusPollingInterval);

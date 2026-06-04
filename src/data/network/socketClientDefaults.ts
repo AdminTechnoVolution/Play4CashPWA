@@ -6,7 +6,8 @@ import { SOCKET_TIMEOUT_MS } from '../../config/api.config';
  * Transport: polling first, then upgrade to WebSocket when stable. Forcing
  * WebSocket-first breaks Vite dev proxy / double-hop Gateway setups — the WS
  * handshake succeeds then drops with "transport error" within milliseconds
- * (see debug session 83380c). Server pingInterval/pingTimeout are negotiated
+ * handshake succeeds then drops with "transport error" within milliseconds.
+ * Server pingInterval/pingTimeout are negotiated
  * from the Engine.IO OPEN packet; do NOT set them on the client.
  */
 export const SOCKET_IO_CLIENT_DEFAULTS = {
