@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -72,10 +72,9 @@ const STATUS_COLORS: Record<RoomStatus, string> = {
   finished: 'var(--sovereign-text-muted)',
 };
 
-/** Create-room modal: Domino seats */
-const DOMINO_CREATE_PLAYER_OPTIONS = [2, 4] as const;
-/** Create-room modal: UNO seats (must match API `UNO_ALLOWED_PLAYER_COUNTS`) */
-const UNO_CREATE_PLAYER_OPTIONS = [2, 4, 6, 8, 10] as const;
+function buildPlayerLimitOptions(min: number, max: number): number[] {
+  return Array.from({ length: max - min + 1 }, (_, i) => min + i);
+}
 
 const RoomsPage: React.FC = () => {
   const { gameSocketCode = '' } = useParams<{ gameSocketCode: string }>();
@@ -138,22 +137,23 @@ const RoomsPage: React.FC = () => {
   } | null>(null);
   const [showRulesModal, setShowRulesModal] = useState(false);
   
+  const createRoomPlayerOptions = useMemo(() => {
+    const min = catalogGame?.minPlayers;
+    const max = catalogGame?.maxPlayers;
+    if (min == null || max == null) return null;
+    if (max <= 2 || max <= min) return null;
+    return buildPlayerLimitOptions(min, max);
+  }, [catalogGame?.minPlayers, catalogGame?.maxPlayers]);
+
   // Reset form and default to minBet when modal opens
   useEffect(() => {
     if (showCreateDialog) {
       setCreateName('');
       setCreateBet(minBetNum);
-      setCreateLimit(2);
+      setCreateLimit(catalogGame?.minPlayers ?? createRoomPlayerOptions?.[0] ?? 2);
       setCreateError('');
     }
-  }, [showCreateDialog, minBetNum, gameSocketCode]);
-
-  const createRoomPlayerOptions =
-    gameSocketCode === 'domino'
-      ? DOMINO_CREATE_PLAYER_OPTIONS
-      : gameSocketCode === 'uno'
-        ? UNO_CREATE_PLAYER_OPTIONS
-        : null;
+  }, [showCreateDialog, minBetNum, catalogGame?.minPlayers, createRoomPlayerOptions]);
 
   useEffect(() => {
     if (!showCreateDialog || !createRoomPlayerOptions) return;
@@ -734,7 +734,7 @@ const RoomsPage: React.FC = () => {
                 </IonText>
               </div>
 
-              {/* Player limit — Domino (2/4) and UNO (2–10 even); backend validates */}
+              {/* Player limit — from catalog min/max; backend validates */}
               {createRoomPlayerOptions && (
                 <div style={{ marginBottom: '28px' }}>
                   <IonText>
