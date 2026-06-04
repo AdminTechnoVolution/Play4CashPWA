@@ -21,6 +21,7 @@ import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import GameSound from '../../../ui/game/GameSound';
 import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
+import { shouldSuppressRoomNotFound } from '../../../util/playRoomSession';
 import { ChessPieceSvg } from './ChessPieces';
 
 // Inject CSS keyframes for selected piece glow (Android SelectedPieceGlow — alpha pulse 0.35↔0.85)
@@ -135,7 +136,7 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
   }, [store.chatErrorToast]);
 
   useEffect(() => {
-    if (store.matchCancelledMessage) {
+    if (store.matchCancelledMessage && !shouldSuppressRoomNotFound()) {
       present({ message: store.matchCancelledMessage, duration: 2500, position: 'bottom' });
       store.clearMatchCancelledToast();
     }
@@ -441,7 +442,7 @@ export default function ChessPage({ roomId, betAmount, roomName, opponentName, h
       />
 
       <GenericErrorModal
-        isOpen={store.apiErrorRawMessage != null}
+        isOpen={store.apiErrorRawMessage != null && !shouldSuppressRoomNotFound()}
         message={formatApiMessageForDisplay(store.apiErrorRawMessage, 'error_try_later_message')}
         onDismiss={() => store.clearGenericError()}
       />
