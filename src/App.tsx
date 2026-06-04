@@ -30,7 +30,7 @@ import DataTreatmentPage from './pages/legal/DataTreatmentPage';
 import TournamentsPage from './pages/tournaments/TournamentsPage';
 import TournamentDetailPage from './pages/tournaments/TournamentDetailPage';
 import TournamentBracketPage from './pages/tournaments/TournamentBracketPage';
-import { tryConsumePlayBack } from './util/playBackNavigation';
+import { AppBackButtonHandler } from './navigation/AppBackButtonHandler';
 
 setupIonicReact({ mode: 'md' });
 
@@ -61,21 +61,10 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, [setDeferredPrompt]);
 
-  useEffect(() => {
-    const onIonBack = (ev: Event) => {
-      const e = ev as CustomEvent<{ register: (priority: number, fn: () => void) => void }>;
-      e.detail.register(10, () => {
-        if (tryConsumePlayBack()) return;
-        window.history.back();
-      });
-    };
-    document.addEventListener('ionBackButton', onIonBack);
-    return () => document.removeEventListener('ionBackButton', onIonBack);
-  }, []);
-
   return (
     <IonApp>
       <BrowserRouter>
+        <AppBackButtonHandler />
         <TournamentSyncProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
