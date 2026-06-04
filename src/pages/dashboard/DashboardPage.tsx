@@ -43,6 +43,7 @@ import {
   gridOutline,
   chevronForwardOutline,
   informationCircleOutline,
+  menuOutline,
 } from 'ionicons/icons';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAuthStore } from '../../store/authStore';
@@ -58,6 +59,16 @@ import { formatUSD } from '../../util/formatCurrency';
 import '../../ui/theme/variables.css';
 
 const MENU_ID = 'dashboard-menu';
+const MENU_COLLAPSED_KEY = 'p4c_dashboard_menu_collapsed';
+const LG_BREAKPOINT = '(min-width: 992px)';
+
+function readMenuCollapsed(): boolean {
+  try {
+    return localStorage.getItem(MENU_COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -71,6 +82,29 @@ const DashboardPage: React.FC = () => {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [selectedGame, setSelectedGame] = useState<any>(null);
+  const [menuCollapsed, setMenuCollapsed] = useState(readMenuCollapsed);
+  const [isLargeScreen, setIsLargeScreen] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(LG_BREAKPOINT).matches,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(LG_BREAKPOINT);
+    const onChange = (event: MediaQueryListEvent) => setIsLargeScreen(event.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const toggleSidebar = () => {
+    setMenuCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(MENU_COLLAPSED_KEY, next ? '1' : '0');
+      } catch {
+        /* ignore storage errors */
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     loadDashboard();
@@ -277,7 +311,7 @@ const DashboardPage: React.FC = () => {
   };
 
   return (
-    <IonSplitPane contentId={MENU_ID} when="lg">
+    <IonSplitPane contentId={MENU_ID} when={menuCollapsed ? false : 'lg'}>
       {/* ── Side Menu ── */}
       <IonMenu contentId={MENU_ID} type="overlay">
         <IonContent style={{ '--background': 'var(--sovereign-surface)' } as React.CSSProperties}>
@@ -390,7 +424,17 @@ const DashboardPage: React.FC = () => {
         <IonHeader>
           <IonToolbar>
             <IonButtons slot="start">
-              <IonMenuButton style={{ color: 'var(--sovereign-gold)' }} />
+              {isLargeScreen ? (
+                <IonButton
+                  fill="clear"
+                  onClick={toggleSidebar}
+                  aria-label={menuCollapsed ? t('menu_open') : t('menu_close')}
+                >
+                  <IonIcon icon={menuOutline} style={{ color: 'var(--sovereign-gold)' }} />
+                </IonButton>
+              ) : (
+                <IonMenuButton style={{ color: 'var(--sovereign-gold)' }} />
+              )}
             </IonButtons>
             <IonTitle style={{ color: 'var(--sovereign-gold)', fontWeight: '700', letterSpacing: '1px' }}>
               PLAY4CASH
