@@ -30,6 +30,11 @@ import {
   resetStateVersionTracker,
 } from '../data/network/socketStateVersion';
 import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
+import {
+  isRoomGoneMessageRaw,
+  setGameEndInProgress,
+  shouldSuppressRoomNotFound,
+} from '../util/playRoomSession';
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 
 let dominoActiveRoomId: string | null = null;
@@ -423,7 +428,8 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
 
     if (!success && json?.data == null) {
       const raw = apiMessagesJoinedOrNull(json) || '';
-      if (!isInformationalNonBlockingSocketRaw(raw)) {
+      const suppressGone = shouldSuppressRoomNotFound() && isRoomGoneMessageRaw(raw);
+      if (!suppressGone && !isInformationalNonBlockingSocketRaw(raw)) {
         set({ apiErrorRawMessage: raw });
       }
       return;
@@ -530,6 +536,7 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
 
     const gameEnded = !!data?.gameEnded;
     if (gameEnded) {
+      setGameEndInProgress(true);
       stopDominoTurnTimer();
       const winnerId = String(data?.winner || '').trim();
       const reasonNorm = String(data?.reason || data?.winnerReason || data?.winner_reason || '')

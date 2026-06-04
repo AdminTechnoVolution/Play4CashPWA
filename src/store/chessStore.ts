@@ -16,6 +16,11 @@ import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetin
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 import {
+  isRoomGoneMessageRaw,
+  setGameEndInProgress,
+  shouldSuppressRoomNotFound,
+} from '../util/playRoomSession';
+import {
   applyIncomingStateVersion,
   createStateVersionTracker,
   resetStateVersionTracker,
@@ -460,8 +465,10 @@ function handleChessMessage(json: any, set: any, get: any) {
         t('chess_invalid_move_toast')
       : null;
 
+    const suppressGone = shouldSuppressRoomNotFound() && isRoomGoneMessageRaw(raw);
     set({
-      apiErrorRawMessage: isInformationalNonBlockingSocketRaw(raw) ? null : raw,
+      apiErrorRawMessage:
+        suppressGone || isInformationalNonBlockingSocketRaw(raw) ? null : raw,
       isMovePending: false,
       board: revert || state.board,
       boardBeforePendingCastle: null,
@@ -534,6 +541,7 @@ function handleChessMessage(json: any, set: any, get: any) {
   ]);
 
   if (gameEnded || terminalOutcomes.has(outcome)) {
+    setGameEndInProgress(true);
     if (countdownInterval) clearInterval(countdownInterval);
     const spectating = state.isSpectator;
     // ── Exact port of Android ChessViewModel.kt lines 473-511 ──
@@ -646,6 +654,9 @@ function handleChessMessage(json: any, set: any, get: any) {
     });
 
     syncCountdownAfterTimerUpdate(prev, nextLeft, yourTurn, remainingFromServer !== null, set, get);
+
+    const roomId = (window as any).currentRoomId;
+    if (roomId) startStatusPolling(roomId, set, get);
   } else if (waitingForOpponent || opponentJoined) {
     if (!canAcceptWaitingLobby(get().phase, get().gameOver)) return;
     set({
@@ -1016,16 +1027,22 @@ function sendMove(roomId: string, fromRow: number, fromCol: number, toRow: numbe
 function startStatusPolling(roomId: string, set: any, get: any) {
   if (statusPollingInterval) clearInterval(statusPollingInterval);
   statusPollingInterval = setInterval(async () => {
-    if (get().phase !== ChessPhase.WAITING) {
+    const phase = get().phase;
+    if (phase !== ChessPhase.WAITING && phase !== ChessPhase.PLAY) {
       clearInterval(statusPollingInterval);
       return;
     }
     try {
       const status = await apiRepository.getRoomStatus(roomId);
-      if (status.status === 'started') {
+      const roomStatus = status.status?.toLowerCase();
+      if (phase === ChessPhase.WAITING && roomStatus === 'started') {
+        (window as any).chessSocket?.requestSync(roomId);
+        clearInterval(statusPollingInterval);
+      }
+      if (phase === ChessPhase.PLAY && roomStatus === 'finished') {
         (window as any).chessSocket?.requestSync(roomId);
         clearInterval(statusPollingInterval);
       }
     } catch {}
-  }, 5000);
+  }, 2500);
 }

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { reconnectAllStaleSockets } from '../data/network/socketRegistry';
+import { resyncActivePlaySession } from '../util/playRoomSession';
 
 /**
  * Phase D: bridges browser visibility/focus into the socket layer.
@@ -11,25 +12,34 @@ import { reconnectAllStaleSockets } from '../data/network/socketRegistry';
  * seconds. Manually poking `socket.connect()` on `visibilitychange` cuts that to
  * roughly one RTT.
  *
+ * Bug A: also handles `pageshow` (bfcache) and re-join/sync on active /play routes;
+ * invalid rooms redirect home via `handleRoomGone` without the forfeit money modal.
+ *
  * Mount once at the App root.
  */
 export function useVisibilityReconnect(): void {
   useEffect(() => {
-    const handler = () => {
-      if (document.visibilityState === 'visible') {
-        reconnectAllStaleSockets();
-      }
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      reconnectAllStaleSockets();
+      void resyncActivePlaySession();
     };
-    // `visibilitychange` covers backgrounding on mobile and tab switch on desktop.
-    // `focus` adds an extra safety net for browsers that don't fire visibilitychange
-    // when the OS hands focus back (some Android WebViews).
-    document.addEventListener('visibilitychange', handler);
-    window.addEventListener('focus', handler);
-    // Also kick once on mount in case we landed here after a long device sleep.
-    handler();
+
+    const onPageShow = (ev: PageTransitionEvent) => {
+      if (!ev.persisted) return;
+      reconnectAllStaleSockets();
+      void resyncActivePlaySession();
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    window.addEventListener('pageshow', onPageShow);
+    onVisible();
+
     return () => {
-      document.removeEventListener('visibilitychange', handler);
-      window.removeEventListener('focus', handler);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
 }

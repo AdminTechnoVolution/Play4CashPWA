@@ -34,6 +34,7 @@ import { findDropRow } from './connectFourDropAnim';
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
+import { shouldSuppressRoomNotFound } from '../../../util/playRoomSession';
 import './connect-four.css';
 
 type DropAnim = {
@@ -157,7 +158,7 @@ export default function ConnectFourPage({
   }, [store.chatErrorToast]);
 
   useEffect(() => {
-    if (store.matchCancelledMessage) {
+    if (store.matchCancelledMessage && !shouldSuppressRoomNotFound()) {
       present({ message: store.matchCancelledMessage, duration: 2500, position: 'bottom' });
       store.clearMatchCancelledToast();
     }
@@ -492,7 +493,7 @@ export default function ConnectFourPage({
         />
 
         <GenericErrorModal
-          isOpen={store.apiErrorRawMessage != null}
+          isOpen={store.apiErrorRawMessage != null && !shouldSuppressRoomNotFound()}
           message={formatApiMessageForDisplay(store.apiErrorRawMessage, 'error_try_later_message')}
           onDismiss={() => store.clearGenericError()}
         />

@@ -6,6 +6,11 @@ import { parseChatEnvelope, type ChatGreetingOverlay } from '../util/ChatGreetin
 import { hasKey, t } from '../i18n/translations';
 import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 import {
+  isRoomGoneMessageRaw,
+  setGameEndInProgress,
+  shouldSuppressRoomNotFound,
+} from '../util/playRoomSession';
+import {
   applyIncomingStateVersion,
   createStateVersionTracker,
   resetStateVersionTracker,
@@ -345,7 +350,8 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
     if (!success && (json?.data === undefined || json?.data === null)) {
       const messages = Array.isArray(json?.messages) ? (json.messages as string[]) : [];
       const msg = messages.join(' ').trim();
-      set({ apiErrorRawMessage: msg || null });
+      const suppressGone = shouldSuppressRoomNotFound() && isRoomGoneMessageRaw(msg);
+      set({ apiErrorRawMessage: suppressGone ? null : msg || null });
       return;
     }
 
@@ -372,6 +378,7 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
 
     // Match end (matchEnded true OR Phase 1 fallback gameEnded without round_ended)
     if (data?.gameEnded || data?.matchEnded) {
+      setGameEndInProgress(true);
       stopUnoTurnTimer();
       stopNextRoundCountdown();
       stopBetweenRoundResync();

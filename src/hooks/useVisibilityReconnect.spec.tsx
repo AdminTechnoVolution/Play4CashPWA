@@ -4,8 +4,14 @@ import React from 'react';
 import { useVisibilityReconnect } from './useVisibilityReconnect';
 
 const reconnectAllStaleSockets = vi.fn();
+const resyncActivePlaySession = vi.fn();
+
 vi.mock('../data/network/socketRegistry', () => ({
   reconnectAllStaleSockets: (...args: unknown[]) => reconnectAllStaleSockets(...args),
+}));
+
+vi.mock('../util/playRoomSession', () => ({
+  resyncActivePlaySession: (...args: unknown[]) => resyncActivePlaySession(...args),
 }));
 
 function Probe() {
@@ -16,6 +22,7 @@ function Probe() {
 describe('useVisibilityReconnect', () => {
   beforeEach(() => {
     reconnectAllStaleSockets.mockClear();
+    resyncActivePlaySession.mockClear();
   });
 
   afterEach(() => {
@@ -31,11 +38,13 @@ describe('useVisibilityReconnect', () => {
   it('reconnects on visibilitychange → visible', () => {
     render(<Probe />);
     reconnectAllStaleSockets.mockClear();
+    resyncActivePlaySession.mockClear();
 
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
     document.dispatchEvent(new Event('visibilitychange'));
 
     expect(reconnectAllStaleSockets).toHaveBeenCalledTimes(1);
+    expect(resyncActivePlaySession).toHaveBeenCalledTimes(1);
   });
 
   it('does not reconnect when the page becomes hidden', () => {
@@ -51,9 +60,22 @@ describe('useVisibilityReconnect', () => {
   it('also reconnects on window focus (Android WebView safety net)', () => {
     render(<Probe />);
     reconnectAllStaleSockets.mockClear();
+    resyncActivePlaySession.mockClear();
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
 
     window.dispatchEvent(new Event('focus'));
     expect(reconnectAllStaleSockets).toHaveBeenCalledTimes(1);
+    expect(resyncActivePlaySession).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconnects and resyncs on pageshow from bfcache', () => {
+    render(<Probe />);
+    reconnectAllStaleSockets.mockClear();
+    resyncActivePlaySession.mockClear();
+
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+
+    expect(reconnectAllStaleSockets).toHaveBeenCalledTimes(1);
+    expect(resyncActivePlaySession).toHaveBeenCalledTimes(1);
   });
 });

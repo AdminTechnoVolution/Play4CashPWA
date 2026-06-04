@@ -12,6 +12,7 @@ import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
+import { attachGameResultListener } from '../../util/playRoomSession';
 import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
 
 const NAMESPACE = '/connect-four';
@@ -70,6 +71,7 @@ export class ConnectFourSocketManager {
     });
 
     attachVersionMismatchListener(this.socket);
+    attachGameResultListener(this.socket);
     instrumentSocket(this.socket, NAMESPACE, {
       onResync: () => {
         if (this.sessionRoomId) {

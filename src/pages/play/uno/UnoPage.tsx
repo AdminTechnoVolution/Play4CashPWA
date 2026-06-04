@@ -38,6 +38,7 @@ import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStreng
 import { formatApiMessageForDisplay, formatSocketMessageForDisplay } from '../../../i18n/ApiMessageDisplay';
 import { SovereignSecondaryButton } from '../../../ui/components/SovereignButton';
 import GameSound from '../../../ui/game/GameSound';
+import { shouldSuppressRoomNotFound } from '../../../util/playRoomSession';
 import './uno.css';
 
 interface UnoPageProps {
@@ -472,7 +473,7 @@ export default function UnoPage(props: UnoPageProps) {
           />
 
           <IonToast
-            isOpen={!!apiErrorRawMessage}
+            isOpen={!!apiErrorRawMessage && !shouldSuppressRoomNotFound()}
             message={formatSocketMessageForDisplay(apiErrorRawMessage, {
               roundWinnerUsername: lastRoundWinnerUsername,
               lastActionUsername,

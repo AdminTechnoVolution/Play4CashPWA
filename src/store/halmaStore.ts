@@ -4,6 +4,7 @@ import { apiService } from '../data/network/ApiService';
 import { apiRepository } from '../data/network/ApiRepository';
 import type { GameOverPayload } from '../data/models/ApiModels';
 import { SpectatorPayload } from '../util/SpectatorPayload';
+import { setGameEndInProgress } from '../util/playRoomSession';
 import { thresholdSeconds, triggerTimeoutWarning } from '../ui/game/turnTimeoutAlarm';
 import { playerGameEndReasonFallback } from '../i18n/ApiMessageDisplay';
 import {
@@ -409,7 +410,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
         const gameEndedRaw = data.gameEnded || data.game_ended || false;
         if (gameEndedRaw || outcome === 'win' || outcome === 'lose' || outcome === 'timeout_loss' ||
             outcome === 'opponent_disconnected' || outcome === 'forfeit' || isDraw) {
-          
+          setGameEndInProgress(true);
           if (pollingInterval) clearInterval(pollingInterval);
           stopCountdown();
           

@@ -19,6 +19,11 @@ import {
   parseLobbyRequiredCount,
 } from '../pages/play/domino/dominoGameLogic';
 import {
+  isRoomGoneMessageRaw,
+  setGameEndInProgress,
+  shouldSuppressRoomNotFound,
+} from '../util/playRoomSession';
+import {
   connectFourPlayStatusMessage,
   connectFourTurnHolderUsername,
   deriveConnectFourOpponentName,
@@ -203,7 +208,7 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
   stopStatusPolling();
   const tick = async () => {
     const st = get();
-    if (st.phase !== ConnectFourPhase.WAITING || st.isSpectator) {
+    if (st.isSpectator || (st.phase !== ConnectFourPhase.WAITING && st.phase !== ConnectFourPhase.PLAY)) {
       stopStatusPolling();
       return;
     }
@@ -215,7 +220,12 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
       socket?.requestSync(roomId);
 
       const status = await apiRepository.getRoomStatus(roomId);
-      if (status.status?.toLowerCase() === 'started') {
+      const roomStatus = status.status?.toLowerCase();
+      if (st.phase === ConnectFourPhase.WAITING && roomStatus === 'started') {
+        socket?.requestSync(roomId);
+        stopStatusPolling();
+      }
+      if (st.phase === ConnectFourPhase.PLAY && roomStatus === 'finished') {
         socket?.requestSync(roomId);
         stopStatusPolling();
       }
@@ -224,7 +234,7 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
     }
   };
   void tick();
-  statusPollTimer = setInterval(tick, 5000);
+  statusPollTimer = setInterval(tick, 2500);
 }
 
 let timeoutWarned = false;
@@ -448,6 +458,7 @@ function applyPlayPayload(
     if (turnChanged || timerJump || turnTimer == null) {
       syncTurnCountdown(set, get);
     }
+    if (afterPlay.roomId) startStatusPolling(afterPlay.roomId, get);
   } else if (spect) {
     stopTurnTimer();
   }
@@ -488,7 +499,8 @@ function handleConnectFourPayload(
 
   if (!success && (!data || Object.keys(data).length === 0)) {
     const raw = apiMessagesJoinedOrNull(envelope) || '';
-    if (!isInformationalNonBlockingSocketRaw(raw)) {
+    const suppressGone = shouldSuppressRoomNotFound() && isRoomGoneMessageRaw(raw);
+    if (!suppressGone && !isInformationalNonBlockingSocketRaw(raw)) {
       set({ apiErrorRawMessage: raw, illegalMoveToast: raw, isMovePending: false });
     } else {
       set({ isMovePending: false });
@@ -545,6 +557,7 @@ function handleConnectFourPayload(
   ]);
 
   if (gameEnded || terminalOutcomes.has(outcomeRaw.toLowerCase())) {
+    setGameEndInProgress(true);
     stopTurnTimer();
     stopStatusPolling();
     stopLobbyWatchdog();
