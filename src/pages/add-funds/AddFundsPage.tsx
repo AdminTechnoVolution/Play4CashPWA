@@ -5,7 +5,6 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonBackButton,
   IonButtons,
   IonSelect,
   IonSelectOption,
@@ -21,6 +20,7 @@ import { useDashboardStore } from '../../store/dashboardStore';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
+import { AppBackButton } from '../../navigation/AppBackButton';
 import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
@@ -143,7 +143,7 @@ const AddFundsPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
+            <AppBackButton to="/dashboard" />
           </IonButtons>
           <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>
             {t('add_funds_title')}

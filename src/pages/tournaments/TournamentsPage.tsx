@@ -5,7 +5,6 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonBackButton,
   IonButtons,
   IonRefresher,
   IonRefresherContent,
@@ -18,6 +17,7 @@ import { filterCatalogTournaments } from '../../util/tournamentUtils';
 import { useTournamentsStore } from '../../store/tournamentsStore';
 import { useT } from '../../i18n/translations';
 import TournamentCard from '../../ui/components/tournaments/TournamentCard';
+import { AppBackButton } from '../../navigation/AppBackButton';
 
 const TournamentsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ const TournamentsPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" />
+            <AppBackButton to="/dashboard" />
           </IonButtons>
           <IonTitle>{t('tournaments_title')}</IonTitle>
         </IonToolbar>

@@ -6,7 +6,6 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonBackButton,
   IonButtons,
   IonSelect,
   IonSelectOption,
@@ -38,6 +37,7 @@ import type { WalletResponse } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
 import { useLanguageStore } from '../../i18n/languageStore';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
+import { AppBackButton } from '../../navigation/AppBackButton';
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -171,7 +171,7 @@ const SettingsPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
+            <AppBackButton to="/dashboard" />
           </IonButtons>
           <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>
             {t('settings_title')}

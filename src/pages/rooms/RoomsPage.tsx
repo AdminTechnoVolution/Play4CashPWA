@@ -5,7 +5,6 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonBackButton,
   IonButtons,
   IonList,
   IonItem,
@@ -57,6 +56,7 @@ import {
 } from '../../i18n/ApiMessageDisplay';
 import { getGameContext, savePlayContext } from '../../util/routingStorage';
 import { formatUSD } from '../../util/formatCurrency';
+import { AppBackButton } from '../../navigation/AppBackButton';
 import '../../ui/theme/variables.css';
 type RoomStatus = 'waiting' | 'started' | 'finished';
 
@@ -343,7 +343,7 @@ const RoomsPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
+            <AppBackButton to="/dashboard" />
           </IonButtons>
           <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '17px' }}>
             <span style={{ display: 'block', lineHeight: 1.15 }}>{decodedGameName}</span>
