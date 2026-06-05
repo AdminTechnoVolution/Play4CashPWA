@@ -391,6 +391,10 @@ const SettingsPage: React.FC = () => {
                 <Link to="/data-treatment" style={linkStyle}>
                   Data Processing
                 </Link>
+                <br />
+                <Link to="/contact-us" style={linkStyle}>
+                  {t('contact_us_title')}
+                </Link>
               </p>
             </IonText>
           </div>

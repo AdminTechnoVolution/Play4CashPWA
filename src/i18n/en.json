@@ -1098,5 +1098,20 @@
   "tournament_between_rounds_wait": "Break between rounds — next match in",
   "tournament_eliminated_title": "You are out of this tournament",
   "tournament_eliminated_watch_hint": "Open the bracket, pick a group, and tap Watch on a live match to follow as a spectator.",
-  "tournament_spectate_match": "Watch"
+  "tournament_spectate_match": "Watch",
+  "contact_us_title": "Contact Us",
+  "contact_us_type_label": "Message type",
+  "contact_us_type_comment": "Comment",
+  "contact_us_type_suggestion": "Suggestion",
+  "contact_us_type_error": "Error report",
+  "contact_us_games_label": "Related games",
+  "contact_us_all_games": "All games",
+  "contact_us_message_label": "Your message",
+  "contact_us_message_placeholder": "Tell us what happened or what you'd like to see improved…",
+  "contact_us_submit": "Send message",
+  "contact_us_success": "Thank you! Your message was sent successfully.",
+  "contact_us_validation_type_required": "Please select a message type.",
+  "contact_us_validation_message_min": "Message must be at least 10 characters.",
+  "contact_us_validation_message_max": "Message cannot exceed 2000 characters.",
+  "contact_us_validation_games_required": "Select at least one game or choose All games."
 }

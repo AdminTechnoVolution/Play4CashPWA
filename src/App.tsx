@@ -23,6 +23,7 @@ import AddFundsPage from './pages/add-funds/AddFundsPage';
 import WithdrawalPage from './pages/withdrawal/WithdrawalPage';
 import WithdrawalVerifyPage from './pages/withdrawal/WithdrawalVerifyPage';
 import SettingsPage from './pages/settings/SettingsPage';
+import ContactUsPage from './pages/contact-us/ContactUsPage';
 import TransactionHistoryPage from './pages/history/TransactionHistoryPage';
 import TermsPage from './pages/legal/TermsPage';
 import PrivacyPage from './pages/legal/PrivacyPage';
@@ -74,6 +75,7 @@ export default function App() {
           <Route element={<RequireAuth />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/contact-us" element={<ContactUsPage />} />
             <Route path="/history" element={<TransactionHistoryPage />} />
             <Route path="/add-funds" element={<AddFundsPage />} />
             <Route path="/withdrawal" element={<WithdrawalPage />} />

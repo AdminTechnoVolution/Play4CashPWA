@@ -24,6 +24,8 @@ import type {
   TournamentHistoryItem,
   TournamentBracketResponse,
   TournamentBracketMatch,
+  ContactUsSubmitPayload,
+  ContactUsSubmitResponse,
 } from '../models/ApiModels';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -435,6 +437,15 @@ export const apiService = {
 
   async removePushSubscription(endpoint: string): Promise<void> {
     await apiClient.post('/api/user/push-subscription/remove', { endpoint });
+  },
+
+  // ─── Contact Us ──────────────────────────────────────────────────────────────
+
+  async submitContactUs(req: ContactUsSubmitPayload): Promise<ContactUsSubmitResponse> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await apiClient.post<ApiResponse<any>>('/api/contact-us', req);
+    const raw = unwrap(res.data);
+    return { id: raw._id ?? raw.id ?? '' };
   },
 };
 
