@@ -6,7 +6,6 @@ import {
   IonTitle,
   IonContent,
   IonButtons,
-  IonBackButton,
   IonToast,
 } from '@ionic/react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -19,6 +18,7 @@ import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import type { TournamentBracketMatch, TournamentHistoryItem, TournamentSummary } from '../../data/models/ApiModels';
 import TournamentBracketView from '../../ui/components/tournaments/TournamentBracketView';
 import { useTournamentSyncFocus } from '../../ui/components/tournaments/TournamentSyncProvider';
+import { AppBackButton } from '../../navigation/AppBackButton';
 
 const TournamentBracketPage: React.FC = () => {
   const { tournamentId = '' } = useParams();
@@ -143,7 +143,7 @@ const TournamentBracketPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref={`/tournaments/${tournamentId}`} />
+            <AppBackButton to={`/tournaments/${tournamentId}`} />
           </IonButtons>
           <IonTitle>{tournamentTitle}</IonTitle>
         </IonToolbar>

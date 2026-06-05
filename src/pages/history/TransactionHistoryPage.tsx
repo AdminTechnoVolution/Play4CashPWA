@@ -6,7 +6,6 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonBackButton,
   IonButtons,
   IonSegment,
   IonSegmentButton,
@@ -21,6 +20,7 @@ import {
   IonRefresherContent,
   RefresherEventDetail,
 } from '@ionic/react';
+import { AppBackButton } from '../../navigation/AppBackButton';
 import {
   medalOutline,
   trophyOutline,
@@ -209,7 +209,7 @@ const TransactionHistoryPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
+            <AppBackButton to="/dashboard" />
           </IonButtons>
           <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('history_hub_title')}</IonTitle>
         </IonToolbar>

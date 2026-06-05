@@ -6,7 +6,6 @@ import {
   IonTitle,
   IonContent,
   IonButtons,
-  IonBackButton,
   IonButton,
   IonIcon,
 } from '@ionic/react';
@@ -23,6 +22,7 @@ import { useAuthStore } from '../../store/authStore';
 import TournamentCard from '../../ui/components/tournaments/TournamentCard';
 import TournamentMatchJoinPanel from '../../ui/components/tournaments/TournamentMatchJoinPanel';
 import { useTournamentSyncFocus } from '../../ui/components/tournaments/TournamentSyncProvider';
+import { AppBackButton } from '../../navigation/AppBackButton';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import {
   canRegisterForTournament,
@@ -120,7 +120,7 @@ const TournamentDetailPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/tournaments" />
+            <AppBackButton to="/tournaments" />
           </IonButtons>
           <IonTitle>{detail?.title ?? t('tournaments_title')}</IonTitle>
         </IonToolbar>
