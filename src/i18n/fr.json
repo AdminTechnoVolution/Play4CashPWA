@@ -1061,5 +1061,20 @@
   "tournament_placement_prize_label": "Gain crédité sur votre solde",
   "tournament_status_cancelled": "Annulé",
   "tournament_status_draft": "Brouillon",
-  "tournament_eliminated_watch_hint": "Ouvrez le tableau, choisissez un groupe et appuyez sur Regarder sur un match en direct pour suivre en spectateur."
+  "tournament_eliminated_watch_hint": "Ouvrez le tableau, choisissez un groupe et appuyez sur Regarder sur un match en direct pour suivre en spectateur.",
+  "contact_us_title": "Nous contacter",
+  "contact_us_type_label": "Type de message",
+  "contact_us_type_comment": "Commentaire",
+  "contact_us_type_suggestion": "Suggestion",
+  "contact_us_type_error": "Signalement d'erreur",
+  "contact_us_games_label": "Jeux concernés",
+  "contact_us_all_games": "Tous les jeux",
+  "contact_us_message_label": "Votre message",
+  "contact_us_message_placeholder": "Décrivez ce qui s'est passé ou ce que vous aimeriez améliorer…",
+  "contact_us_submit": "Envoyer le message",
+  "contact_us_success": "Merci ! Votre message a bien été envoyé.",
+  "contact_us_validation_type_required": "Veuillez sélectionner un type de message.",
+  "contact_us_validation_message_min": "Le message doit contenir au moins 10 caractères.",
+  "contact_us_validation_message_max": "Le message ne peut pas dépasser 2000 caractères.",
+  "contact_us_validation_games_required": "Sélectionnez au moins un jeu ou choisissez Tous les jeux."
 }

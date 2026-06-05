@@ -44,6 +44,7 @@ import {
   chevronForwardOutline,
   informationCircleOutline,
   menuOutline,
+  mailOutline,
 } from 'ionicons/icons';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useAuthStore } from '../../store/authStore';
@@ -139,6 +140,7 @@ const DashboardPage: React.FC = () => {
     { icon: walletOutline, label: t('add_funds_title'), path: '/add-funds' },
     { icon: arrowDownOutline, label: t('withdrawal_title'), path: '/withdrawal' },
     { icon: timeOutline, label: t('game_history_title'), path: '/history' },
+    { icon: mailOutline, label: t('contact_us_title'), path: '/contact-us' },
     { icon: settingsOutline, label: t('settings_title'), path: '/settings' },
   ];
 

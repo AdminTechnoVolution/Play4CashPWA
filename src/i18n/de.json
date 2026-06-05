@@ -1061,5 +1061,20 @@
   "tournament_placement_prize_label": "Preis auf dein Guthaben gutgeschrieben",
   "tournament_status_cancelled": "Abgesagt",
   "tournament_status_draft": "Entwurf",
-  "tournament_eliminated_watch_hint": "Öffne den Turnierbaum, wähle eine Gruppe und tippe auf Zuschauen bei einem laufenden Match."
+  "tournament_eliminated_watch_hint": "Öffne den Turnierbaum, wähle eine Gruppe und tippe auf Zuschauen bei einem laufenden Match.",
+  "contact_us_title": "Kontakt",
+  "contact_us_type_label": "Nachrichtentyp",
+  "contact_us_type_comment": "Kommentar",
+  "contact_us_type_suggestion": "Vorschlag",
+  "contact_us_type_error": "Fehlermeldung",
+  "contact_us_games_label": "Betroffene Spiele",
+  "contact_us_all_games": "Alle Spiele",
+  "contact_us_message_label": "Deine Nachricht",
+  "contact_us_message_placeholder": "Beschreibe, was passiert ist oder was du verbessert sehen möchtest…",
+  "contact_us_submit": "Nachricht senden",
+  "contact_us_success": "Danke! Deine Nachricht wurde erfolgreich gesendet.",
+  "contact_us_validation_type_required": "Bitte wähle einen Nachrichtentyp.",
+  "contact_us_validation_message_min": "Die Nachricht muss mindestens 10 Zeichen haben.",
+  "contact_us_validation_message_max": "Die Nachricht darf maximal 2000 Zeichen haben.",
+  "contact_us_validation_games_required": "Wähle mindestens ein Spiel oder Alle Spiele."
 }

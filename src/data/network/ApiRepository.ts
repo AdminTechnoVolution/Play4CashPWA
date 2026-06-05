@@ -23,6 +23,8 @@ import type {
   TournamentHistoryItem,
   TournamentSummary,
   TournamentBracketResponse,
+  ContactUsSubmitPayload,
+  ContactUsSubmitResponse,
 } from '../models/ApiModels';
 
 const ACCOUNT_CACHE_TTL_MS = 30_000;
@@ -230,5 +232,11 @@ export const apiRepository = {
 
   async removePushSubscription(endpoint: string): Promise<void> {
     return apiService.removePushSubscription(endpoint);
+  },
+
+  // ─── Contact Us ──────────────────────────────────────────────────────────────
+
+  async submitContactUs(req: ContactUsSubmitPayload): Promise<ContactUsSubmitResponse> {
+    return apiService.submitContactUs(req);
   },
 };

@@ -1061,5 +1061,20 @@
   "tournament_placement_prize_label": "Prêmio creditado no seu saldo",
   "tournament_status_cancelled": "Cancelado",
   "tournament_status_draft": "Rascunho",
-  "tournament_eliminated_watch_hint": "Abra a chave, escolha um grupo e toque em Assistir numa partida ao vivo para acompanhar como espectador."
+  "tournament_eliminated_watch_hint": "Abra a chave, escolha um grupo e toque em Assistir numa partida ao vivo para acompanhar como espectador.",
+  "contact_us_title": "Fale conosco",
+  "contact_us_type_label": "Tipo de mensagem",
+  "contact_us_type_comment": "Comentário",
+  "contact_us_type_suggestion": "Sugestão",
+  "contact_us_type_error": "Relato de erro",
+  "contact_us_games_label": "Jogos relacionados",
+  "contact_us_all_games": "Todos os jogos",
+  "contact_us_message_label": "Sua mensagem",
+  "contact_us_message_placeholder": "Conte o que aconteceu ou o que você gostaria de melhorar…",
+  "contact_us_submit": "Enviar mensagem",
+  "contact_us_success": "Obrigado! Sua mensagem foi enviada com sucesso.",
+  "contact_us_validation_type_required": "Selecione um tipo de mensagem.",
+  "contact_us_validation_message_min": "A mensagem deve ter pelo menos 10 caracteres.",
+  "contact_us_validation_message_max": "A mensagem não pode exceder 2000 caracteres.",
+  "contact_us_validation_games_required": "Selecione pelo menos um jogo ou marque Todos os jogos."
 }

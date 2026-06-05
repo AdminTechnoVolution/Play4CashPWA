@@ -469,3 +469,17 @@ export interface TournamentBracketResponse {
   groupMatches: TournamentBracketMatch[];
   finalsMatches: TournamentBracketMatch[];
 }
+
+// ─── Contact Us ───────────────────────────────────────────────────────────────
+export type ContactUsType = 'comment' | 'suggestion' | 'error';
+
+export interface ContactUsSubmitPayload {
+  type: ContactUsType;
+  message: string;
+  game_ids: string[];
+  all_games: boolean;
+}
+
+export interface ContactUsSubmitResponse {
+  id: string;
+}
