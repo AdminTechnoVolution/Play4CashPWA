@@ -48,16 +48,17 @@ API/Gateway must respond with `Access-Control-Allow-Credentials: true` and an ex
 `Access-Control-Allow-Origin` matching the SPA origin. In production, the Gateway sits in
 front of both and CORS is configured there.
 
-## 3. Refresh cookie
+## 3. Cookies
 
 | Variable                          | API | Notes |
 |-----------------------------------|-----|-------|
-| `AUTH_REFRESH_COOKIE_NAME`        | ✅   | e.g. `p4c_rt`. |
+| `AUTH_ACCESS_COOKIE_NAME`         | ✅   | Browser access cookie, default `p4c_access`. |
+| `AUTH_REFRESH_COOKIE_NAME`        | ✅   | Refresh cookie, e.g. `p4c_rt`. |
 | `AUTH_REFRESH_COOKIE_SAMESITE`    | ✅   | `lax` (same-site), `strict`, or `none` (cross-site). |
 | `AUTH_REFRESH_COOKIE_SECURE`      | ✅   | `true` in production. Auto-forced `true` when SameSite=none. |
 
-The SPA never reads or writes this cookie. It only sends requests with
-`withCredentials: true`. Logout and `POST /api/login/invalidate-browser-session` clear it.
+The SPA never reads or writes either cookie. It only sends requests with
+`withCredentials: true`. Logout and `POST /api/login/invalidate-browser-session` clear them.
 
 ## 4. Gateway → API internal trust
 
@@ -102,14 +103,15 @@ The Gateway reads only the prefix `accessTokens:` (via `REDIS_TOKEN_PREFIX`, def
 | `REDIS_URL`          | ✅       | ✅   | Same Redis instance. |
 | `REDIS_TOKEN_PREFIX` | ✅       | —   | Must equal the API constant `accessTokens:`. |
 
-## 7. Tokens in URLs
+## 7. Token query fallback (legacy/native only)
 
-Default is **off** for HTTP and **on for WebSockets** (the Gateway needs `?token=` in the WS
-handshake URL because the browser cannot set `Authorization` on a WebSocket upgrade).
+Browser clients authenticate with cookies. The Gateway and API still accept `?token=` and
+`Authorization: Bearer ...` for legacy/native callers, but the web PWA should not depend on
+that path.
 
 | Variable                 | Gateway | Notes |
 |--------------------------|---------|-------|
-| `ALLOW_HTTP_TOKEN_QUERY` | ✅       | Default `false`. Set to `true` only if you absolutely need it (logs can leak it). |
+| `ALLOW_HTTP_TOKEN_QUERY` | ✅       | Default `false`. Enable only for legacy/native callers that cannot use cookies. |
 
 ## 8. PWA-only
 
@@ -135,8 +137,20 @@ Equivalent one-liner (same behaviour as before + env injection):
 node /home/site/wwwroot/scripts/generate-runtime-config.mjs /home/site/wwwroot/env-config.js && pm2 serve /home/site/wwwroot --no-daemon --spa
 ```
 
-`startup.sh` reads Application Settings, writes `env-config.js`, then runs
-`pm2 serve` on port `$PORT`. Alternative without pm2: `node server.mjs`.
+`startup.sh` reads Application Settings, writes `env-config.js`, then runs the hardened
+`node server.mjs` entrypoint on port `$PORT`.
+
+The PWA server is also responsible for the browser security headers:
+
+- `Content-Security-Policy`
+- `Strict-Transport-Security`
+- `X-Frame-Options`
+- `X-Content-Type-Options`
+- `Referrer-Policy`
+- `Permissions-Policy`
+
+`index.html` and `env-config.js` are served with no-store cache control. Hashed assets are
+served with long-lived cache headers.
 
 Set `SCM_DO_BUILD_DURING_DEPLOYMENT=false`. Deploy package: `./azure-deploy` (flat
 static files at wwwroot root + `scripts/`).

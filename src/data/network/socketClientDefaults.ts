@@ -11,6 +11,7 @@ import { SOCKET_TIMEOUT_MS } from '../../config/api.config';
  * from the Engine.IO OPEN packet; do NOT set them on the client.
  */
 export const SOCKET_IO_CLIENT_DEFAULTS = {
+  withCredentials: true,
   transports: ['polling', 'websocket'] as ('websocket' | 'polling')[],
   autoConnect: false as const,
   forceNew: true,

@@ -40,8 +40,6 @@ function unwrap<T>(data: ApiResponse<T>): T {
 
 export const apiService = {
   // ─── Auth ──────────────────────────────────────────────────────────────────
-  // Android: POST /api/login with { token: String }
-
   async login(googleIdToken: string): Promise<LoginResponse> {
     const res = await bareClient.post<ApiResponse<LoginResponse>>('/api/login', {
       token: googleIdToken,
@@ -49,7 +47,6 @@ export const apiService = {
     return unwrap(res.data);
   },
 
-  // Android: POST /api/login/refresh — optional body when refresh is only in httpOnly cookie
   async refreshToken(refreshToken?: string): Promise<LoginResponse> {
     const res = await bareClient.post<ApiResponse<LoginResponse>>(
       '/api/login/refresh',
@@ -64,7 +61,6 @@ export const apiService = {
     return unwrap(res.data);
   },
 
-  // POST /api/logout — refresh from httpOnly cookie and/or body (native)
   async logout(refreshToken?: string): Promise<void> {
     await apiClient.post<ApiResponse<void>>(
       '/api/logout',
@@ -73,8 +69,6 @@ export const apiService = {
   },
 
   // ─── Account ───────────────────────────────────────────────────────────────
-  // Android: GET /api/user/account
-
   async getUserAccount(): Promise<UserAccountResponse> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any>>('/api/user/account');
@@ -94,8 +88,6 @@ export const apiService = {
   },
 
   // ─── Games ─────────────────────────────────────────────────────────────────
-  // Android: GET /api/games
-
   async getGames(): Promise<GameResponse[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any[]>>('/api/games');
@@ -130,8 +122,6 @@ export const apiService = {
   },
 
   // ─── Greetings ─────────────────────────────────────────────────────────────
-  // Android: GET /api/greetings
-
   async getGreetings(): Promise<GreetingResponse[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any[]>>('/api/greetings');
@@ -143,9 +133,6 @@ export const apiService = {
   },
 
   // ─── Wallets ───────────────────────────────────────────────────────────────
-  // Android: GET /api/wallets
-  // Backend fields: { _id, coin, address, red, description, isActive, minAmount, networkWithdrawalFee }
-
   async getWallets(): Promise<WalletResponse[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any[]>>('/api/wallets');
@@ -171,8 +158,6 @@ export const apiService = {
   },
 
   // ─── Rooms ─────────────────────────────────────────────────────────────────
-  // Android: GET /api/rooms/stats
-
   async getRoomStats(): Promise<RoomStatsResponse> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any>>('/api/rooms/stats');
@@ -184,7 +169,6 @@ export const apiService = {
     };
   },
 
-  // Android: GET /api/rooms/game/{gameId}
   async getRooms(gameId: string): Promise<RoomResponse[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any[]>>(`/api/rooms/game/${gameId}`);
@@ -192,11 +176,6 @@ export const apiService = {
     return raw.map(normalizeRoom);
   },
 
-  // Android: POST /api/rooms → returns { _id } only
-  // Phase C: sends an `Idempotency-Key` (UUID) so a transparent retry (network
-  // timeout, app backgrounded mid-flight) does NOT create a second room and a
-  // second balance hold. The server caches the first response for ~5 minutes;
-  // identical retries within that window replay the original result.
   async createRoom(req: CreateRoomRequest): Promise<string> {
     const idempKey =
       typeof globalThis.crypto?.randomUUID === 'function'
@@ -210,14 +189,10 @@ export const apiService = {
     return data._id ?? data.id ?? '';
   },
 
-  // Android: POST /api/rooms/{id}/join
   async joinRoom(roomId: string): Promise<void> {
     await apiClient.post<ApiResponse<void>>(`/api/rooms/${roomId}/join`);
   },
 
-  // Phase C: returns the room the user is currently participating in (waiting or
-  // started) or `null` if none. Used on app boot to redirect a player back into
-  // their active match without forcing a lobby search.
   async getActiveRoom(): Promise<RoomResponse | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any | null>>('/api/rooms/active');
@@ -226,25 +201,21 @@ export const apiService = {
     return normalizeRoom(raw);
   },
 
-  // Android: POST /api/rooms/{id}/spectate
   async spectateRoom(roomId: string): Promise<void> {
     console.log('[SPECTATOR][1] ApiService.spectateRoom → POST /api/rooms/' + roomId + '/spectate');
     await apiClient.post<ApiResponse<void>>(`/api/rooms/${roomId}/spectate`);
     console.log('[SPECTATOR][1] ApiService.spectateRoom → 200 OK');
   },
 
-  // Android: PATCH /api/rooms/{id}/ready with { ready: true }
   async readyRoom(roomId: string): Promise<void> {
     await apiClient.patch<ApiResponse<void>>(`/api/rooms/${roomId}/ready`, { ready: true });
   },
 
-  // Android: POST /api/rooms/{id}/leave
   async leaveRoom(roomId: string): Promise<RoomStatusResponse> {
     const res = await apiClient.post<ApiResponse<RoomStatusResponse>>(`/api/rooms/${roomId}/leave`);
     return unwrap(res.data);
   },
 
-  // Android: GET /api/rooms/{id}/status
   async getRoomStatus(roomId: string): Promise<RoomStatusResponse> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any>>(`/api/rooms/${roomId}/status`);
