@@ -1,7 +1,6 @@
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { BASE_URL } from '../../config/api.config';
-import { getAccessToken } from '../auth/AuthSessionStore';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
@@ -20,19 +19,14 @@ export class BattleshipSocketManager {
   connect(roomId: string): void {
     this.disconnect();
 
-    const token = getAccessToken();
-    if (!token) {
-      window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
-      return;
-    }
 
     this.sessionRoomId = roomId;
 
     this.socket = io(`${BASE_URL}${NAMESPACE}`, {
       ...SOCKET_IO_CLIENT_DEFAULTS,
-      query: { token, appVersion: __APP_VERSION__ },
-      auth: { token, appVersion: __APP_VERSION__ },
-      extraHeaders: socketIoExtraHeaders(token),
+      query: { appVersion: __APP_VERSION__ },
+      auth: { appVersion: __APP_VERSION__ },
+      extraHeaders: socketIoExtraHeaders(),
     });
 
     attachVersionMismatchListener(this.socket);

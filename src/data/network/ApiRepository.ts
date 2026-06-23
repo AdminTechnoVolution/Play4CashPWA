@@ -1,5 +1,4 @@
 import { apiService } from './ApiService';
-import { getAccessToken } from '../auth/AuthSessionStore';
 import type {
   LoginResponse,
   UserAccountResponse,
@@ -37,8 +36,6 @@ interface CacheEntry<T> {
 let accountCache: CacheEntry<UserAccountResponse> | null = null;
 
 export const apiRepository = {
-  // ─── Auth ──────────────────────────────────────────────────────────────────
-
   async login(googleIdToken: string): Promise<LoginResponse> {
     return apiService.login(googleIdToken);
   },
@@ -55,15 +52,7 @@ export const apiRepository = {
     return apiService.getPublicUserStats();
   },
 
-  // ─── Account ───────────────────────────────────────────────────────────────
-
   async getUserAccount(): Promise<UserAccountResponse> {
-    // Never serve a cached account when there is no in-memory access token: that would
-    // make protected pages render with a "fantom" user after logout / token expiry.
-    if (!getAccessToken()) {
-      accountCache = null;
-      return apiService.getUserAccount();
-    }
     if (accountCache && accountCache.expiresAt > Date.now()) {
       return accountCache.data;
     }
@@ -73,7 +62,6 @@ export const apiRepository = {
   },
 
   getCachedUserAccount(): UserAccountResponse | null {
-    if (!getAccessToken()) return null;
     if (accountCache && accountCache.expiresAt > Date.now()) {
       return accountCache.data;
     }
@@ -84,25 +72,17 @@ export const apiRepository = {
     accountCache = null;
   },
 
-  // ─── Games ─────────────────────────────────────────────────────────────────
-
   async getGames(): Promise<GameResponse[]> {
     return apiService.getGames();
   },
-
-  // ─── Greetings ─────────────────────────────────────────────────────────────
 
   async getGreetings(): Promise<GreetingResponse[]> {
     return apiService.getGreetings();
   },
 
-  // ─── Wallets ───────────────────────────────────────────────────────────────
-
   async getWallets(): Promise<WalletResponse[]> {
     return apiService.getWallets();
   },
-
-  // ─── Rooms ─────────────────────────────────────────────────────────────────
 
   async getRoomStats(): Promise<RoomStatsResponse> {
     return apiService.getRoomStats();
@@ -112,7 +92,6 @@ export const apiRepository = {
     return apiService.getRooms(gameId);
   },
 
-  /** Phase C: returns the user's active room (waiting/started) or `null`. */
   async getActiveRoom(): Promise<RoomResponse | null> {
     return apiService.getActiveRoom();
   },
@@ -146,16 +125,9 @@ export const apiRepository = {
     return apiService.getRoomStatus(roomId);
   },
 
-  // ─── Battleship ────────────────────────────────────────────────────────────
-
-  async submitBattleshipPlacement(
-    roomId: string,
-    req: BattleshipPlacementRequest,
-  ): Promise<void> {
+  async submitBattleshipPlacement(roomId: string, req: BattleshipPlacementRequest): Promise<void> {
     return apiService.submitBattleshipPlacement(roomId, req);
   },
-
-  // ─── Wallet / Finance ──────────────────────────────────────────────────────
 
   async requestWalletChange(req: RequestWalletChangePayload): Promise<void> {
     return apiService.requestWalletChange(req);
@@ -180,8 +152,6 @@ export const apiRepository = {
   async verifyWithdrawal(req: VerifyWithdrawalRequest): Promise<void> {
     return apiService.verifyWithdrawal(req);
   },
-
-  // ─── History ───────────────────────────────────────────────────────────────
 
   async getRechargeHistory(): Promise<RechargeHistoryItem[]> {
     return apiService.getRechargeHistory();
@@ -219,6 +189,10 @@ export const apiRepository = {
     return apiService.registerTournament(id);
   },
 
+  async submitContactUs(payload: ContactUsSubmitPayload): Promise<ContactUsSubmitResponse> {
+    return apiService.submitContactUs(payload);
+  },
+
   async unregisterTournament(id: string): Promise<unknown> {
     return apiService.unregisterTournament(id);
   },
@@ -232,11 +206,5 @@ export const apiRepository = {
 
   async removePushSubscription(endpoint: string): Promise<void> {
     return apiService.removePushSubscription(endpoint);
-  },
-
-  // ─── Contact Us ──────────────────────────────────────────────────────────────
-
-  async submitContactUs(req: ContactUsSubmitPayload): Promise<ContactUsSubmitResponse> {
-    return apiService.submitContactUs(req);
   },
 };

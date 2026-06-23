@@ -8,9 +8,7 @@ type AppBackButtonProps = {
 };
 
 /**
- * SPA-safe back control. IonBackButton without IonReactRouter often uses
- * history.back() or a document navigation, which can reload the app and drop
- * the in-memory access token (refresh cookie may fail cross-origin in dev).
+ * SPA-safe back control. Avoids a document-level navigation that can reload the app unexpectedly.
  */
 export function AppBackButton({ to, color = 'var(--sovereign-gold)' }: AppBackButtonProps) {
   const navigate = useNavigate();

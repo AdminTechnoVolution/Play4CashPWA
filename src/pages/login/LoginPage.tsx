@@ -11,7 +11,6 @@ import {
 import { useNavigate, Link } from 'react-router-dom';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { useAuthStore } from '../../store/authStore';
-import { hasValidSession } from '../../data/auth/AuthSessionStore';
 import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { useT } from '../../i18n/translations';
 import { useLanguageStore } from '../../i18n/languageStore';
@@ -30,7 +29,7 @@ const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (!authHydrated || isLoading) return;
-    if (user && hasValidSession()) {
+    if (user) {
       clearError();
       navigate('/dashboard', { replace: true });
     }
