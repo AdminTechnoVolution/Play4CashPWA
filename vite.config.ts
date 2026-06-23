@@ -4,10 +4,13 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const CONFIG_DIR = fileURLToPath(new URL('.', import.meta.url));
 
 function readPackageVersion(): string {
   try {
-    const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as { version?: string };
+    const pkg = JSON.parse(readFileSync(resolve(CONFIG_DIR, 'package.json'), 'utf8')) as { version?: string };
     return pkg.version || '0.0.0';
   } catch {
     return '0.0.0';
