@@ -12,6 +12,7 @@ const saveUserAccount = vi.fn();
 const getUserAccount = vi.fn(() => null);
 const invalidateAccountCache = vi.fn();
 const getUserAccountRemote = vi.fn();
+const refreshTokenRemote = vi.fn();
 const emitAuthFailureEvent = vi.fn();
 const requestRefreshCookieCleared = vi.fn();
 
@@ -28,6 +29,7 @@ vi.mock('../data/auth/AuthSessionStore', () => ({
 vi.mock('../data/network/ApiRepository', () => ({
   apiRepository: {
     login: vi.fn(),
+    refreshToken: (...args: Parameters<typeof refreshTokenRemote>) => refreshTokenRemote(...args),
     logout: vi.fn(),
     invalidateAccountCache: (...args: Parameters<typeof invalidateAccountCache>) =>
       invalidateAccountCache(...args),
@@ -58,25 +60,27 @@ describe('authStore loadSession race', () => {
     getUserAccount.mockClear();
     invalidateAccountCache.mockClear();
     getUserAccountRemote.mockReset();
+    refreshTokenRemote.mockReset();
     emitAuthFailureEvent.mockClear();
     requestRefreshCookieCleared.mockClear();
   });
 
   it('does not clear a newer token when an older session check fails', async () => {
-    let rejectRequest!: (reason?: unknown) => void;
-    const pending = new Promise<never>((_, reject) => {
-      rejectRequest = reject;
+    let resolveRequest!: (value: { id: string; email: string }) => void;
+    const pending = new Promise<{ id: string; email: string }>((resolve) => {
+      resolveRequest = resolve;
     });
     getUserAccountRemote.mockReturnValueOnce(pending);
+    tokenState = 'old-token';
 
     const { useAuthStore } = await import('./authStore');
 
-    const loadPromise = useAuthStore.getState().loadSession();
+    const loadPromise = useAuthStore.getState().loadSession().catch(() => undefined);
     expect(invalidateAccountCache).toHaveBeenCalledTimes(1);
     expect(getAccessToken).toHaveBeenCalled();
 
     tokenState = 'fresh-token';
-    rejectRequest(new Error('unauthorized'));
+    resolveRequest({ id: 'u-old', email: 'old@example.com' });
     await loadPromise;
 
     expect(clearTokens).not.toHaveBeenCalled();
@@ -93,5 +97,17 @@ describe('authStore loadSession race', () => {
 
     expect(clearTokens).not.toHaveBeenCalled();
     expect(emitAuthFailureEvent).not.toHaveBeenCalled();
+  });
+
+  it('rehydrates from the refresh cookie when no access token is in memory', async () => {
+    refreshTokenRemote.mockResolvedValueOnce({ token: 'refreshed-token' });
+    getUserAccountRemote.mockResolvedValueOnce({ id: 'u1', email: 'a@b' });
+
+    const { useAuthStore } = await import('./authStore');
+    await useAuthStore.getState().loadSession();
+
+    expect(refreshTokenRemote).toHaveBeenCalledTimes(1);
+    expect(saveTokens).toHaveBeenCalledWith('refreshed-token');
+    expect(saveUserAccount).toHaveBeenCalledWith({ id: 'u1', email: 'a@b' });
   });
 });
