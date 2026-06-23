@@ -135,7 +135,7 @@ describe('useAppUpdate', () => {
   it('dismissOfflineReady persists the seen flag in localStorage', () => {
     const { result } = renderHook(() => useAppUpdate());
     act(() => result.current.dismissOfflineReady());
-    expect(localStorage.getItem('p4c_offline_ready_seen')).toBe('1');
+    expect(localStorage.getItem('p4c_install_ready_seen')).toBe('1');
   });
 
   it('schedules a periodic registration.update() poll on registration', () => {

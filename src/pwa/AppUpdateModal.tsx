@@ -14,8 +14,8 @@ import { useT } from '../i18n/translations';
  * - Centered modal: appears when a new app version is detected (background SW update or
  *   API-forced via X-App-Min-Version). Confirmation required before reloading so we don't
  *   disrupt active gameplay or open forms. Forced updates suppress the dismiss button.
- * - Offline-ready toast: fires once after the SW finishes precaching for the first time.
- *   Lets the user know the install completed and offline use is available.
+ * - Install-ready toast: fires once after the SW finishes precaching for the first time.
+ *   Lets the user know the install completed.
  */
 const AppUpdateModal: React.FC = () => {
   const t = useT();
@@ -103,12 +103,12 @@ const AppUpdateModal: React.FC = () => {
       <IonToast
         isOpen={showOfflineReady}
         onDidDismiss={dismissOfflineReady}
-        message={`${t('update_offline_ready_title')} — ${t('update_offline_ready_body')}`}
+        message={`${t('update_install_ready_title')} — ${t('update_install_ready_body')}`}
         icon={cloudDoneOutline}
         duration={5000}
         position="top"
         color="success"
-        buttons={[{ text: t('update_offline_ready_dismiss'), role: 'cancel' }]}
+        buttons={[{ text: t('update_install_ready_dismiss'), role: 'cancel' }]}
       />
     </>
   );
