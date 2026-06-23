@@ -101,14 +101,20 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const tokenAtStart = getAccessToken();
       set({ isLoading: true });
       try {
+        if (!tokenAtStart) {
+          const refreshed = await apiRepository.refreshToken();
+          saveTokens(refreshed.token);
+        }
+        const tokenBeforeAccountRequest = getAccessToken();
         const account = await apiRepository.getUserAccount();
-        if (getAccessToken() !== tokenAtStart) {
+        if (getAccessToken() !== tokenBeforeAccountRequest) {
           return;
         }
         saveUserAccount(account);
         set({ user: account, isLoading: false, authHydrated: true, error: null });
       } catch (err) {
-        if (getAccessToken() !== tokenAtStart) {
+        const tokenNow = getAccessToken();
+        if (tokenAtStart && tokenNow !== tokenAtStart) {
           return;
         }
         const reason = err instanceof Error ? err.message : '';
