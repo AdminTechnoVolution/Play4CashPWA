@@ -26,9 +26,9 @@ describe('AuthSessionStore', () => {
   });
 
   describe('token compatibility shims', () => {
-    it('does not persist access tokens in browser storage', () => {
+    it('keeps access tokens only in memory', () => {
       saveTokens('aaa.bbb.ccc');
-      expect(getAccessToken()).toBeNull();
+      expect(getAccessToken()).toBe('aaa.bbb.ccc');
       expect(localStorage.getItem('p4c_access_token')).toBeNull();
     });
 
@@ -46,7 +46,7 @@ describe('AuthSessionStore', () => {
 
     it('hasValidSession is false because the browser no longer owns the token', () => {
       saveTokens('fresh');
-      expect(hasValidSession()).toBe(false);
+      expect(hasValidSession()).toBe(true);
     });
   });
 

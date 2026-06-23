@@ -8,6 +8,7 @@ import {
   saveTokens,
   clearTokens,
   saveUserAccount,
+  getAccessToken,
   getUserAccount,
   isCrossTabAuthStorageKey,
   onAuthBroadcast,
@@ -97,18 +98,27 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     loadSession: async () => {
       apiRepository.invalidateAccountCache();
+      const tokenAtStart = getAccessToken();
       set({ isLoading: true });
-      const likelyHadSession = getUserAccount() !== null;
       try {
         const account = await apiRepository.getUserAccount();
+        if (getAccessToken() !== tokenAtStart) {
+          return;
+        }
         saveUserAccount(account);
         set({ user: account, isLoading: false, authHydrated: true, error: null });
-      } catch {
-        clearTokens();
-        set({ user: null, isLoading: false, authHydrated: true });
-        if (likelyHadSession) {
-          emitAuthFailureEvent();
+      } catch (err) {
+        if (getAccessToken() !== tokenAtStart) {
+          return;
         }
+        const reason = err instanceof Error ? err.message : '';
+        if (reason === 'error_session_expired') {
+          clearTokens();
+          set({ user: null, isLoading: false, authHydrated: true });
+          emitAuthFailureEvent();
+          return;
+        }
+        set({ isLoading: false, authHydrated: true });
       }
     },
 

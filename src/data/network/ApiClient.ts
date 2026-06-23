@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { BASE_URL, REQUEST_TIMEOUT_MS } from '../../config/api.config';
-import { getLanguage } from '../auth/AuthSessionStore';
+import { getAccessToken, getLanguage, saveTokens } from '../auth/AuthSessionStore';
 import type { ApiResponse } from '../models/ApiModels';
 import { checkAppMinVersion } from '../../pwa/versionContract';
 
@@ -21,7 +21,11 @@ export const apiClient: AxiosInstance = axios.create({
 let refreshPromise: Promise<void> | null = null;
 
 async function doRefresh(): Promise<void> {
-  await bareClient.post('/api/login/refresh', {});
+  const res = await bareClient.post<ApiResponse<{ token: string; refreshToken?: string }>>('/api/login/refresh', {});
+  const token = res.data?.data?.token;
+  if (token) {
+    saveTokens(token);
+  }
 }
 
 export async function requestRefreshCookieCleared(): Promise<void> {
@@ -52,6 +56,12 @@ function extractErrorMessage(error: AxiosError): string {
   return error.message ?? 'Unknown error';
 }
 
+function isMissingTokenResponse(error: AxiosError): boolean {
+  const body = error.response?.data as ApiResponse<unknown> | undefined;
+  const message = String(body?.message ?? body?.messages?.[0] ?? '').trim().toLowerCase();
+  return message === 'no token provided' || message === 'no auth token provided';
+}
+
 bareClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   config.headers.set('accept-language', getLanguage());
   config.headers.set('X-App-Version', __APP_VERSION__);
@@ -61,6 +71,10 @@ bareClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   config.headers.set('accept-language', getLanguage());
   config.headers.set('X-App-Version', __APP_VERSION__);
+  const token = getAccessToken();
+  if (token && !config.headers.has('Authorization')) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
   return config;
 });
 
@@ -97,6 +111,9 @@ apiClient.interceptors.response.use(
     const status = error.response.status;
 
     if (status === 401 && !originalRequest._retried) {
+      if (isMissingTokenResponse(error)) {
+        throw new Error('error_try_later_message');
+      }
       originalRequest._retried = true;
       try {
         await refreshAccessTokenWithLock();

@@ -13,6 +13,7 @@ const KEYS = {
 type AuthBroadcastKind = 'login' | 'refresh' | 'logout';
 type AuthBroadcastListener = (kind: AuthBroadcastKind) => void;
 const broadcastListeners: AuthBroadcastListener[] = [];
+let inMemoryAccessToken: string | null = null;
 
 let broadcastChannel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
@@ -54,12 +55,13 @@ export function isCrossTabAuthStorageKey(key: string | null): boolean {
 }
 
 export function saveTokens(_token: string): void {
+  inMemoryAccessToken = _token;
   const hadAccount = getUserAccount() !== null;
   notifyAuthChange(hadAccount ? 'refresh' : 'login');
 }
 
 export function getAccessToken(): string | null {
-  return null;
+  return inMemoryAccessToken;
 }
 
 export function getRefreshToken(): string | null {
@@ -67,6 +69,7 @@ export function getRefreshToken(): string | null {
 }
 
 export function clearTokens(): void {
+  inMemoryAccessToken = null;
   const hadAccount = getUserAccount() !== null;
   try {
     localStorage.removeItem(KEYS.ACCESS_TOKEN_LEGACY);
@@ -80,7 +83,7 @@ export function clearTokens(): void {
 }
 
 export function hasValidSession(): boolean {
-  return false;
+  return inMemoryAccessToken !== null;
 }
 
 export function saveUserAccount(account: UserAccountResponse): void {
