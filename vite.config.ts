@@ -134,9 +134,10 @@ export default defineConfig(({ mode }) => {
               handler: 'NetworkOnly',
             },
             {
+              // Never cache authenticated API traffic. Cookies + auth refresh must always hit network,
+              // otherwise a stale cached 401 can mask a valid session.
               urlPattern: /^https:\/\/p4c-api/,
-              handler: 'NetworkFirst',
-              options: { cacheName: 'api-cache', expiration: { maxEntries: 50, maxAgeSeconds: 300 } }
+              handler: 'NetworkOnly',
             }
           ]
         }
