@@ -187,6 +187,8 @@ function buildContentSecurityPolicy() {
     'self',
     parseAbsoluteOrigin(process.env.VITE_API_URL),
     parseAbsoluteOrigin(process.env.VITE_GATEWAY_URL),
+    parseAbsoluteOrigin(process.env.PWA_API_PROXY_TARGET),
+    parseAbsoluteOrigin(process.env.VITE_DEV_PROXY_TARGET),
   ]);
   const connectSrc = unique([
     "'self'",
@@ -289,7 +291,7 @@ function serveStatic(pathname, res, req) {
   res.end(readFileSync(filePath));
 }
 
-const configuredKeys = ['VITE_API_URL', 'VITE_GOOGLE_CLIENT_ID', 'PWA_API_PROXY_TARGET'].filter(
+const configuredKeys = ['VITE_API_URL', 'VITE_GOOGLE_CLIENT_ID', 'PWA_API_PROXY_TARGET', 'VITE_GATEWAY_URL', 'VITE_DEV_PROXY_TARGET'].filter(
   (k) => process.env[k] !== undefined && process.env[k] !== '',
 );
 console.log(
