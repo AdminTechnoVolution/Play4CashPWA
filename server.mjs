@@ -1,4 +1,5 @@
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +9,10 @@ const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const PORT = Number(process.env.PORT || process.env.WEBSITES_PORT || 8080);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_PROD = NODE_ENV === 'production';
+const PWA_API_PROXY_TARGET =
+  process.env.PWA_API_PROXY_TARGET?.trim() ||
+  process.env.VITE_API_URL?.trim() ||
+  '';
 const GOOGLE_ORIGINS = [
   'https://accounts.google.com',
   'https://apis.google.com',
@@ -41,6 +46,15 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function parseTargetUrl(value) {
+  if (!value) return null;
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
 function isHiddenPath(pathname) {
   const parts = pathname.split('/').filter(Boolean);
   return parts.some((part) => part.startsWith('.') && part !== '.well-known');
@@ -64,6 +78,108 @@ function buildCacheControl(pathname) {
   }
 
   return 'no-store, no-cache, must-revalidate';
+}
+
+function isProxyPath(pathname) {
+  return pathname === '/api' || pathname.startsWith('/api/') || pathname === '/socket.io' || pathname.startsWith('/socket.io/');
+}
+
+function getForwardedProto(req) {
+  const header = `${req?.headers?.['x-forwarded-proto'] || ''}`.split(',')[0].trim();
+  if (header) return header;
+  return req?.socket?.encrypted ? 'https' : 'http';
+}
+
+function buildProxyHeaders(req, targetUrl, preserveUpgrade = false) {
+  const headers = { ...req.headers };
+  delete headers.host;
+  delete headers.connection;
+  delete headers['content-length'];
+  delete headers['transfer-encoding'];
+  if (!preserveUpgrade) {
+    delete headers.upgrade;
+    delete headers['sec-websocket-key'];
+    delete headers['sec-websocket-version'];
+    delete headers['sec-websocket-protocol'];
+    delete headers['sec-websocket-extensions'];
+  }
+
+  headers.host = targetUrl.host;
+  headers['x-forwarded-host'] = `${req.headers.host || ''}`;
+  headers['x-forwarded-proto'] = getForwardedProto(req);
+
+  const existingForwardedFor = `${req.headers['x-forwarded-for'] || ''}`
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const remoteAddress = req.socket?.remoteAddress;
+  if (remoteAddress) {
+    headers['x-forwarded-for'] = [...existingForwardedFor, remoteAddress].join(', ');
+  }
+
+  return headers;
+}
+
+function proxyError(resOrSocket, errorMessage) {
+  if ('writeHead' in resOrSocket) {
+    const res = resOrSocket;
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+    }
+    res.end(JSON.stringify({ statusCode: 502, message: errorMessage }));
+    return;
+  }
+
+  resOrSocket.destroy();
+}
+
+function proxyHttpRequest(req, res, targetUrl) {
+  const upstreamUrl = new URL(req.url || '/', targetUrl);
+  const client = upstreamUrl.protocol === 'https:' ? httpsRequest : httpRequest;
+  const proxyReq = client(
+    upstreamUrl,
+    {
+      method: req.method,
+      headers: buildProxyHeaders(req, targetUrl),
+    },
+    (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+      proxyRes.pipe(res);
+    },
+  );
+
+  proxyReq.on('error', (err) => {
+    proxyError(res, `Upstream unavailable: ${err.message}`);
+  });
+
+  req.pipe(proxyReq);
+}
+
+function proxyUpgrade(req, socket, head, targetUrl) {
+  const upstreamUrl = new URL(req.url || '/', targetUrl);
+  const client = upstreamUrl.protocol === 'https:' ? httpsRequest : httpRequest;
+  const proxyReq = client(upstreamUrl, {
+    method: req.method,
+    headers: buildProxyHeaders(req, targetUrl, true),
+  });
+
+  proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
+    const statusLine = `HTTP/1.1 ${proxyRes.statusCode || 101} ${proxyRes.statusMessage || 'Switching Protocols'}\r\n`;
+    const headers = Object.entries(proxyRes.headers)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+      .join('\r\n');
+    socket.write(`${statusLine}${headers}\r\n\r\n`);
+    if (proxyHead?.length) socket.write(proxyHead);
+    if (head?.length) proxySocket.write(head);
+    proxySocket.pipe(socket).pipe(proxySocket);
+  });
+
+  proxyReq.on('error', () => {
+    socket.destroy();
+  });
+
+  proxyReq.end();
 }
 
 function buildContentSecurityPolicy() {
@@ -173,7 +289,7 @@ function serveStatic(pathname, res, req) {
   res.end(readFileSync(filePath));
 }
 
-const configuredKeys = ['VITE_API_URL', 'VITE_GOOGLE_CLIENT_ID'].filter(
+const configuredKeys = ['VITE_API_URL', 'VITE_GOOGLE_CLIENT_ID', 'PWA_API_PROXY_TARGET'].filter(
   (k) => process.env[k] !== undefined && process.env[k] !== '',
 );
 console.log(
@@ -181,6 +297,11 @@ console.log(
 );
 
 generateRuntimeConfig(join(ROOT, 'env-config.js'));
+
+const proxyTargetUrl = parseTargetUrl(PWA_API_PROXY_TARGET);
+if (PWA_API_PROXY_TARGET && !proxyTargetUrl) {
+  console.warn(`Invalid PWA_API_PROXY_TARGET ignored: ${PWA_API_PROXY_TARGET}`);
+}
 
 createServer((req, res) => {
   const pathname = (req.url ?? '/').split('?')[0];
@@ -190,7 +311,19 @@ createServer((req, res) => {
     return;
   }
 
+  if (proxyTargetUrl && isProxyPath(pathname)) {
+    proxyHttpRequest(req, res, proxyTargetUrl);
+    return;
+  }
+
   serveStatic(pathname, res, req);
+}).on('upgrade', (req, socket, head) => {
+  const pathname = (req.url ?? '/').split('?')[0];
+  if (proxyTargetUrl && pathname.startsWith('/socket.io')) {
+    proxyUpgrade(req, socket, head, proxyTargetUrl);
+    return;
+  }
+  socket.destroy();
 }).listen(PORT, () => {
   console.log(`Play4Cash PWA listening on port ${PORT}`);
 });
