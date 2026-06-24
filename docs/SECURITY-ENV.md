@@ -41,7 +41,7 @@ removes spoofable headers).
 | Variable          | PWA | Gateway | API | Notes |
 |-------------------|-----|---------|-----|-------|
 | `ALLOWED_ORIGINS` | —   | ✅       | ✅   | Comma-separated. MUST include the PWA origin. Gateway refuses to start with empty `CORS_ORIGINS` when `NODE_ENV=production`. |
-| `VITE_API_URL`    | ✅   | —       | —   | Base URL the SPA hits. Leave empty in dev when using `VITE_DEV_PROXY_TARGET`. |
+| `VITE_API_URL`    | ✅   | —       | —   | Base URL the SPA hits. In production, prefer `"/"` so the browser talks to the PWA origin and cookies stay first-party. Leave empty in dev when using `VITE_DEV_PROXY_TARGET`. |
 
 When using the httpOnly refresh cookie, the SPA's origin MUST match the API origin OR the
 API/Gateway must respond with `Access-Control-Allow-Credentials: true` and an explicit
@@ -117,13 +117,15 @@ that path.
 
 | Variable                  | Notes |
 |---------------------------|-------|
-| `VITE_API_URL`            | Production API/Gateway origin. Leave empty in dev when using the proxy. On Azure App Service, set as **Application Setting** (runtime); the Node server injects it via `/env-config.js` — no rebuild needed. |
+| `VITE_API_URL`            | Legacy upstream URL for the PWA server. When the proxy is enabled the runtime injector writes `"/"` so the browser keeps a same-origin session. |
 | `VITE_GOOGLE_CLIENT_ID`   | OAuth client used at the login screen. Same runtime injection on App Service. |
 | `VITE_DEV_PROXY_TARGET`   | Dev-only. When set, Vite proxies `/api` and `/socket.io` to that origin. |
 | `VITE_DEV_PROXY_INSECURE` | Dev-only. `true` to allow self-signed HTTPS targets. |
+| `PWA_API_PROXY_TARGET`    | Server-only. When set on Azure App Service, `server.mjs` reverse-proxies `/api` and `/socket.io` to the Gateway and forces `VITE_API_URL=/` at runtime. |
 
-**Azure App Service (p4c-web / p4c-web-dev):** configure `VITE_API_URL` and
-`VITE_GOOGLE_CLIENT_ID` under Configuration → Application settings.
+**Azure App Service (p4c-web / p4c-web-dev):** configure `VITE_API_URL` (or
+`PWA_API_PROXY_TARGET`) and `VITE_GOOGLE_CLIENT_ID` under Configuration → Application settings.
+If the proxy is enabled, `env-config.js` will expose `VITE_API_URL=/` to the browser.
 
 **Startup command** — replace plain `pm2 serve` (which skips runtime config) with:
 
@@ -139,6 +141,10 @@ node /home/site/wwwroot/scripts/generate-runtime-config.mjs /home/site/wwwroot/e
 
 `startup.sh` reads Application Settings, writes `env-config.js`, then runs the hardened
 `node server.mjs` entrypoint on port `$PORT`.
+
+When `PWA_API_PROXY_TARGET` is configured, the browser only calls the PWA origin and the
+server forwards `/api` and `/socket.io` to the Gateway. That keeps the auth cookies
+first-party and avoids refresh-time session loss on browsers that restrict third-party cookies.
 
 The PWA server is also responsible for the browser security headers:
 
@@ -192,7 +198,8 @@ the forced-update flow silently breaks.
 3. Same `REDIS_URL` for Gateway and API. Same `REDIS_TOKEN_PREFIX` constant (`accessTokens:`).
 4. `CORS_ORIGINS` on Gateway (and `ALLOWED_ORIGINS` on API) must include every PWA origin —
    no leading-wildcard subdomains in production.
-5. PWA `VITE_API_URL` points to the Gateway, not the API directly.
+5. Prefer `PWA_API_PROXY_TARGET` on the PWA so `VITE_API_URL` becomes `/` and the browser
+   stays same-origin. Only fall back to a direct Gateway URL when you cannot deploy the proxy.
 6. In production: `AUTH_REFRESH_COOKIE_SECURE=true`, `AUTH_REFRESH_COOKIE_SAMESITE=lax` (or
    `none` if cross-site), `NODE_ENV=production`.
 7. Bump `PWA_MIN_VERSION` only when the new build is **not** backward compatible with older

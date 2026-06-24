@@ -120,7 +120,7 @@ export default defineConfig(({ mode }) => {
           // builds don't linger and cause ChunkLoadError after a deploy.
           cleanupOutdatedCaches: true,
           // SPA fallback so deep links work offline / cached.
-          navigationPreload: true,
+          navigationPreload: false,
           navigateFallback: '/index.html',
           // Claim clients when a worker **activates**. Updates still wait in `waiting` until the user
           // confirms (`skipWaiting: false` + modal); without claim, `controllerchange` may never fire
