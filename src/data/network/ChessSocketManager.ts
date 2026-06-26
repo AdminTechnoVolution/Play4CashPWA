@@ -6,7 +6,7 @@
  */
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { BASE_URL } from '../../config/api.config';
+import { buildSocketUrl } from '../../config/api.config';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
@@ -35,7 +35,7 @@ export class ChessSocketManager {
 
     this.sessionRoomId = roomId;
 
-    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
+    this.socket = io(buildSocketUrl(NAMESPACE), {
       ...SOCKET_IO_CLIENT_DEFAULTS,
       query: { appVersion: __APP_VERSION__ },
       auth: { appVersion: __APP_VERSION__ },
