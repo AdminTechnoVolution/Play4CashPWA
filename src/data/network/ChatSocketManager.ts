@@ -1,6 +1,6 @@
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { BASE_URL } from '../../config/api.config';
+import { buildSocketUrl } from '../../config/api.config';
 import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
@@ -25,7 +25,7 @@ export class ChatSocketManager {
     const lang = acceptLanguageTag();
     this.sessionRoomId = roomId;
 
-    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
+    this.socket = io(buildSocketUrl(NAMESPACE), {
       ...SOCKET_IO_CLIENT_DEFAULTS,
       query: { lang, appVersion: __APP_VERSION__ },
       auth: { lang, appVersion: __APP_VERSION__ },
