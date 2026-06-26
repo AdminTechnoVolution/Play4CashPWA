@@ -3,14 +3,14 @@ import { SOCKET_TIMEOUT_MS } from '../../config/api.config';
 /**
  * Shared Socket.IO client options.
  *
- * Transport: try WebSocket first and fall back to polling. Production supports
- * HTTP upgrade through the PWA proxy/gateway; polling remains as a safety net.
+ * Transport: start with polling so the Socket.IO session is established reliably,
+ * then upgrade to WebSocket when the PWA proxy/gateway allows HTTP upgrade.
  * Server pingInterval/pingTimeout are negotiated
  * from the Engine.IO OPEN packet; do NOT set them on the client.
  */
 export const SOCKET_IO_CLIENT_DEFAULTS = {
   withCredentials: true,
-  transports: ['websocket', 'polling'] as ('websocket' | 'polling')[],
+  transports: ['polling', 'websocket'] as ('websocket' | 'polling')[],
   autoConnect: false as const,
   forceNew: false,
   multiplex: true,
