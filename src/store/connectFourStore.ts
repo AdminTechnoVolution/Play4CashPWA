@@ -40,6 +40,7 @@ import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 import {
   applyIncomingStateVersion,
   createStateVersionTracker,
+  resetStateVersionTracker,
 } from '../data/network/socketStateVersion';
 
 const connectFourStateVersionTracker = createStateVersionTracker(() => {
@@ -458,7 +459,6 @@ function applyPlayPayload(
     if (turnChanged || timerJump || turnTimer == null) {
       syncTurnCountdown(set, get);
     }
-    if (afterPlay.roomId) startStatusPolling(afterPlay.roomId, get);
   } else if (spect) {
     stopTurnTimer();
   }
@@ -750,6 +750,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
     stopTurnTimer();
     stopStatusPolling();
     teardownConnectFourSocket();
+    resetStateVersionTracker(connectFourStateVersionTracker);
     const epoch = connectFourSocketEpoch;
 
     set({

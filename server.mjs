@@ -105,6 +105,9 @@ function buildProxyHeaders(req, targetUrl, preserveUpgrade = false) {
   }
 
   headers.host = targetUrl.host;
+  if (preserveUpgrade) {
+    headers.connection = 'Upgrade';
+  }
   headers['x-forwarded-host'] = `${req.headers.host || ''}`;
   headers['x-forwarded-proto'] = getForwardedProto(req);
 
