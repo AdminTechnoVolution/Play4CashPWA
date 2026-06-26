@@ -654,20 +654,27 @@ const RoomsPage: React.FC = () => {
         {/* Create Room Modal */}
         <IonModal
           isOpen={showCreateDialog}
-          onDidDismiss={() => { setShowCreateDialog(false); setCreateError(''); }}
+          canDismiss={!createLoading}
+          onDidDismiss={() => {
+            if (createLoading) return;
+            setShowCreateDialog(false);
+            setCreateError('');
+          }}
           breakpoints={[0, 1]}
           initialBreakpoint={1}
         >
           <IonHeader>
             <IonToolbar style={{ '--background': 'var(--sovereign-surface)', '--border-color': 'var(--sovereign-border)' } as React.CSSProperties}>
               <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('create_room')}</IonTitle>
-              <IonButtons slot="end">
-                <IonIcon
-                  icon={closeOutline}
-                  onClick={() => setShowCreateDialog(false)}
-                  style={{ color: 'var(--sovereign-text-muted)', fontSize: '24px', cursor: 'pointer', marginRight: '12px' }}
-                />
-              </IonButtons>
+              {!createLoading && (
+                <IonButtons slot="end">
+                  <IonIcon
+                    icon={closeOutline}
+                    onClick={() => setShowCreateDialog(false)}
+                    style={{ color: 'var(--sovereign-text-muted)', fontSize: '24px', cursor: 'pointer', marginRight: '12px' }}
+                  />
+                </IonButtons>
+              )}
             </IonToolbar>
           </IonHeader>
 
@@ -685,6 +692,7 @@ const RoomsPage: React.FC = () => {
                     onIonInput={(e) => setCreateName(e.detail.value ?? '')}
                     placeholder={t('placeholder_enter_room_name')}
                     maxlength={40}
+                    disabled={createLoading}
                   style={{
                     '--background': 'transparent',
                     '--color': 'var(--sovereign-text)',
@@ -714,6 +722,7 @@ const RoomsPage: React.FC = () => {
                   min={String(minBetNum)}
                   max={String(userBalanceNum)}
                   step="0.01"
+                  disabled={createLoading}
                   style={{
                     '--background': 'transparent',
                     '--color': 'var(--sovereign-text)',
@@ -746,6 +755,7 @@ const RoomsPage: React.FC = () => {
                     value={createLimit}
                     onIonChange={(e) => setCreateLimit(Number(e.detail.value))}
                     interface="popover"
+                    disabled={createLoading}
                     style={{
                       '--background': 'transparent',
                       '--color': 'var(--sovereign-text)',
@@ -827,9 +837,11 @@ const RoomsPage: React.FC = () => {
 
               <div style={{ height: '12px' }} />
 
-              <SovereignSecondaryButton onClick={() => setShowCreateDialog(false)} expand="block">
-                {t('cancel')}
-              </SovereignSecondaryButton>
+              {!createLoading && (
+                <SovereignSecondaryButton onClick={() => setShowCreateDialog(false)} expand="block">
+                  {t('cancel')}
+                </SovereignSecondaryButton>
+              )}
             </div>
           </IonContent>
         </IonModal>
