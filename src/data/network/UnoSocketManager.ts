@@ -7,6 +7,7 @@ import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
 import { attachGameResultListener } from '../../util/playRoomSession';
 import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
+import { clearSocketResyncThrottle, emitSocketResync } from './socketResync';
 import type { UnoColor } from '../models/ApiModels';
 
 const NAMESPACE = '/uno';
@@ -74,11 +75,12 @@ export class UnoSocketManager {
     this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;
+    clearSocketResyncThrottle(NAMESPACE);
     releaseSocket(NAMESPACE);
   }
 
   requestSync(roomId: string): void {
-    this.socket?.emit('join', { room_id: roomId });
+    emitSocketResync(this.socket, NAMESPACE, roomId);
   }
 
   playCard(

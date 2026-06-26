@@ -13,6 +13,7 @@ import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
 import { attachGameResultListener } from '../../util/playRoomSession';
 import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
+import { clearSocketResyncThrottle, emitSocketResync } from './socketResync';
 
 const NAMESPACE = '/chess';
 
@@ -100,8 +101,7 @@ export class ChessSocketManager {
   }
 
   requestSync(roomId: string): void {
-    if (!this.isConnected) return;
-    this.socket?.emit('join', { room_id: roomId });
+    emitSocketResync(this.socket, NAMESPACE, roomId);
   }
 
   disconnect(): void {
@@ -109,6 +109,7 @@ export class ChessSocketManager {
     this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;
+    clearSocketResyncThrottle(NAMESPACE);
     releaseSocket(NAMESPACE);
   }
 }
