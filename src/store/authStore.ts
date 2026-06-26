@@ -30,6 +30,8 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
+  let loadSessionPromise: Promise<void> | null = null;
+
   window.addEventListener('p4c:auth-failure', () => {
     void (async () => {
       await requestRefreshCookieCleared();
@@ -70,7 +72,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
   }
 
   return {
-    user: null,
+    user: getUserAccount(),
     isLoading: false,
     authHydrated: false,
     error: null,
@@ -97,35 +99,52 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     loadSession: async () => {
-      apiRepository.invalidateAccountCache();
-      const tokenAtStart = getAccessToken();
-      set({ isLoading: true });
-      try {
-        if (!tokenAtStart) {
-          const refreshed = await apiRepository.refreshToken();
-          saveTokens(refreshed.token);
-        }
-        const tokenBeforeAccountRequest = getAccessToken();
-        const account = await apiRepository.getUserAccount();
-        if (getAccessToken() !== tokenBeforeAccountRequest) {
-          return;
-        }
-        saveUserAccount(account);
-        set({ user: account, isLoading: false, authHydrated: true, error: null });
-      } catch (err) {
-        const tokenNow = getAccessToken();
-        if (tokenAtStart && tokenNow !== tokenAtStart) {
-          return;
-        }
-        const reason = err instanceof Error ? err.message : '';
-        if (reason === 'error_session_expired') {
-          clearTokens();
-          set({ user: null, isLoading: false, authHydrated: true });
-          emitAuthFailureEvent();
-          return;
-        }
-        set({ isLoading: false, authHydrated: true });
+      if (loadSessionPromise) return loadSessionPromise;
+
+      const cachedUser = getUserAccount();
+      if (cachedUser) {
+        set({ user: cachedUser });
       }
+
+      loadSessionPromise = (async () => {
+        apiRepository.invalidateAccountCache();
+        const tokenAtStart = getAccessToken();
+        set({ isLoading: true });
+        try {
+          if (!tokenAtStart) {
+            const refreshed = await apiRepository.refreshToken();
+            saveTokens(refreshed.token);
+          }
+          const tokenBeforeAccountRequest = getAccessToken();
+          const account = await apiRepository.getUserAccount();
+          if (getAccessToken() !== tokenBeforeAccountRequest) {
+            return;
+          }
+          saveUserAccount(account);
+          set({ user: account, isLoading: false, authHydrated: true, error: null });
+        } catch (err) {
+          const tokenNow = getAccessToken();
+          if (tokenAtStart && tokenNow !== tokenAtStart) {
+            return;
+          }
+          const reason = err instanceof Error ? err.message : '';
+          if (reason === 'error_session_expired') {
+            clearTokens();
+            set({ user: null, isLoading: false, authHydrated: true });
+            emitAuthFailureEvent();
+            return;
+          }
+          set({
+            user: cachedUser ?? getUserAccount(),
+            isLoading: false,
+            authHydrated: true,
+          });
+        } finally {
+          loadSessionPromise = null;
+        }
+      })();
+
+      return loadSessionPromise;
     },
 
     logout: async () => {
