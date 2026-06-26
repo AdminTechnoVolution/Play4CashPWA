@@ -424,6 +424,10 @@ function applyPlayPayload(
 
   const moveRevision = resolveAppliedConnectFourMoveRevision(data, prior.moveRevision);
 
+  console.log(
+    `[PWA][${new Date().toISOString()}] aplica board room=${prior.roomId} moveRevision=${moveRevision}`,
+  );
+
   const beforePlay = prior;
   set({
     phase: ConnectFourPhase.PLAY,
@@ -481,12 +485,23 @@ function handleConnectFourPayload(
       ? envelope.data
       : (json as Record<string, unknown>);
 
+  console.log(
+    `[PWA][${new Date().toISOString()}] recibe connect-four room=${String(
+      data?.roomId ?? data?.room_id ?? '',
+    )} phase=${get().phase} moveRevision=${String(data?.moveRevision ?? data?.move_revision ?? '')}`,
+  );
+
   if (!payloadTargetsCurrentRoom(data, get)) return;
 
+  // stateVersion may request a resync on gaps, but it must not block valid board updates.
   applyIncomingStateVersion(connectFourStateVersionTracker, data);
 
   const success = envelope?.success !== false;
   const hadMoveInFlight = get().isMovePending;
+  if (hadMoveInFlight) {
+    clearMovePendingRecoveryTimer();
+    set({ isMovePending: false });
+  }
   const myUserId = get().myUserId;
 
   if (get().isSpectator) {
@@ -642,6 +657,7 @@ function handleConnectFourPayload(
       }
     }
 
+    clearMovePendingRecoveryTimer();
     applyPlayPayload(data, set, get);
     return;
   }
@@ -850,6 +866,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
     const s = get();
     if (s.isSpectator || s.phase !== ConnectFourPhase.PLAY || !s.isPlayerTurn || s.isMovePending) return;
     if (s.roomId !== roomId) return;
+    console.log(`[PWA][${new Date().toISOString()}] click drop_disc room=${roomId} col=${col} moveRevision=${s.moveRevision}`);
     const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
     if (!socket?.dropDisc(roomId, col)) return;
     set({ isMovePending: true });
