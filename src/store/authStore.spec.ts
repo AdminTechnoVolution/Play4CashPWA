@@ -110,4 +110,18 @@ describe('authStore loadSession race', () => {
     expect(saveTokens).toHaveBeenCalledWith('refreshed-token');
     expect(saveUserAccount).toHaveBeenCalledWith({ id: 'u1', email: 'a@b' });
   });
+
+  it('boots with the cached user so a refresh does not flash the login screen', async () => {
+    getUserAccount.mockImplementationOnce(
+      () => ({ id: 'cached-1', email: 'cached@example.com' } as any),
+    );
+
+    const { useAuthStore } = await import('./authStore');
+
+    expect(useAuthStore.getState().user).toEqual({
+      id: 'cached-1',
+      email: 'cached@example.com',
+    });
+    expect(useAuthStore.getState().authHydrated).toBe(false);
+  });
 });
