@@ -10,6 +10,7 @@ pnpm-debug.log*
 
 build/
 dist/
+dev-dist/
 www/
 out/
 azure-deploy/
