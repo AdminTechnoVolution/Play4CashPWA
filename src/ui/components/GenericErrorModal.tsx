@@ -5,6 +5,8 @@ import {
 } from '@ionic/react';
 import { alertCircleOutline, closeOutline } from 'ionicons/icons';
 import { SovereignPrimaryButton } from './SovereignButton';
+import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
+import { useT } from '../../i18n/translations';
 
 interface GenericErrorModalProps {
   isOpen: boolean;
@@ -17,6 +19,9 @@ const GenericErrorModal: React.FC<GenericErrorModalProps> = ({
   message,
   onDismiss,
 }) => {
+  const t = useT();
+  const displayMessage = formatApiMessageForDisplay(message, 'error_try_later_message');
+
   return (
     <IonModal
       isOpen={isOpen}
@@ -47,7 +52,7 @@ const GenericErrorModal: React.FC<GenericErrorModalProps> = ({
               fontSize: '16px',
             }}
           >
-            Error
+            {t('error_try_later_title')}
           </span>
           <IonIcon
             icon={closeOutline}
@@ -87,14 +92,14 @@ const GenericErrorModal: React.FC<GenericErrorModalProps> = ({
               margin: 0,
             }}
           >
-            {message}
+            {displayMessage}
           </p>
 
           <SovereignPrimaryButton
             onClick={onDismiss}
             style={{ minWidth: '140px' } as React.CSSProperties}
           >
-            OK
+            {t('error_try_later_retry')}
           </SovereignPrimaryButton>
         </div>
       </div>
