@@ -5,7 +5,6 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonBackButton,
   IonButtons,
   IonInput,
   IonText,
@@ -17,6 +16,7 @@ import { useDashboardStore } from '../../store/dashboardStore';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
 import { hasKey } from '../../i18n/translations';
 import { useT } from '../../i18n/translations';
+import { AppBackButton } from '../../navigation/AppBackButton';
 import '../../ui/theme/variables.css';
 
 const WithdrawalVerifyPage: React.FC = () => {
@@ -67,7 +67,7 @@ const WithdrawalVerifyPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/withdrawal" style={{ color: 'var(--sovereign-gold)' }} />
+            <AppBackButton to="/withdrawal" />
           </IonButtons>
           <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>
             {t('withdrawal_verify_title')}

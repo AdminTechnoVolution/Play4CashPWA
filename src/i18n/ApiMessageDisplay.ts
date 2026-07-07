@@ -129,7 +129,7 @@ function resolveApiMessageLine(trimmedLine: string, opts?: { minBet?: number }):
 }
 
 /** Resolves a single API line to a catalog key when possible (mirrors Android `rawLineToMessageKey`). */
-function rawLineToMessageKey(trimmedLine: string): string | null {
+export function rawLineToMessageKey(trimmedLine: string): string | null {
   if (!trimmedLine) return null;
   if (hasKey(trimmedLine)) return trimmedLine;
   const fromMap = englishApiLiteralToKey[normalizeEnglishApiLiteral(trimmedLine)];

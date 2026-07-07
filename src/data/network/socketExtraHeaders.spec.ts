@@ -17,14 +17,14 @@ describe('socketExtraHeaders', () => {
     expect(acceptLanguageTag()).toBe('es');
   });
 
-  it('socketIoExtraHeaders includes Bearer token, locale, and X-App-Version', () => {
-    const h = socketIoExtraHeaders('AAA.BBB.CCC');
-    expect(h.Authorization).toBe('Bearer AAA.BBB.CCC');
+  it('socketIoExtraHeaders includes locale and X-App-Version without auth headers', () => {
+    const h = socketIoExtraHeaders();
+    expect(h.Authorization).toBeUndefined();
     expect(h['accept-language']).toBe('es');
     expect(h['X-App-Version']).toBe('0.0.0-test');
   });
 
-  it('socketIoAuthPayload mirrors the version under appVersion (browser fallback)', () => {
+  it('socketIoAuthPayload keeps the version field for compatibility', () => {
     const a = socketIoAuthPayload('xyz');
     expect(a.token).toBe('xyz');
     expect(a.appVersion).toBe('0.0.0-test');

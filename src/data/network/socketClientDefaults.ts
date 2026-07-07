@@ -3,16 +3,17 @@ import { SOCKET_TIMEOUT_MS } from '../../config/api.config';
 /**
  * Shared Socket.IO client options.
  *
- * Transport: polling first, then upgrade to WebSocket when stable. Forcing
- * WebSocket-first breaks Vite dev proxy / double-hop Gateway setups — the WS
- * handshake succeeds then drops with "transport error" within milliseconds
- * (see debug session 83380c). Server pingInterval/pingTimeout are negotiated
+ * Transport: start with polling so the Socket.IO session is established reliably,
+ * then upgrade to WebSocket when the PWA proxy/gateway allows HTTP upgrade.
+ * Server pingInterval/pingTimeout are negotiated
  * from the Engine.IO OPEN packet; do NOT set them on the client.
  */
 export const SOCKET_IO_CLIENT_DEFAULTS = {
+  withCredentials: true,
   transports: ['polling', 'websocket'] as ('websocket' | 'polling')[],
   autoConnect: false as const,
-  forceNew: true,
+  forceNew: false,
+  multiplex: true,
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,

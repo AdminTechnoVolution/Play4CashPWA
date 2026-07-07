@@ -1,11 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   IonPage,
   IonHeader,
   IonToolbar,
   IonTitle,
   IonContent,
-  IonBackButton,
   IonButtons,
   IonList,
   IonItem,
@@ -57,6 +56,7 @@ import {
 } from '../../i18n/ApiMessageDisplay';
 import { getGameContext, savePlayContext } from '../../util/routingStorage';
 import { formatUSD } from '../../util/formatCurrency';
+import { AppBackButton } from '../../navigation/AppBackButton';
 import '../../ui/theme/variables.css';
 type RoomStatus = 'waiting' | 'started' | 'finished';
 
@@ -72,10 +72,9 @@ const STATUS_COLORS: Record<RoomStatus, string> = {
   finished: 'var(--sovereign-text-muted)',
 };
 
-/** Create-room modal: Domino seats */
-const DOMINO_CREATE_PLAYER_OPTIONS = [2, 4] as const;
-/** Create-room modal: UNO seats (must match API `UNO_ALLOWED_PLAYER_COUNTS`) */
-const UNO_CREATE_PLAYER_OPTIONS = [2, 4, 6, 8, 10] as const;
+function buildPlayerLimitOptions(min: number, max: number): number[] {
+  return Array.from({ length: max - min + 1 }, (_, i) => min + i);
+}
 
 const RoomsPage: React.FC = () => {
   const { gameSocketCode = '' } = useParams<{ gameSocketCode: string }>();
@@ -138,22 +137,23 @@ const RoomsPage: React.FC = () => {
   } | null>(null);
   const [showRulesModal, setShowRulesModal] = useState(false);
   
+  const createRoomPlayerOptions = useMemo(() => {
+    const min = catalogGame?.minPlayers;
+    const max = catalogGame?.maxPlayers;
+    if (min == null || max == null) return null;
+    if (max <= 2 || max <= min) return null;
+    return buildPlayerLimitOptions(min, max);
+  }, [catalogGame?.minPlayers, catalogGame?.maxPlayers]);
+
   // Reset form and default to minBet when modal opens
   useEffect(() => {
     if (showCreateDialog) {
       setCreateName('');
       setCreateBet(minBetNum);
-      setCreateLimit(2);
+      setCreateLimit(catalogGame?.minPlayers ?? createRoomPlayerOptions?.[0] ?? 2);
       setCreateError('');
     }
-  }, [showCreateDialog, minBetNum, gameSocketCode]);
-
-  const createRoomPlayerOptions =
-    gameSocketCode === 'domino'
-      ? DOMINO_CREATE_PLAYER_OPTIONS
-      : gameSocketCode === 'uno'
-        ? UNO_CREATE_PLAYER_OPTIONS
-        : null;
+  }, [showCreateDialog, minBetNum, catalogGame?.minPlayers, createRoomPlayerOptions]);
 
   useEffect(() => {
     if (!showCreateDialog || !createRoomPlayerOptions) return;
@@ -343,7 +343,7 @@ const RoomsPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" style={{ color: 'var(--sovereign-gold)' }} />
+            <AppBackButton to="/dashboard" />
           </IonButtons>
           <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '17px' }}>
             <span style={{ display: 'block', lineHeight: 1.15 }}>{decodedGameName}</span>
@@ -654,20 +654,27 @@ const RoomsPage: React.FC = () => {
         {/* Create Room Modal */}
         <IonModal
           isOpen={showCreateDialog}
-          onDidDismiss={() => { setShowCreateDialog(false); setCreateError(''); }}
+          canDismiss={!createLoading}
+          onDidDismiss={() => {
+            if (createLoading) return;
+            setShowCreateDialog(false);
+            setCreateError('');
+          }}
           breakpoints={[0, 1]}
           initialBreakpoint={1}
         >
           <IonHeader>
             <IonToolbar style={{ '--background': 'var(--sovereign-surface)', '--border-color': 'var(--sovereign-border)' } as React.CSSProperties}>
               <IonTitle style={{ color: 'var(--sovereign-text)', fontWeight: '700' }}>{t('create_room')}</IonTitle>
-              <IonButtons slot="end">
-                <IonIcon
-                  icon={closeOutline}
-                  onClick={() => setShowCreateDialog(false)}
-                  style={{ color: 'var(--sovereign-text-muted)', fontSize: '24px', cursor: 'pointer', marginRight: '12px' }}
-                />
-              </IonButtons>
+              {!createLoading && (
+                <IonButtons slot="end">
+                  <IonIcon
+                    icon={closeOutline}
+                    onClick={() => setShowCreateDialog(false)}
+                    style={{ color: 'var(--sovereign-text-muted)', fontSize: '24px', cursor: 'pointer', marginRight: '12px' }}
+                  />
+                </IonButtons>
+              )}
             </IonToolbar>
           </IonHeader>
 
@@ -685,6 +692,7 @@ const RoomsPage: React.FC = () => {
                     onIonInput={(e) => setCreateName(e.detail.value ?? '')}
                     placeholder={t('placeholder_enter_room_name')}
                     maxlength={40}
+                    disabled={createLoading}
                   style={{
                     '--background': 'transparent',
                     '--color': 'var(--sovereign-text)',
@@ -714,6 +722,7 @@ const RoomsPage: React.FC = () => {
                   min={String(minBetNum)}
                   max={String(userBalanceNum)}
                   step="0.01"
+                  disabled={createLoading}
                   style={{
                     '--background': 'transparent',
                     '--color': 'var(--sovereign-text)',
@@ -734,7 +743,7 @@ const RoomsPage: React.FC = () => {
                 </IonText>
               </div>
 
-              {/* Player limit — Domino (2/4) and UNO (2–10 even); backend validates */}
+              {/* Player limit — from catalog min/max; backend validates */}
               {createRoomPlayerOptions && (
                 <div style={{ marginBottom: '28px' }}>
                   <IonText>
@@ -746,6 +755,7 @@ const RoomsPage: React.FC = () => {
                     value={createLimit}
                     onIonChange={(e) => setCreateLimit(Number(e.detail.value))}
                     interface="popover"
+                    disabled={createLoading}
                     style={{
                       '--background': 'transparent',
                       '--color': 'var(--sovereign-text)',
@@ -827,9 +837,11 @@ const RoomsPage: React.FC = () => {
 
               <div style={{ height: '12px' }} />
 
-              <SovereignSecondaryButton onClick={() => setShowCreateDialog(false)} expand="block">
-                {t('cancel')}
-              </SovereignSecondaryButton>
+              {!createLoading && (
+                <SovereignSecondaryButton onClick={() => setShowCreateDialog(false)} expand="block">
+                  {t('cancel')}
+                </SovereignSecondaryButton>
+              )}
             </div>
           </IonContent>
         </IonModal>

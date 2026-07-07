@@ -1,7 +1,6 @@
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { BASE_URL } from '../../config/api.config';
-import { getAccessToken } from '../auth/AuthSessionStore';
+import { buildSocketUrl } from '../../config/api.config';
 import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
@@ -22,20 +21,15 @@ export class ChatSocketManager {
   connect(roomId: string): void {
     this.disconnect();
 
-    const token = getAccessToken();
-    if (!token) {
-      window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
-      return;
-    }
 
     const lang = acceptLanguageTag();
     this.sessionRoomId = roomId;
 
-    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
+    this.socket = io(buildSocketUrl(NAMESPACE), {
       ...SOCKET_IO_CLIENT_DEFAULTS,
-      query: { token, lang, appVersion: __APP_VERSION__ },
-      auth: { token, lang, appVersion: __APP_VERSION__ },
-      extraHeaders: socketIoExtraHeaders(token),
+      query: { lang, appVersion: __APP_VERSION__ },
+      auth: { lang, appVersion: __APP_VERSION__ },
+      extraHeaders: socketIoExtraHeaders(),
     });
 
     attachVersionMismatchListener(this.socket);

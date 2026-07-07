@@ -27,13 +27,13 @@ function isStandalone(): boolean {
   return Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
 }
 
-/** localStorage flag so the offline-ready toast only fires once per browser/install. */
-const OFFLINE_READY_SEEN_KEY = 'p4c_offline_ready_seen';
+/** localStorage flag so the install-ready toast only fires once per browser/install. */
+const OFFLINE_READY_SEEN_KEY = 'p4c_install_ready_seen';
 
 export interface AppUpdateState {
   /** A new SW has finished installing in the background. Show the prompt. */
   needRefresh: boolean;
-  /** App is ready for offline use (first install). */
+  /** App install completed for this browser/install. */
   offlineReady: boolean;
   /** Set to true when the API forces an upgrade via X-App-Min-Version header. */
   forced: boolean;
@@ -43,13 +43,13 @@ export interface AppUpdateState {
   appFullVersion: string;
   buildTime: string;
   isStandalone: boolean;
-  /** True when offlineReady fires AND we haven't shown the toast yet on this device. */
+  /** True when install-ready fires AND we haven't shown the toast yet on this device. */
   showOfflineReady: boolean;
   /** Apply the new SW and reload. Resolves after reload is triggered. */
   applyUpdate: () => Promise<void>;
   /** Hide the update prompt for this session (does NOT install the update). */
   dismiss: () => void;
-  /** Mark the offline-ready toast as seen so it never fires again on this device. */
+  /** Mark the install-ready toast as seen so it never fires again on this device. */
   dismissOfflineReady: () => void;
 }
 

@@ -29,8 +29,11 @@ const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (!authHydrated || isLoading) return;
-    if (user) navigate('/dashboard', { replace: true });
-  }, [user, authHydrated, isLoading, navigate]);
+    if (user) {
+      clearError();
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, authHydrated, isLoading, navigate, clearError]);
 
   const refreshPublicStats = useCallback(async () => {
     setStatsLoading(true);
@@ -61,7 +64,7 @@ const LoginPage: React.FC = () => {
     if (!credential) return;
     try {
       await signInWithGoogle(credential);
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch {
       // error set in store
     }

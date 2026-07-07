@@ -16,8 +16,6 @@ interface DashboardState {
   clearError: () => void;
 }
 
-const SYNC_DELAY_MS = 500;
-
 export const useDashboardStore = create<DashboardState>((set) => ({
   account: null,
   games: [],
@@ -28,18 +26,24 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   loadDashboard: async () => {
     set({ isLoading: true, error: null });
     try {
-      // Add a small delay to allow backend to finalize balance after a game
-      await new Promise((resolve) => setTimeout(resolve, SYNC_DELAY_MS));
+      const cachedAccount = apiRepository.getCachedUserAccount();
+      const account = cachedAccount ?? await apiRepository.getUserAccount();
+      saveUserAccount(account);
+      useAuthStore.getState().syncUser();
 
-      apiRepository.invalidateAccountCache();
-      const [account, games, roomStats] = await Promise.all([
-        apiRepository.getUserAccount(),
+      const [gamesResult, roomStatsResult] = await Promise.allSettled([
         apiRepository.getGames(),
         apiRepository.getRoomStats(),
       ]);
-      saveUserAccount(account);
-      useAuthStore.getState().syncUser();
-      set({ account, games, roomStats, isLoading: false });
+
+      const nextState: Partial<DashboardState> = { account, isLoading: false };
+      if (gamesResult.status === 'fulfilled') {
+        nextState.games = gamesResult.value;
+      }
+      if (roomStatsResult.status === 'fulfilled') {
+        nextState.roomStats = roomStatsResult.value;
+      }
+      set(nextState);
     } catch (err: any) {
       set({ isLoading: false, error: formatApiMessageForDisplay(err) });
     }
@@ -47,9 +51,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
 
   refreshAccount: async () => {
     try {
-      // Add a small delay to allow backend to finalize balance after a game
-      await new Promise((resolve) => setTimeout(resolve, SYNC_DELAY_MS));
-
       apiRepository.invalidateAccountCache();
       const account = await apiRepository.getUserAccount();
       saveUserAccount(account);

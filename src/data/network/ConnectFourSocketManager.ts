@@ -6,13 +6,14 @@
  */
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { BASE_URL } from '../../config/api.config';
-import { getAccessToken } from '../auth/AuthSessionStore';
+import { buildSocketUrl } from '../../config/api.config';
 import { socketIoExtraHeaders, acceptLanguageTag } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
+import { attachGameResultListener } from '../../util/playRoomSession';
 import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
+import { clearSocketResyncThrottle, emitSocketResync } from './socketResync';
 
 const NAMESPACE = '/connect-four';
 const EVENT = 'connect-four';
@@ -53,23 +54,19 @@ export class ConnectFourSocketManager {
   connect(roomId: string): void {
     this.disconnect();
 
-    const token = getAccessToken();
-    if (!token) {
-      window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
-      return;
-    }
 
     const lang = acceptLanguageTag();
     this.sessionRoomId = roomId;
 
-    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
+    this.socket = io(buildSocketUrl(NAMESPACE), {
       ...SOCKET_IO_CLIENT_DEFAULTS,
-      query: { token, appVersion: __APP_VERSION__, lang },
-      auth: { token, appVersion: __APP_VERSION__, lang },
-      extraHeaders: socketIoExtraHeaders(token),
+      query: { appVersion: __APP_VERSION__, lang },
+      auth: { appVersion: __APP_VERSION__, lang },
+      extraHeaders: socketIoExtraHeaders(),
     });
 
     attachVersionMismatchListener(this.socket);
+    attachGameResultListener(this.socket);
     instrumentSocket(this.socket, NAMESPACE, {
       onResync: () => {
         if (this.sessionRoomId) {
@@ -109,7 +106,7 @@ export class ConnectFourSocketManager {
   }
 
   requestSync(roomId: string): void {
-    this.socket?.emit('join', { room_id: roomId });
+    emitSocketResync(this.socket, NAMESPACE, roomId);
   }
 
   dropDisc(roomId: string, col: number): boolean {
@@ -128,6 +125,7 @@ export class ConnectFourSocketManager {
     this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;
+    clearSocketResyncThrottle(NAMESPACE);
     releaseSocket(NAMESPACE);
   }
 }

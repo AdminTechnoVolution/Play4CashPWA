@@ -4,10 +4,13 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const CONFIG_DIR = fileURLToPath(new URL('.', import.meta.url));
 
 function readPackageVersion(): string {
   try {
-    const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as { version?: string };
+    const pkg = JSON.parse(readFileSync(resolve(CONFIG_DIR, 'package.json'), 'utf8')) as { version?: string };
     return pkg.version || '0.0.0';
   } catch {
     return '0.0.0';
@@ -117,7 +120,7 @@ export default defineConfig(({ mode }) => {
           // builds don't linger and cause ChunkLoadError after a deploy.
           cleanupOutdatedCaches: true,
           // SPA fallback so deep links work offline / cached.
-          navigationPreload: true,
+          navigationPreload: false,
           navigateFallback: '/index.html',
           // Claim clients when a worker **activates**. Updates still wait in `waiting` until the user
           // confirms (`skipWaiting: false` + modal); without claim, `controllerchange` may never fire
@@ -131,9 +134,10 @@ export default defineConfig(({ mode }) => {
               handler: 'NetworkOnly',
             },
             {
+              // Never cache authenticated API traffic. Cookies + auth refresh must always hit network,
+              // otherwise a stale cached 401 can mask a valid session.
               urlPattern: /^https:\/\/p4c-api/,
-              handler: 'NetworkFirst',
-              options: { cacheName: 'api-cache', expiration: { maxEntries: 50, maxAgeSeconds: 300 } }
+              handler: 'NetworkOnly',
             }
           ]
         }

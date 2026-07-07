@@ -6,13 +6,14 @@
  */
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { BASE_URL } from '../../config/api.config';
-import { getAccessToken } from '../auth/AuthSessionStore';
+import { buildSocketUrl } from '../../config/api.config';
 import { socketIoExtraHeaders } from './socketExtraHeaders';
 import { isSocketUnauthorizedConnectError, refreshSocketHandshake } from './socketSessionRefresh';
 import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
+import { attachGameResultListener } from '../../util/playRoomSession';
 import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
+import { clearSocketResyncThrottle, emitSocketResync } from './socketResync';
 
 const NAMESPACE = '/chess';
 
@@ -32,22 +33,18 @@ export class ChessSocketManager {
   connect(roomId: string): void {
     this.disconnect();
 
-    const token = getAccessToken();
-    if (!token) {
-      window.dispatchEvent(new CustomEvent('p4c:auth-failure'));
-      return;
-    }
 
     this.sessionRoomId = roomId;
 
-    this.socket = io(`${BASE_URL}${NAMESPACE}`, {
+    this.socket = io(buildSocketUrl(NAMESPACE), {
       ...SOCKET_IO_CLIENT_DEFAULTS,
-      query: { token, appVersion: __APP_VERSION__ },
-      auth: { token, appVersion: __APP_VERSION__ },
-      extraHeaders: socketIoExtraHeaders(token),
+      query: { appVersion: __APP_VERSION__ },
+      auth: { appVersion: __APP_VERSION__ },
+      extraHeaders: socketIoExtraHeaders(),
     });
 
     attachVersionMismatchListener(this.socket);
+    attachGameResultListener(this.socket);
     instrumentSocket(this.socket, NAMESPACE, {
       onResync: () => {
         if (this.sessionRoomId) this.requestSync(this.sessionRoomId);
@@ -55,9 +52,6 @@ export class ChessSocketManager {
     });
 
     this.socket.on('connect', () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'ChessSocketManager.ts:connect',message:'chess_socket_connected',data:{roomId},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
       this.onConnected?.();
       this.socket?.emit('join', { room_id: roomId });
     });
@@ -80,9 +74,6 @@ export class ChessSocketManager {
     });
 
     this.socket.on('chess', (data: any) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'ChessSocketManager.ts:chess',message:'chess_event',data:{success:data?.success,waitingForOpponent:!!data?.data?.waitingForOpponent,opponentJoined:!!data?.data?.opponentJoined,gameStarted:!!data?.data?.gameStarted,gameEnded:!!data?.data?.gameEnded},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion
       this.onChessMessage?.(data);
     });
 
@@ -110,8 +101,7 @@ export class ChessSocketManager {
   }
 
   requestSync(roomId: string): void {
-    if (!this.isConnected) return;
-    this.socket?.emit('join', { room_id: roomId });
+    emitSocketResync(this.socket, NAMESPACE, roomId);
   }
 
   disconnect(): void {
@@ -119,6 +109,7 @@ export class ChessSocketManager {
     this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;
+    clearSocketResyncThrottle(NAMESPACE);
     releaseSocket(NAMESPACE);
   }
 }

@@ -18,7 +18,7 @@ import HalmaPage from './halma/HalmaPage';
 import UnoPage from './uno/UnoPage';
 import ConnectFourPage from './connect-four/ConnectFourPage';
 import { useConnectFourStore, ConnectFourPhase } from '../../store/connectFourStore';
-import { getPlayContext, clearPlayContext } from '../../util/routingStorage';
+import { getPlayContext } from '../../util/routingStorage';
 import { formatUSD } from '../../util/formatCurrency';
 import { useAuthStore } from '../../store/authStore';
 import { useTournamentsStore } from '../../store/tournamentsStore';
@@ -32,11 +32,11 @@ import {
   teardownPlaySession,
   isPlaySessionTearingDown,
 } from '../../util/playBackNavigation';
-
-/** Defer clearing play context until after navigation unmounts PlayPage (avoids one frame of blank UI). */
-function scheduleClearPlayContext() {
-  setTimeout(() => clearPlayContext(), 0);
-}
+import {
+  clearRoomState,
+  registerRoomGoneNavigator,
+  resetPlayRoomSessionFlags,
+} from '../../util/playRoomSession';
 
 // ── Leave-context snapshot (called at the moment the user requests to leave) ──
 function getLeaveContext(gameSocketCode: string): {
@@ -171,7 +171,14 @@ export default function PlayPage() {
 
   useEffect(() => {
     resetPlaySessionTeardown();
+    resetPlayRoomSessionFlags();
   }, [roomId, gameSocketCode]);
+
+  useEffect(() => {
+    return registerRoomGoneNavigator((path, replace) => {
+      navigate(path, { replace: replace ?? true });
+    });
+  }, [navigate]);
 
   // ── Leave state ─────────────────────────────────────────────────────────────
   const [checkingLeave,    setCheckingLeave]    = useState(false);
@@ -204,34 +211,33 @@ export default function PlayPage() {
     if (leavingInFlightRef.current) return;
     leavingInFlightRef.current = true;
     setLeavingInFlight(true);
+    let showResultAlert = false;
     try {
       const status = await apiRepository.leaveRoom(roomId);
       const serverSettled = isRoomTerminalWithWinner(status);
 
       if (serverSettled && !isSpectator && !silent) {
-        // If the game ended because we left (or just now), show the result alert
         setFinishedStatus(status);
         setShowFinished(true);
-        leavingInFlightRef.current = false;
-        setLeavingInFlight(false);
+        showResultAlert = true;
         return;
       }
     } catch (e) {
       console.error('[PlayPage] Error during leaveRoom:', e);
-      // Reset the flag on failure so the user can retry — they're still on the page.
+    } finally {
       leavingInFlightRef.current = false;
       setLeavingInFlight(false);
-      return;
-    }
-    const dest = opts?.explicitPath;
-    consumePlayBackTrapThenNavigate(() => {
-      if (dest) {
+      if (showResultAlert) return;
+
+      const dest =
+        opts?.explicitPath ?? `/rooms/${encodeURIComponent(gameSocketCode)}`;
+      beginPlaySessionTeardown();
+      clearRoomState(gameSocketCode, roomId);
+      resetPlayRoomSessionFlags();
+      consumePlayBackTrapThenNavigate(() => {
         navigate(dest, { replace: true });
-      } else {
-        navigate(-1);
-      }
-      scheduleClearPlayContext();
-    });
+      });
+    }
   };
 
   // ── Android-equivalent leave validation ─────────────────────────────────────
@@ -250,6 +256,7 @@ export default function PlayPage() {
     if (gameIsOver) {
       const dest = `/rooms/${encodeURIComponent(gameSocketCode)}`;
       beginPlaySessionTeardown();
+      resetPlayRoomSessionFlags();
       teardownPlaySession(gameSocketCode, roomId);
       consumePlayBackTrapThenNavigate(() => {
         navigate(dest, { replace: true });
@@ -276,17 +283,16 @@ export default function PlayPage() {
         }
       } catch {
         setCheckingLeave(false);
-        // If status check fails, show forfeit warning as safe default
-        setShowForfeit(true);
+        // Room likely gone on server — exit without forfeit/money modal
+        const dest = `/rooms/${encodeURIComponent(gameSocketCode)}`;
+        void doLeave(true, { explicitPath: dest });
       }
       return;
     }
 
-    // Rule 3: spectator / placement phase / no opponent → leave directly, no API call needed
-    consumePlayBackTrapThenNavigate(() => {
-      navigate(-1);
-      scheduleClearPlayContext();
-    });
+    // Rule 3: spectator / waiting alone / placement without staked opponent — no money modal
+    const dest = `/rooms/${encodeURIComponent(gameSocketCode)}`;
+    void doLeave(true, { explicitPath: dest });
   };
 
   handleLeaveRef.current = handleLeaveRequest;
@@ -440,6 +446,7 @@ export default function PlayPage() {
             text: t('ok'),
             handler: () => {
               setShowFinished(false);
+              resetPlayRoomSessionFlags();
               const dest = `/rooms/${encodeURIComponent(gameSocketCode)}`;
               beginPlaySessionTeardown();
               teardownPlaySession(gameSocketCode, roomId);

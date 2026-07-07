@@ -19,6 +19,11 @@ import {
   parseLobbyRequiredCount,
 } from '../pages/play/domino/dominoGameLogic';
 import {
+  isRoomGoneMessageRaw,
+  setGameEndInProgress,
+  shouldSuppressRoomNotFound,
+} from '../util/playRoomSession';
+import {
   connectFourPlayStatusMessage,
   connectFourTurnHolderUsername,
   deriveConnectFourOpponentName,
@@ -35,6 +40,7 @@ import { canAcceptWaitingLobby } from '../util/playPhaseGuards';
 import {
   applyIncomingStateVersion,
   createStateVersionTracker,
+  resetStateVersionTracker,
 } from '../data/network/socketStateVersion';
 
 const connectFourStateVersionTracker = createStateVersionTracker(() => {
@@ -216,9 +222,6 @@ function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
 
       const status = await apiRepository.getRoomStatus(roomId);
       const roomStatus = status.status?.toLowerCase();
-      // #region agent log
-      fetch('http://127.0.0.1:7561/ingest/0b3eb4fe-aeac-4231-b94b-1592d63bdad8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83380c'},body:JSON.stringify({sessionId:'83380c',location:'connectFourStore.ts:startStatusPolling',message:'room_status_poll',data:{roomId,phase:st.phase,roomStatus},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
-      // #endregion
       if (st.phase === ConnectFourPhase.WAITING && roomStatus === 'started') {
         socket?.requestSync(roomId);
         stopStatusPolling();
@@ -421,6 +424,10 @@ function applyPlayPayload(
 
   const moveRevision = resolveAppliedConnectFourMoveRevision(data, prior.moveRevision);
 
+  console.log(
+    `[PWA][${new Date().toISOString()}] aplica board room=${prior.roomId} moveRevision=${moveRevision}`,
+  );
+
   const beforePlay = prior;
   set({
     phase: ConnectFourPhase.PLAY,
@@ -456,7 +463,6 @@ function applyPlayPayload(
     if (turnChanged || timerJump || turnTimer == null) {
       syncTurnCountdown(set, get);
     }
-    if (afterPlay.roomId) startStatusPolling(afterPlay.roomId, get);
   } else if (spect) {
     stopTurnTimer();
   }
@@ -479,12 +485,23 @@ function handleConnectFourPayload(
       ? envelope.data
       : (json as Record<string, unknown>);
 
+  console.log(
+    `[PWA][${new Date().toISOString()}] recibe connect-four room=${String(
+      data?.roomId ?? data?.room_id ?? '',
+    )} phase=${get().phase} moveRevision=${String(data?.moveRevision ?? data?.move_revision ?? '')}`,
+  );
+
   if (!payloadTargetsCurrentRoom(data, get)) return;
 
+  // stateVersion may request a resync on gaps, but it must not block valid board updates.
   applyIncomingStateVersion(connectFourStateVersionTracker, data);
 
   const success = envelope?.success !== false;
   const hadMoveInFlight = get().isMovePending;
+  if (hadMoveInFlight) {
+    clearMovePendingRecoveryTimer();
+    set({ isMovePending: false });
+  }
   const myUserId = get().myUserId;
 
   if (get().isSpectator) {
@@ -497,7 +514,8 @@ function handleConnectFourPayload(
 
   if (!success && (!data || Object.keys(data).length === 0)) {
     const raw = apiMessagesJoinedOrNull(envelope) || '';
-    if (!isInformationalNonBlockingSocketRaw(raw)) {
+    const suppressGone = shouldSuppressRoomNotFound() && isRoomGoneMessageRaw(raw);
+    if (!suppressGone && !isInformationalNonBlockingSocketRaw(raw)) {
       set({ apiErrorRawMessage: raw, illegalMoveToast: raw, isMovePending: false });
     } else {
       set({ isMovePending: false });
@@ -554,6 +572,7 @@ function handleConnectFourPayload(
   ]);
 
   if (gameEnded || terminalOutcomes.has(outcomeRaw.toLowerCase())) {
+    setGameEndInProgress(true);
     stopTurnTimer();
     stopStatusPolling();
     stopLobbyWatchdog();
@@ -638,6 +657,7 @@ function handleConnectFourPayload(
       }
     }
 
+    clearMovePendingRecoveryTimer();
     applyPlayPayload(data, set, get);
     return;
   }
@@ -746,6 +766,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
     stopTurnTimer();
     stopStatusPolling();
     teardownConnectFourSocket();
+    resetStateVersionTracker(connectFourStateVersionTracker);
     const epoch = connectFourSocketEpoch;
 
     set({
@@ -845,6 +866,7 @@ export const useConnectFourStore = create<ConnectFourStore>((set, get) => ({
     const s = get();
     if (s.isSpectator || s.phase !== ConnectFourPhase.PLAY || !s.isPlayerTurn || s.isMovePending) return;
     if (s.roomId !== roomId) return;
+    console.log(`[PWA][${new Date().toISOString()}] click drop_disc room=${roomId} col=${col} moveRevision=${s.moveRevision}`);
     const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
     if (!socket?.dropDisc(roomId, col)) return;
     set({ isMovePending: true });

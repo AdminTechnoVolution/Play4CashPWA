@@ -1,17 +1,15 @@
 import { create } from 'zustand';
 import { apiRepository } from '../data/network/ApiRepository';
 import {
-  refreshAccessTokenWithLock,
   emitAuthFailureEvent,
   requestRefreshCookieCleared,
 } from '../data/network/ApiClient';
 import {
   saveTokens,
   clearTokens,
-  hasValidSession,
   saveUserAccount,
-  getUserAccount,
   getAccessToken,
+  getUserAccount,
   isCrossTabAuthStorageKey,
   onAuthBroadcast,
 } from '../data/auth/AuthSessionStore';
@@ -22,7 +20,6 @@ import type { UserAccountResponse } from '../data/models/ApiModels';
 interface AuthState {
   user: UserAccountResponse | null;
   isLoading: boolean;
-  /** True after the first `loadSession` run finishes (or early-exits). Avoids flashing login before hydration. */
   authHydrated: boolean;
   error: string | null;
   signInWithGoogle: (idToken: string) => Promise<void>;
@@ -33,7 +30,8 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
-  // Token refresh failed, 401 unrecoverable, or socket auth failure — clear cookie, storage, UI
+  let loadSessionPromise: Promise<void> | null = null;
+
   window.addEventListener('p4c:auth-failure', () => {
     void (async () => {
       await requestRefreshCookieCleared();
@@ -49,9 +47,6 @@ export const useAuthStore = create<AuthState>((set, get) => {
     })();
   });
 
-  // Other tabs: logout, login, refresh, or session clear — sync this tab.
-  // We listen to BroadcastChannel (primary) AND a `storage` "session version" key (fallback
-  // for older browsers / Private mode where BroadcastChannel may be missing).
   if (typeof window !== 'undefined') {
     const w = window as Window & { __p4cAuthCrossTab?: boolean };
     if (!w.__p4cAuthCrossTab) {
@@ -77,7 +72,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
   }
 
   return {
-    user: null,
+    user: getUserAccount(),
     isLoading: false,
     authHydrated: false,
     error: null,
@@ -104,52 +99,52 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     loadSession: async () => {
-      // Always start from a clean slate on the API repo cache so we never hand a stale
-      // account back to a request that has no live token behind it.
-      apiRepository.invalidateAccountCache();
+      if (loadSessionPromise) return loadSessionPromise;
 
-      if (!hasValidSession()) {
-        // We can't see the httpOnly refresh cookie in JS, so we always try one refresh on cold
-        // start. The API responds 401 if there is no cookie (or it's invalid), and we treat that
-        // as "logged out" without firing a noisy auth-failure event.
-        const likelyHadSession = !!getAccessToken() || !!getUserAccount();
+      const cachedUser = getUserAccount();
+      if (cachedUser) {
+        set({ user: cachedUser });
+      }
+
+      loadSessionPromise = (async () => {
+        apiRepository.invalidateAccountCache();
+        const tokenAtStart = getAccessToken();
+        set({ isLoading: true });
         try {
-          await refreshAccessTokenWithLock();
-        } catch {
-          // Refresh failed: wipe any stale cached account so a leftover `p4c_user_account`
-          // in localStorage cannot bypass the auth guard on the next render. Mark hydration
-          // done immediately so the RequireAuth can redirect without waiting for the async
-          // auth-failure listener to finish.
-          clearTokens();
-          set({ user: null, isLoading: false, authHydrated: true });
-          if (likelyHadSession) {
-            emitAuthFailureEvent();
+          if (!tokenAtStart) {
+            const refreshed = await apiRepository.refreshToken();
+            saveTokens(refreshed.token);
           }
-          return;
+          const tokenBeforeAccountRequest = getAccessToken();
+          const account = await apiRepository.getUserAccount();
+          if (getAccessToken() !== tokenBeforeAccountRequest) {
+            return;
+          }
+          saveUserAccount(account);
+          set({ user: account, isLoading: false, authHydrated: true, error: null });
+        } catch (err) {
+          const tokenNow = getAccessToken();
+          if (tokenAtStart && tokenNow !== tokenAtStart) {
+            return;
+          }
+          const reason = err instanceof Error ? err.message : '';
+          if (reason === 'error_session_expired') {
+            clearTokens();
+            set({ user: null, isLoading: false, authHydrated: true });
+            emitAuthFailureEvent();
+            return;
+          }
+          set({
+            user: cachedUser ?? getUserAccount(),
+            isLoading: false,
+            authHydrated: true,
+          });
+        } finally {
+          loadSessionPromise = null;
         }
-      }
+      })();
 
-      if (!hasValidSession()) {
-        clearTokens();
-        set({ user: null, isLoading: false, authHydrated: true });
-        return;
-      }
-
-      set({ isLoading: true });
-      try {
-        const account = await apiRepository.getUserAccount();
-        saveUserAccount(account);
-        set({ user: account, isLoading: false, authHydrated: true, error: null });
-      } catch {
-        // Account fetch failed (token revoked, 401, network blip).
-        // Do NOT fall back to the cached account: that would let the user navigate
-        // into protected pages without a real session behind them. Hydrate first so
-        // RequireAuth redirects right away.
-        const hadSession = !!getAccessToken();
-        clearTokens();
-        set({ user: null, isLoading: false, authHydrated: true });
-        if (hadSession) emitAuthFailureEvent();
-      }
+      return loadSessionPromise;
     },
 
     logout: async () => {
