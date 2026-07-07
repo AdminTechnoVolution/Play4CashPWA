@@ -125,10 +125,9 @@ export interface VerifyWithdrawalRequest {
   verification_code: string;
 }
 
-// POST /api/transactions/recharge — Android: { txId, amount, coin: "usdt" }
+// POST /api/transactions/recharge — Android: { txId, coin: "usdt" }
 export interface RechargeRequest {
   txId: string;
-  amount: number;
   coin: string;
   /** Stable per-submit key so retries do not duplicate the recharge. */
   idempotencyKey?: string;

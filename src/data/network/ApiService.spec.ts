@@ -25,7 +25,6 @@ describe('apiService.recharge', () => {
 
     await apiService.recharge({
       txId: 'tx-1',
-      amount: 25,
       coin: 'usdt',
       idempotencyKey: '550e8400-e29b-41d4-a716-446655440000',
     });
@@ -34,7 +33,6 @@ describe('apiService.recharge', () => {
       '/api/transactions/recharge',
       {
         txId: 'tx-1',
-        amount: 25,
         coin: 'usdt',
         idempotencyKey: '550e8400-e29b-41d4-a716-446655440000',
       },
@@ -56,7 +54,6 @@ describe('apiService.recharge', () => {
 
     await apiService.recharge({
       txId: 'tx-2',
-      amount: 50,
       coin: 'usdt',
     });
 
@@ -65,7 +62,6 @@ describe('apiService.recharge', () => {
       '/api/transactions/recharge',
       {
         txId: 'tx-2',
-        amount: 50,
         coin: 'usdt',
       },
       {

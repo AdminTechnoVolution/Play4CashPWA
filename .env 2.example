@@ -1,0 +1,15 @@
+# Must match an entry in the API ALLOWED_ORIGINS when using cookies (httpOnly refresh).
+VITE_API_URL=https://p4c-api.techno-volution.com
+VITE_GOOGLE_CLIENT_ID=your-google-client-id-here
+
+# In Azure App Service, set the same keys as Application Settings (Configuration).
+# They are injected at runtime via /env-config.js — no rebuild required when they change.
+
+# ─── Dev only ─────────────────────────────────────────────────────────────────
+# Where the Vite dev proxy forwards `/api` and `/socket.io` so the SPA can share
+# the same origin as the API (avoiding CORS + SameSite=None cookie hassles in dev).
+# Example: http://localhost:3001 if you run the gateway/API locally on that port.
+# When set, leave VITE_API_URL empty (the SPA will use relative URLs).
+VITE_DEV_PROXY_TARGET=
+# Set to "true" to forward to a self-signed HTTPS dev target.
+VITE_DEV_PROXY_INSECURE=false

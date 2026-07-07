@@ -391,7 +391,7 @@
   "WARNING_TX_NOT_FOUND": "La transaction n'apparaît pas encore dans notre wallet. Veuillez réessayer plus tard.",
   "add_funds": "Ajouter des fonds",
   "add_funds_form_title": "Recharge",
-  "add_funds_important_info_text": "Ci-dessous nous partageons les informations nécessaires pour recharger votre compte. Veuillez noter que tous les recharges doivent être effectués uniquement en USDT sur la red que vous sélectionnez ci-dessous pour garantir que vos fonds soient crédités correctement. Vous pouvez envoyer des montants entiers ou décimaux (par exemple 5 €, 10,50 € ou 100 €), uniquement vers le portefeuille indiqué ici. Une fois le rechargement effectué et votre transaction approuvée dans votre portefeuille, copiez l'ID de la transaction, car nous vous le demanderons à l'étape suivante avec le montant déposé.",
+  "add_funds_important_info_text": "Ci-dessous nous partageons les informations nécessaires pour recharger votre compte. Veuillez noter que tous les recharges doivent être effectués uniquement en USDT sur le réseau que vous sélectionnez ci-dessous pour garantir que vos fonds soient crédités correctement. Envoyez le dépôt uniquement vers le portefeuille indiqué ici. Une fois le rechargement effectué et votre transaction approuvée dans votre portefeuille, copiez l'ID de la transaction afin de la valider à l'étape suivante.",
   "add_funds_step2_important_info_text": "Veuillez utiliser l'ID de transaction affiché dans votre portefeuille pour valider et créditer vos fonds sur votre compte Play4Cash. Assurez-vous que la transaction soit à l'état Approuvé avant de valider.",
   "add_funds_title": "Ajouter des fonds",
   "bs_connection_error": "Erreur de connexion",
