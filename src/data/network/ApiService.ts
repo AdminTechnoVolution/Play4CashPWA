@@ -276,7 +276,7 @@ export const apiService = {
     }
   },
 
-  // Android: POST /api/transactions/recharge with { txId, amount, coin }
+  // Android: POST /api/transactions/recharge with { txId, coin }
   async recharge(req: RechargeRequest): Promise<void> {
     const idempotencyKey = req.idempotencyKey ?? createIdempotencyKey();
     await apiClient.post<ApiResponse<void>>('/api/transactions/recharge', req, {

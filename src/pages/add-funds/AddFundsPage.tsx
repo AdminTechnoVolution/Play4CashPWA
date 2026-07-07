@@ -25,12 +25,6 @@ import '../../ui/theme/variables.css';
 import type { WalletResponse } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
 
-function isValidDepositAmountInput(s: string): boolean {
-  if (s === '') return true;
-  if ((s.match(/\./g) || []).length > 1) return false;
-  return /^\d*(\.\d*)?$/.test(s);
-}
-
 const AddFundsPage: React.FC = () => {
   const t = useT();
   const navigate = useNavigate();
@@ -45,7 +39,6 @@ const AddFundsPage: React.FC = () => {
 
   // Step 2 form
   const [txId, setTxId] = useState('');
-  const [amountText, setAmountText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Alert state (matches Android AlertDialog)
@@ -106,15 +99,9 @@ const AddFundsPage: React.FC = () => {
 
   const handleSubmit = () => {
     const txIdTrimmed = txId.trim();
-    const amountDouble = parseFloat(amountText.trim());
 
     if (!txIdTrimmed) {
       setAlertMessage(t('recharge_error_tx_required'));
-      setAlertOpen(true);
-      return;
-    }
-    if (isNaN(amountDouble) || amountDouble <= 0) {
-      setAlertMessage(t('recharge_error_amount_invalid'));
       setAlertOpen(true);
       return;
     }
@@ -126,7 +113,6 @@ const AddFundsPage: React.FC = () => {
         rechargeIdempotencyKeyRef.current = idempotencyKey;
         await apiRepository.recharge({
           txId: txIdTrimmed,
-          amount: amountDouble,
           coin: 'usdt',
           idempotencyKey,
         });
@@ -298,23 +284,6 @@ const AddFundsPage: React.FC = () => {
                       setTxId(e.detail.value ?? '');
                     }}
                     placeholder={t('label_transaction_id')}
-                    style={inputStyle}
-                  />
-                </div>
-
-                {/* Amount */}
-                <div style={{ marginBottom: '16px' }}>
-                  <SectionLabel>{t('label_amount')}</SectionLabel>
-                  <IonInput
-                    type="text"
-                    inputmode="decimal"
-                    value={amountText}
-                    onIonInput={(e) => {
-                      rechargeIdempotencyKeyRef.current = null;
-                      const v = (e.detail.value ?? '').replace(',', '.');
-                      if (isValidDepositAmountInput(v)) setAmountText(v);
-                    }}
-                    placeholder="0"
                     style={inputStyle}
                   />
                 </div>

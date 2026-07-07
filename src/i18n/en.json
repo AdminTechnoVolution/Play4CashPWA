@@ -391,7 +391,7 @@
   "WARNING_TX_NOT_FOUND": "The transaction has not appeared in our wallet yet. Please try again later.",
   "add_funds": "Add funds",
   "add_funds_form_title": "Recharge",
-  "add_funds_important_info_text": "Below we share the information you need to recharge your account. Please note that all recharges must be made only in USDT on the red you select below to ensure your funds are credited correctly. You may send whole or decimal amounts (for example $5, $10.50, or $100), only to the wallet we indicate here. Once you have made the recharge and your transaction is approved in your wallet, please copy the transaction ID, as we will ask for it in the next step along with the amount deposited.",
+  "add_funds_important_info_text": "Below we share the information you need to recharge your account. Please note that all recharges must be made only in USDT on the network you select below to ensure your funds are credited correctly. Send the deposit only to the wallet we indicate here. Once you have made the recharge and your transaction is approved in your wallet, please copy the transaction ID so you can validate it in the next step.",
   "add_funds_step2_important_info_text": "Please use the transaction ID displayed in your wallet to validate and accredit your funds to your Play4Cash account. Make sure the transaction is in Approved state before validating.",
   "add_funds_title": "Add funds",
   "bs_connection_error": "Connection error",

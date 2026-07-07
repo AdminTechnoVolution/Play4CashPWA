@@ -156,9 +156,8 @@ async function openRechargeForm() {
   await screen.findByText('verify_button');
 }
 
-function fillRechargeForm(txId: string, amount: string) {
+function fillRechargeForm(txId: string) {
   fireEvent.change(screen.getByPlaceholderText('label_transaction_id'), { target: { value: txId } });
-  fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: amount } });
 }
 
 describe('AddFundsPage idempotency', () => {
@@ -191,7 +190,7 @@ describe('AddFundsPage idempotency', () => {
     ]);
 
     await openRechargeForm();
-    fillRechargeForm('tx-1', '25');
+    fillRechargeForm('tx-1');
 
     fireEvent.click(screen.getByText('verify_button'));
     await waitFor(() => expect(mocks.recharge).toHaveBeenCalledTimes(1));
@@ -231,19 +230,19 @@ describe('AddFundsPage idempotency', () => {
     expect(secondKey).not.toBe(firstKey);
   });
 
-  it('creates a new idempotency key when the amount changes', async () => {
+  it('keeps the same idempotency key when the form does not change', async () => {
     mockCrypto([
       '55555555-5555-4555-8555-555555555555',
       '66666666-6666-4666-8666-666666666666',
     ]);
 
     await openRechargeForm();
-    fillRechargeForm('tx-1', '25');
+    fillRechargeForm('tx-1');
 
     fireEvent.click(screen.getByText('verify_button'));
     await waitFor(() => expect(mocks.recharge).toHaveBeenCalledTimes(1));
 
-    fillRechargeForm('tx-1', '30');
+    fillRechargeForm('tx-1');
     fireEvent.click(screen.getByText('verify_button'));
     await waitFor(() => expect(mocks.recharge).toHaveBeenCalledTimes(2));
 
@@ -251,7 +250,6 @@ describe('AddFundsPage idempotency', () => {
     const secondKey = mocks.recharge.mock.calls[1][0].idempotencyKey;
 
     expect(firstKey).toBe('55555555-5555-4555-8555-555555555555');
-    expect(secondKey).toBe('66666666-6666-4666-8666-666666666666');
-    expect(secondKey).not.toBe(firstKey);
+    expect(secondKey).toBe(firstKey);
   });
 });

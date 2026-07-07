@@ -1,0 +1,4 @@
+# Production builds must NOT embed per-environment URLs or OAuth IDs.
+# Azure App Service injects these at runtime via /env-config.js (Application Settings).
+VITE_API_URL=
+VITE_GOOGLE_CLIENT_ID=

@@ -391,7 +391,7 @@
   "WARNING_TX_NOT_FOUND": "Die Transaktion ist in unserer Wallet noch nicht sichtbar. Bitte versuchen Sie es später erneut.",
   "add_funds": "Guthaben aufladen",
   "add_funds_form_title": "Aufladen",
-  "add_funds_important_info_text": "Im Folgenden teilen wir Ihnen die Informationen mit, die Sie zur Aufladung Ihres Kontos benötigen. Bitte beachten Sie, dass alle Aufladungen ausschließlich in USDT über die Red, die Sie unten auswählen, erfolgen müssen, um eine korrekte Gutschrift Ihrer Mittel zu gewährleisten. Sie können ganze oder Dezimalbeträge senden (z. B. 5 €, 10,50 € oder 100 €), und nur an die hier angegebene Wallet. Sobald Sie die Aufladung vorgenommen haben und Ihre Transaktion in der Wallet bestätigt wurde, kopieren Sie bitte die Transaktions-ID, da wir diese im nächsten Schritt zusammen mit dem eingezahlten Betrag anfordern.",
+  "add_funds_important_info_text": "Im Folgenden teilen wir Ihnen die Informationen mit, die Sie zur Aufladung Ihres Kontos benötigen. Bitte beachten Sie, dass alle Aufladungen ausschließlich in USDT über das unten gewählte Netzwerk erfolgen müssen, um eine korrekte Gutschrift Ihrer Mittel zu gewährleisten. Senden Sie die Einzahlung nur an die hier angegebene Wallet. Sobald Sie die Aufladung vorgenommen haben und Ihre Transaktion in der Wallet bestätigt wurde, kopieren Sie bitte die Transaktions-ID, damit Sie sie im nächsten Schritt validieren können.",
   "add_funds_step2_important_info_text": "Bitte verwenden Sie die in Ihrer Wallet angezeigte Transaktions-ID, um Ihre Mittel zu validieren und Ihrem Play4Cash-Konto gutzuschreiben. Stellen Sie sicher, dass die Transaktion vor der Validierung den Status Genehmigt hat.",
   "add_funds_title": "Guthaben aufladen",
   "bs_connection_error": "Verbindungsfehler",

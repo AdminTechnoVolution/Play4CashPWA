@@ -391,7 +391,7 @@
   "WARNING_TX_NOT_FOUND": "A transação ainda não aparece na nossa wallet. Tente novamente mais tarde.",
   "add_funds": "Adicionar fundos",
   "add_funds_form_title": "Recarga",
-  "add_funds_important_info_text": "Abaixo compartilhamos as informações necessárias para recarregar sua conta. Lembre-se de que todas as recargas devem ser feitas apenas em USDT na red que você selecionar abaixo, para garantir que seus fundos sejam creditados corretamente. Você pode enviar valores inteiros ou com decimais (por exemplo R$ 5, R$ 10,50 ou R$ 100), somente para a carteira que indicamos aqui. Após realizar a recarga e sua transação for aprovada na carteira, copie o ID da transação, pois solicitaremos no próximo passo junto com o valor depositado.",
+  "add_funds_important_info_text": "Abaixo compartilhamos as informações necessárias para recarregar sua conta. Lembre-se de que todas as recargas devem ser feitas apenas em USDT na rede que você selecionar abaixo, para garantir que seus fundos sejam creditados corretamente. Envie o depósito somente para a carteira que indicamos aqui. Após realizar a recarga e sua transação for aprovada na carteira, copie o ID da transação para validá-la no próximo passo.",
   "add_funds_step2_important_info_text": "Por favor, use o ID da transação exibido na sua carteira para validar e creditar seus fundos na sua conta Play4Cash. Certifique-se de que a transação esteja no estado Aprovado antes de validar.",
   "add_funds_title": "Adicionar fundos",
   "bs_connection_error": "Erro de conexão",

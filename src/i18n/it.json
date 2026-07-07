@@ -391,7 +391,7 @@
   "WARNING_TX_NOT_FOUND": "La transazione non appare ancora nel nostro wallet. Riprova più tardi.",
   "add_funds": "Aggiungi fondi",
   "add_funds_form_title": "Ricarica",
-  "add_funds_important_info_text": "Di seguito condividiamo le informazioni necessarie per ricaricare il tuo account. Ti ricordiamo che tutti i ricarichi devono essere effettuati esclusivamente in USDT sulla red che selezioni qui sotto per garantire che i tuoi fondi vengano accreditati correttamente. Puoi inviare importi interi o con decimali (ad esempio 5 €, 10,50 € o 100 €), solo al portafoglio che ti indichiamo qui. Una volta effettuata la ricarica e approvata la transazione nel tuo portafoglio, copia l'ID della transazione, poiché te lo chiederemo nel prossimo passo insieme all'importo depositato.",
+  "add_funds_important_info_text": "Di seguito condividiamo le informazioni necessarie per ricaricare il tuo account. Ti ricordiamo che tutte le ricariche devono essere effettuate esclusivamente in USDT sulla rete che selezioni qui sotto per garantire che i tuoi fondi vengano accreditati correttamente. Invia il deposito solo al portafoglio che ti indichiamo qui. Una volta effettuata la ricarica e approvata la transazione nel tuo portafoglio, copia l'ID della transazione per convalidarla nel passo successivo.",
   "add_funds_step2_important_info_text": "Utilizza l'ID transazione visualizzato nel tuo portafoglio per convalidare e accreditare i tuoi fondi sul tuo account Play4Cash. Assicurati che la transazione sia nello stato Approvato prima di convalidare.",
   "add_funds_title": "Aggiungi fondi",
   "bs_connection_error": "Errore di connessione",
