@@ -213,12 +213,12 @@ describe('AddFundsPage idempotency', () => {
     ]);
 
     await openRechargeForm();
-    fillRechargeForm('tx-1', '25');
+    fillRechargeForm('tx-1');
 
     fireEvent.click(screen.getByText('verify_button'));
     await waitFor(() => expect(mocks.recharge).toHaveBeenCalledTimes(1));
 
-    fillRechargeForm('tx-2', '25');
+    fillRechargeForm('tx-2');
     fireEvent.click(screen.getByText('verify_button'));
     await waitFor(() => expect(mocks.recharge).toHaveBeenCalledTimes(2));
 
