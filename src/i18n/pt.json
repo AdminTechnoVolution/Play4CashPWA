@@ -388,7 +388,7 @@
   "SUCCESS_REGISTER_WALLET": "Carteira salva",
   "SUCCESS_WITHDRAWAL_CREATED": "Solicitação de saque enviada com sucesso.",
   "SUCCESS_WITHDRAWAL_VERIFY": "Saque verificado com sucesso.",
-  "WARNING_TX_NOT_FOUND": "Não encontramos esta transação com este valor, confira o id e o valor e tente novamente, lembrando que aceitamos apenas USDT",
+  "WARNING_TX_NOT_FOUND": "A transação ainda não aparece na nossa wallet. Tente novamente mais tarde.",
   "add_funds": "Adicionar fundos",
   "add_funds_form_title": "Recarga",
   "add_funds_important_info_text": "Abaixo compartilhamos as informações necessárias para recarregar sua conta. Lembre-se de que todas as recargas devem ser feitas apenas em USDT na red que você selecionar abaixo, para garantir que seus fundos sejam creditados corretamente. Você pode enviar valores inteiros ou com decimais (por exemplo R$ 5, R$ 10,50 ou R$ 100), somente para a carteira que indicamos aqui. Após realizar a recarga e sua transação for aprovada na carteira, copie o ID da transação, pois solicitaremos no próximo passo junto com o valor depositado.",

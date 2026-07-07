@@ -130,6 +130,8 @@ export interface RechargeRequest {
   txId: string;
   amount: number;
   coin: string;
+  /** Stable per-submit key so retries do not duplicate the recharge. */
+  idempotencyKey?: string;
 }
 
 // POST /api/user/request-wallet-change — { wallet, coin, network }; OTP emailed.

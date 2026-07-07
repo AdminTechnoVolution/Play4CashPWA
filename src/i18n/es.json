@@ -388,7 +388,7 @@
   "SUCCESS_REGISTER_WALLET": "Billetera guardada correctamente",
   "SUCCESS_WITHDRAWAL_CREATED": "Solicitud de retiro enviada correctamente.",
   "SUCCESS_WITHDRAWAL_VERIFY": "Retiro verificado correctamente.",
-  "WARNING_TX_NOT_FOUND": "No encontramos esta transacción con este monto, verifica el id y el monto e inténtalo de nuevo, recuerda que solo aceptamos USDT",
+  "WARNING_TX_NOT_FOUND": "La transacción todavía no aparece en nuestra wallet. Intenta nuevamente más tarde.",
   "add_funds": "Añadir fondos",
   "add_funds_form_title": "Recarga",
   "add_funds_important_info_text": "A continuación te compartimos la información necesaria para recargar tu cuenta. Recuerda que todas las recargas deben realizarse únicamente por USDT en la red que selecciones abajo, para garantizar que tus fondos se acrediten de manera correcta. Puedes enviar montos enteros o con decimales (por ejemplo $5, $10,50 o $100), únicamente a la billetera que aquí te indicamos. Una vez realices la recarga y tu transacción se encuentre aprobada en tu billetera, copia el ID de la transacción ya que en el siguiente paso te la solicitaremos junto con el monto depositado.",

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build --configLoader runner",
+    "build": "tsc && vite build",
     "build:azure": "npm run build && node scripts/prepare-azure-deploy.mjs",
     "start": "node server.mjs",
     "preview": "vite preview",
