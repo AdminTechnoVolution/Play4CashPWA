@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -52,10 +52,12 @@ const AddFundsPage: React.FC = () => {
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const rechargeIdempotencyKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!alertOpen && isSuccess) {
       setIsSuccess(false);
+      rechargeIdempotencyKeyRef.current = null;
       refreshAccount();
       navigate('/dashboard');
     }
@@ -120,10 +122,13 @@ const AddFundsPage: React.FC = () => {
     setIsSubmitting(true);
     (async () => {
       try {
+        const idempotencyKey = rechargeIdempotencyKeyRef.current ?? createIdempotencyKey();
+        rechargeIdempotencyKeyRef.current = idempotencyKey;
         await apiRepository.recharge({
           txId: txIdTrimmed,
           amount: amountDouble,
           coin: 'usdt',
+          idempotencyKey,
         });
         setAlertMessage(t('recharge_success'));
         setIsSuccess(true);
@@ -288,7 +293,10 @@ const AddFundsPage: React.FC = () => {
                   <SectionLabel>{t('label_transaction_id')}</SectionLabel>
                   <IonInput
                     value={txId}
-                    onIonInput={(e) => setTxId(e.detail.value ?? '')}
+                    onIonInput={(e) => {
+                      rechargeIdempotencyKeyRef.current = null;
+                      setTxId(e.detail.value ?? '');
+                    }}
                     placeholder={t('label_transaction_id')}
                     style={inputStyle}
                   />
@@ -302,6 +310,7 @@ const AddFundsPage: React.FC = () => {
                     inputmode="decimal"
                     value={amountText}
                     onIonInput={(e) => {
+                      rechargeIdempotencyKeyRef.current = null;
                       const v = (e.detail.value ?? '').replace(',', '.');
                       if (isValidDepositAmountInput(v)) setAmountText(v);
                     }}
@@ -395,3 +404,10 @@ const inputStyle = {
 } as React.CSSProperties;
 
 export default AddFundsPage;
+
+function createIdempotencyKey(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}

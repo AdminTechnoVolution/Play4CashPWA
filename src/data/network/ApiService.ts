@@ -305,7 +305,10 @@ export const apiService = {
 
   // Android: POST /api/transactions/recharge with { txId, amount, coin }
   async recharge(req: RechargeRequest): Promise<void> {
-    await apiClient.post<ApiResponse<void>>('/api/transactions/recharge', req);
+    const idempotencyKey = req.idempotencyKey ?? createIdempotencyKey();
+    await apiClient.post<ApiResponse<void>>('/api/transactions/recharge', req, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
   },
 
   // Android: POST /api/transactions/withdrawal with { amount } only
@@ -437,6 +440,13 @@ export const apiService = {
     await apiClient.post('/api/user/push-subscription/remove', { endpoint });
   },
 };
+
+function createIdempotencyKey(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

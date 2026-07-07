@@ -388,7 +388,7 @@
   "SUCCESS_REGISTER_WALLET": "Wallet gespeichert",
   "SUCCESS_WITHDRAWAL_CREATED": "Auszahlungsanfrage erfolgreich eingereicht.",
   "SUCCESS_WITHDRAWAL_VERIFY": "Auszahlung erfolgreich bestätigt.",
-  "WARNING_TX_NOT_FOUND": "Wir konnten diese Transaktion mit diesem Betrag nicht finden. Bitte prüfen Sie ID und Betrag und versuchen Sie es erneut. Wir akzeptieren nur USDT.",
+  "WARNING_TX_NOT_FOUND": "Die Transaktion ist in unserer Wallet noch nicht sichtbar. Bitte versuchen Sie es später erneut.",
   "add_funds": "Guthaben aufladen",
   "add_funds_form_title": "Aufladen",
   "add_funds_important_info_text": "Im Folgenden teilen wir Ihnen die Informationen mit, die Sie zur Aufladung Ihres Kontos benötigen. Bitte beachten Sie, dass alle Aufladungen ausschließlich in USDT über die Red, die Sie unten auswählen, erfolgen müssen, um eine korrekte Gutschrift Ihrer Mittel zu gewährleisten. Sie können ganze oder Dezimalbeträge senden (z. B. 5 €, 10,50 € oder 100 €), und nur an die hier angegebene Wallet. Sobald Sie die Aufladung vorgenommen haben und Ihre Transaktion in der Wallet bestätigt wurde, kopieren Sie bitte die Transaktions-ID, da wir diese im nächsten Schritt zusammen mit dem eingezahlten Betrag anfordern.",

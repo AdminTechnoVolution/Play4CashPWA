@@ -388,7 +388,7 @@
   "SUCCESS_REGISTER_WALLET": "Wallet saved successfully",
   "SUCCESS_WITHDRAWAL_CREATED": "Withdrawal request submitted successfully.",
   "SUCCESS_WITHDRAWAL_VERIFY": "Withdrawal verified successfully.",
-  "WARNING_TX_NOT_FOUND": "We couldn't find this transaction with this amount, please double check the id and amount and try again, remember we only accept USDT coin",
+  "WARNING_TX_NOT_FOUND": "The transaction has not appeared in our wallet yet. Please try again later.",
   "add_funds": "Add funds",
   "add_funds_form_title": "Recharge",
   "add_funds_important_info_text": "Below we share the information you need to recharge your account. Please note that all recharges must be made only in USDT on the red you select below to ensure your funds are credited correctly. You may send whole or decimal amounts (for example $5, $10.50, or $100), only to the wallet we indicate here. Once you have made the recharge and your transaction is approved in your wallet, please copy the transaction ID, as we will ask for it in the next step along with the amount deposited.",
