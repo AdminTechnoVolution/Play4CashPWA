@@ -31,7 +31,7 @@ interface Props {
   onLeaveRequest: () => void;
 }
 
-export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectator, opponentName: initialOpponentName }: Props) {
+export default function HalmaPage({ roomId, betAmount, roomName, onLeaveRequest, isSpectator, opponentName: initialOpponentName }: Props) {
   const { user } = useAuthStore();
   const store = useHalmaStore();
   const t = useT();
@@ -181,7 +181,7 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
           <IonButtons slot="start">
             <IonButton onClick={onLeaveRequest}><IonIcon icon={arrowBackOutline} style={{ color: '#c9a84c' }} /></IonButton>
           </IonButtons>
-          <IonTitle style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>{t('halma_screen_title')}</IonTitle>
+          <IonTitle style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>{roomName}</IonTitle>
           <IonButtons slot="end">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '12px' }}>
               <div
@@ -287,6 +287,17 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
             </div>
           </div>
 
+          {!isSpectator && (
+            <div style={{ margin: '8px 0 16px' }}>
+              <ChatGreetingChips
+                greetings={greetings}
+                onSend={(id) => chatRef.current.sendGreeting(roomId, id)}
+                lastReceivedMessage={lastMsg}
+                showIncomingBanner={false}
+              />
+            </div>
+          )}
+
           {(store.mustEndTurn || store.isContinuingJump) && !store.isSpectator && (
             <IonButton
               expand="block"
@@ -317,16 +328,6 @@ export default function HalmaPage({ roomId, betAmount, onLeaveRequest, isSpectat
             </IonText>
           )}
 
-          {!isSpectator && (
-            <div style={{ marginTop: 'auto', paddingBottom: '20px' }}>
-              <ChatGreetingChips
-                greetings={greetings}
-                onSend={(id) => chatRef.current.sendGreeting(roomId, id)}
-                lastReceivedMessage={lastMsg}
-                showIncomingBanner={false}
-              />
-            </div>
-          )}
         </div>
 
         <style>{`

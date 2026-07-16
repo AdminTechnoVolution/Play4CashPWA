@@ -228,6 +228,7 @@ export const apiService = {
         raw.player_count ??
         (Array.isArray(raw.players) ? raw.players.length : 0) ??
         0,
+      playerLimit: raw.playerLimit ?? raw.player_limit,
       betAmount: raw.bet_amount,
       winner: raw.winner,
       winnerReason: raw.winner_reason,
@@ -346,6 +347,7 @@ export const apiService = {
       betAmount: item.bet_amount ?? 0,
       result: item.result ?? '',
       prize: item.prize ?? 0,
+      lostAmount: item.lost_amount ?? item.lostAmount ?? 0,
       opponentName: item.opponent?.username ?? '',
       finishedAt: item.finished_at ?? item.date ?? '',
     }));

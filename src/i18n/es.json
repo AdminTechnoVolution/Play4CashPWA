@@ -614,6 +614,7 @@
   "domino_victory_last_standing": "¡Ganaste! Sigues en la sala: los demás se fueron o se quedaron sin tiempo.",
   "domino_wait_player_left_counts": "%1$s salió de la sala. Hay %2$d de %3$d jugadores — seguimos esperando.",
   "domino_wait_player_left_name": "%s salió de la sala. Esperando más jugadores…",
+  "domino_wait_player_left_generic": "Un jugador salió. Esperando a más jugadores.",
   "domino_waiting_lobby_players": "%1$d de %2$d jugadores en la sala — faltan %3$d para empezar.",
   "domino_your_hand": "Tu mano",
   "active_room_banner_message": "Tienes una partida en curso",

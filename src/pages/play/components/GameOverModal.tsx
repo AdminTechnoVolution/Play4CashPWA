@@ -13,7 +13,7 @@ import {
 import { formatUSD } from '../../../util/formatCurrency';
 import { getPlayContext } from '../../../util/routingStorage';
 
-const DEFEAT_DELAY_MS = 5000;
+const CHECKMATE_DELAY_MS = 3000;
 
 interface GameOverModalProps {
   isOpen: boolean;
@@ -42,10 +42,10 @@ const GameOverModal: React.FC<GameOverModalProps> = ({
       return;
     }
 
-    const isDefeat = !isSpectator && gameOver != null && !gameOver.youWon && !gameOver.isDraw;
+    const isCheckmate = !isSpectator && !!gameOver?.reason && gameOver.reason.toLowerCase().includes('checkmate');
 
-    if (isDefeat) {
-      timerRef.current = setTimeout(() => setVisibleOpen(true), DEFEAT_DELAY_MS);
+    if (isCheckmate) {
+      timerRef.current = setTimeout(() => setVisibleOpen(true), CHECKMATE_DELAY_MS);
     } else {
       setVisibleOpen(true);
     }

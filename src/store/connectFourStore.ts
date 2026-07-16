@@ -156,20 +156,6 @@ function stopLobbyWatchdog() {
 
 function scheduleLobbyWatchdog(roomId: string, get: () => ConnectFourStore) {
   stopLobbyWatchdog();
-  const attempt = async () => {
-    const st = get();
-    if (st.phase !== ConnectFourPhase.WAITING || st.isSpectator) return;
-    try {
-      const status = await apiRepository.getRoomStatus(roomId);
-      if (status.status?.toLowerCase() === 'started') {
-        (window as any).connectFourSocket?.requestSync(roomId);
-      }
-    } catch {
-      /* ignore */
-    }
-  };
-  lobbyWatchdogTimers.push(setTimeout(() => void attempt(), 2000));
-  lobbyWatchdogTimers.push(setTimeout(() => void attempt(), 5000));
 }
 
 function triggerLobbyFullSync(roomId: string, get: () => ConnectFourStore) {
@@ -207,35 +193,6 @@ function stopStatusPolling() {
 
 function startStatusPolling(roomId: string, get: () => ConnectFourStore) {
   stopStatusPolling();
-  const tick = async () => {
-    const st = get();
-    if (st.isSpectator || (st.phase !== ConnectFourPhase.WAITING && st.phase !== ConnectFourPhase.PLAY)) {
-      stopStatusPolling();
-      return;
-    }
-    try {
-      const socket = (window as any).connectFourSocket as ConnectFourSocketManager | undefined;
-      if (st.opponentConfirmed || st.hasOpponent) {
-        apiRepository.roomReady(roomId).catch(() => {});
-      }
-      socket?.requestSync(roomId);
-
-      const status = await apiRepository.getRoomStatus(roomId);
-      const roomStatus = status.status?.toLowerCase();
-      if (st.phase === ConnectFourPhase.WAITING && roomStatus === 'started') {
-        socket?.requestSync(roomId);
-        stopStatusPolling();
-      }
-      if (st.phase === ConnectFourPhase.PLAY && roomStatus === 'finished') {
-        socket?.requestSync(roomId);
-        stopStatusPolling();
-      }
-    } catch {
-      /* ignore */
-    }
-  };
-  void tick();
-  statusPollTimer = setInterval(tick, 2500);
 }
 
 let timeoutWarned = false;

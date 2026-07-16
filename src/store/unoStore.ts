@@ -60,22 +60,6 @@ function scheduleUnoChatOverlay(set: (partial: Partial<UnoStoreState>) => void, 
 
 function startStatusPolling(roomId: string, get: () => UnoStore) {
   stopStatusPolling();
-  statusPollTimer = setInterval(async () => {
-    const st = get();
-    if (st.phase !== UnoPhase.WAITING || st.isSpectator) {
-      stopStatusPolling();
-      return;
-    }
-    try {
-      const status = await apiRepository.getRoomStatus(roomId);
-      if (status.status?.toLowerCase() === 'started') {
-        st.socket?.requestSync(roomId);
-        stopStatusPolling();
-      }
-    } catch {
-      /* ignore */
-    }
-  }, 5000);
 }
 
 interface UnoStoreState {

@@ -180,6 +180,12 @@ const TransactionHistoryPage: React.FC = () => {
     return { bg: 'rgba(138,155,191,0.15)', color: 'var(--sovereign-text-muted)', label: t('APP.HISTORY.RESULT_DRAW') };
   };
 
+  const normalizeGameHistoryResult = (item: GameHistoryItem): 'win' | 'lose' | 'draw' => {
+    const result = (item.result || '').toLowerCase();
+    if (result === 'win' || result === 'lose' || result === 'draw') return result;
+    return item.prize > 0 ? 'win' : 'lose';
+  };
+
   const SkeletonItem = () => (
     <div
       style={{
@@ -425,7 +431,9 @@ const TransactionHistoryPage: React.FC = () => {
               ) : (
                 <IonList style={{ background: 'transparent' }}>
                   {games.map((item, idx) => {
-                    const resultStyle = gameResultStyle((item.result as 'win' | 'lose' | 'draw') ?? 'lose');
+                    const normalizedResult = normalizeGameHistoryResult(item);
+                    const resultStyle = gameResultStyle(normalizedResult);
+                    const showLostAmount = normalizedResult === 'lose' && (item.lostAmount ?? 0) > 0;
                     return (
                       <div
                         key={idx}
@@ -487,6 +495,13 @@ const TransactionHistoryPage: React.FC = () => {
                               <IonText>
                                 <span style={{ color: 'var(--sovereign-gold)', fontWeight: '700', fontSize: '13px' }}>
                                   +${formatUSD(item.prize)}
+                                </span>
+                              </IonText>
+                            )}
+                            {showLostAmount && (
+                              <IonText>
+                                <span style={{ color: 'var(--sovereign-error)', fontWeight: '700', fontSize: '13px' }}>
+                                  -${formatUSD(item.lostAmount ?? 0)}
                                 </span>
                               </IonText>
                             )}

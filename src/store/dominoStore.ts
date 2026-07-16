@@ -162,22 +162,6 @@ function stopStatusPolling() {
 
 function startStatusPolling(roomId: string, get: () => DominoStore) {
   stopStatusPolling();
-  statusPollTimer = setInterval(async () => {
-    const st = get();
-    if (st.phase !== DominoPhase.WAITING || st.isSpectator) {
-      stopStatusPolling();
-      return;
-    }
-    try {
-      const status = await apiRepository.getRoomStatus(roomId);
-      if (status.status?.toLowerCase() === 'started') {
-        st.socket?.requestSync(roomId);
-        stopStatusPolling();
-      }
-    } catch {
-      /* ignore */
-    }
-  }, 5000);
 }
 
 interface DominoStoreState {
@@ -481,18 +465,16 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
       const ws = applyWsMessagePlaceholders(t('ws.domino.playerLeftWaiting'), data);
       set({
         phase: DominoPhase.WAITING,
-        statusMessage: ws,
+        statusMessage: ws.includes('{{') ? t('domino_wait_player_left_generic') : ws,
         waitingLobbySubtitle: '',
       });
       return;
     }
 
     if (opponentLeft && get().phase === DominoPhase.WAITING) {
-      set({
-        opponentLeftMessage: t('bs_opponent_left'),
-        opponentConfirmed: false,
-        waitingLobbySubtitle: '',
-      });
+      // This can be a stale packet racing with gameStarted. Do not surface a modal;
+      // the durable room-status loop will either keep us waiting or request a snapshot.
+      get().socket?.requestSync(get().roomId);
       return;
     }
 
