@@ -192,7 +192,11 @@ export const applyWsMessagePlaceholders = (template: string, data: any): string 
   res = res.replace(/\{\{(\w+)\}\}/g, (match, key) => {
     let value: string | undefined;
     if (key === 'username') {
-      value = ['username', 'userName', 'displayName', 'playerName', 'player_name', 'winner', 'winnerName']
+      value = [
+        'username', 'userName', 'displayName', 'playerName', 'player_name',
+        'playerLeft', 'player_left', 'leftPlayerName', 'left_player_name',
+        'winner', 'winnerName',
+      ]
         .map(k => String(data[k] ?? '').trim())
         .find(v => v.length > 0);
     } else if (key === 'shipType') {

@@ -78,6 +78,8 @@ export interface RoomStatusResponse {
   id: string;
   status: string;
   playerCount: number;
+  /** Maximum number of players accepted by the room, when supplied by the API. */
+  playerLimit?: number;
   betAmount?: number;
   winner?: string;
   winnerReason?: string;
@@ -195,6 +197,7 @@ export interface GameHistoryItem {
   betAmount: number;
   result: string;
   prize: number;
+  lostAmount?: number;
   opponentName: string;
   finishedAt: string;
 }

@@ -345,17 +345,10 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
         statusMessage: isSpectator ? 'spectator_watching_status' : (hasOpponent ? 'halma_opponent_joined' : 'status_waiting_opponent')
       });
 
-      // Polling mirrored from Android (HalmaViewModel.kt:150)
-      if (!isSpectator) {
-        pollingInterval = window.setInterval(async () => {
-          if (get().phase !== HalmaPhase.WAITING) return;
-          try {
-            const res = await apiService.getRoomStatus(roomId);
-            if (res.status === 'started') {
-              socketManager?.requestSync(roomId);
-            }
-          } catch {}
-        }, 5000);
+      // PlayPage owns the single waiting-room status poll for every automatic-start game.
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
       }
 
       socketManager = new HalmaSocketManager();

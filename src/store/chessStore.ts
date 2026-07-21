@@ -1025,24 +1025,8 @@ function sendMove(roomId: string, fromRow: number, fromCol: number, toRow: numbe
 }
 
 function startStatusPolling(roomId: string, set: any, get: any) {
+  // Waiting-room start recovery is centralized in PlayPage at a 10-second cadence.
+  // Keep this compatibility entry point so existing store call sites remain harmless.
   if (statusPollingInterval) clearInterval(statusPollingInterval);
-  statusPollingInterval = setInterval(async () => {
-    const phase = get().phase;
-    if (phase !== ChessPhase.WAITING && phase !== ChessPhase.PLAY) {
-      clearInterval(statusPollingInterval);
-      return;
-    }
-    try {
-      const status = await apiRepository.getRoomStatus(roomId);
-      const roomStatus = status.status?.toLowerCase();
-      if (phase === ChessPhase.WAITING && roomStatus === 'started') {
-        (window as any).chessSocket?.requestSync(roomId);
-        clearInterval(statusPollingInterval);
-      }
-      if (phase === ChessPhase.PLAY && roomStatus === 'finished') {
-        (window as any).chessSocket?.requestSync(roomId);
-        clearInterval(statusPollingInterval);
-      }
-    } catch {}
-  }, 2500);
+  statusPollingInterval = null;
 }

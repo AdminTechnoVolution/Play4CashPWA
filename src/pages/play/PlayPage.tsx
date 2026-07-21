@@ -19,6 +19,7 @@ import UnoPage from './uno/UnoPage';
 import ConnectFourPage from './connect-four/ConnectFourPage';
 import { useConnectFourStore, ConnectFourPhase } from '../../store/connectFourStore';
 import { getPlayContext } from '../../util/routingStorage';
+import { useWaitingRoomStartSync } from '../../hooks/useWaitingRoomStartSync';
 import { formatUSD } from '../../util/formatCurrency';
 import { useAuthStore } from '../../store/authStore';
 import { useTournamentsStore } from '../../store/tournamentsStore';
@@ -143,6 +144,8 @@ export default function PlayPage() {
   const isSpectator = playCtx?.isSpectator ?? false;
   const isTournamentPlay = (playCtx?.betAmount ?? 0) === 0 && !isSpectator;
 
+  useWaitingRoomStartSync(gameSocketCode, roomId, isSpectator);
+
   useEffect(() => {
     return () => {
       if (!isTournamentPlay) return;
@@ -228,6 +231,9 @@ export default function PlayPage() {
       leavingInFlightRef.current = false;
       setLeavingInFlight(false);
       if (showResultAlert) return;
+
+      apiRepository.invalidateAccountCache();
+      void useAuthStore.getState().loadSession();
 
       const dest =
         opts?.explicitPath ?? `/rooms/${encodeURIComponent(gameSocketCode)}`;

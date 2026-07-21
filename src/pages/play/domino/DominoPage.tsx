@@ -223,6 +223,8 @@ function SnakeDominoBoard({
                 gap: 3,
                 justifyContent: rowJustify,
                 width: '100%',
+                paddingLeft: v.underEnd === 'right' ? 10 : 0,
+                paddingRight: v.underEnd === 'left' ? 10 : 0,
                 marginTop,
               }}
             >
