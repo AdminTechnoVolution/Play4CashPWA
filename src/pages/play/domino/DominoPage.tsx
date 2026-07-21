@@ -20,103 +20,13 @@ import { applyWsMessagePlaceholders, formatApiMessageForDisplay, formatCatalogIn
 import GenericErrorModal from '../../../ui/components/GenericErrorModal';
 import ConnectionStrengthIndicator from '../../../ui/components/ConnectionStrengthIndicator';
 import { BoardTileViz, EndIndicatorViz, HandTileViz, END_LEFT, END_RIGHT } from './DominoTileViews';
+import { buildDominoBoardLayout } from './dominoBoardLayout';
 import GameSound from '../../../ui/game/GameSound';
 import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
 import { shouldSuppressRoomNotFound } from '../../../util/playRoomSession';
 
 function tilesEqual(t1: DominoTile, t2: DominoTile) {
   return (t1.a === t2.a && t1.b === t2.b) || (t1.a === t2.b && t1.b === t2.a);
-}
-
-/**
- * For each board index, the pip values facing the previous / next tile in the chain
- * (matches real play: touching halves show the same count).
- */
-function chainNeighborPips(
-  board: DominoTile[],
-  leftEnd: number,
-  rightEnd: number,
-): { towardPrev: number; towardNext: number }[] {
-  const n = board.length;
-  if (n === 0) return [];
-  const fromLeft: number[] = new Array(n);
-  fromLeft[0] = leftEnd;
-  const out: { towardPrev: number; towardNext: number }[] = [];
-  for (let i = 0; i < n; i++) {
-    const t = board[i];
-    const fl = fromLeft[i];
-    const tn = i === n - 1 ? rightEnd : t.a === t.b ? t.a : t.a === fl ? t.b : t.a;
-    out.push({ towardPrev: fl, towardNext: tn });
-    if (i < n - 1) fromLeft[i + 1] = tn;
-  }
-  return out;
-}
-
-// Table chain: horizontal runs alternate LTR / RTL; when a run is full and more tiles
-// remain, exactly one vertical bridge appears under the exit end, flush with the
-// predecessor. If only one tile is left after a full run, it continues on the next
-// horizontal run without a bridge.
-
-type HorizSeg = { kind: 'h'; start: number; len: number; dir: 'ltr' | 'rtl' };
-type VertSeg = { kind: 'v'; index: number; underEnd: 'left' | 'right' };
-type BoardSegment = HorizSeg | VertSeg;
-
-/** One row: either only horizontals, or vertical bend + following horizontals on the same line (bottom-aligned). */
-type DominoBoardRowUnit = { kind: 'flat'; h: HorizSeg } | { kind: 'bend'; v: VertSeg; h: HorizSeg };
-
-function buildBoardSegments(totalLen: number, hMax: number): BoardSegment[] {
-  const out: BoardSegment[] = [];
-  if (totalLen === 0) return out;
-
-  let i = 0;
-  let lastHoriz: 'ltr' | 'rtl' = 'ltr';
-
-  const firstLen = Math.min(hMax, totalLen);
-  out.push({ kind: 'h', start: 0, len: firstLen, dir: 'ltr' });
-  i = firstLen;
-
-  while (i < totalLen) {
-    const remaining = totalLen - i;
-    if (remaining === 1) {
-      const nextDir: 'ltr' | 'rtl' = lastHoriz === 'ltr' ? 'rtl' : 'ltr';
-      out.push({ kind: 'h', start: i, len: 1, dir: nextDir });
-      break;
-    }
-
-    const underEnd: 'left' | 'right' = lastHoriz === 'ltr' ? 'right' : 'left';
-    out.push({ kind: 'v', index: i, underEnd });
-    i += 1;
-
-    const horizLen = Math.min(hMax, totalLen - i);
-    const nextDir: 'ltr' | 'rtl' = lastHoriz === 'ltr' ? 'rtl' : 'ltr';
-    out.push({ kind: 'h', start: i, len: horizLen, dir: nextDir });
-    lastHoriz = nextDir;
-    i += horizLen;
-  }
-
-  return out;
-}
-
-function boardRowUnits(segments: BoardSegment[]): DominoBoardRowUnit[] {
-  const out: DominoBoardRowUnit[] = [];
-  for (let i = 0; i < segments.length; i++) {
-    const s = segments[i];
-    if (s.kind === 'v') {
-      const next = segments[i + 1];
-      if (next?.kind === 'h') {
-        out.push({ kind: 'bend', v: s, h: next });
-        i += 1;
-      }
-    } else {
-      out.push({ kind: 'flat', h: s });
-    }
-  }
-  return out;
-}
-
-function dominoBoardIndices(start: number, len: number, dir: 'ltr' | 'rtl'): number[] {
-  const arr = Array.from({ length: len }, (_, j) => start + j);
-  return dir === 'ltr' ? arr : arr.reverse();
 }
 
 interface SnakeBoardProps {
@@ -133,17 +43,13 @@ function SnakeDominoBoard({
   board, leftEnd, rightEnd, lastPlayedTile, sidePickTile, canPlaceLeft, canPlaceRight,
 }: SnakeBoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [tilesPerRow, setTilesPerRow] = useState(() => {
-    const w = window.innerWidth - 56;
-    return Math.max(3, Math.floor((w - 44) / 51));
-  });
+  const [containerWidth, setContainerWidth] = useState(() => Math.max(180, window.innerWidth - 56));
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const compute = () => {
-      const w = el.clientWidth - 16;
-      setTilesPerRow(Math.max(3, Math.floor((w - 44) / 51)));
+      setContainerWidth(Math.max(180, el.clientWidth));
     };
     compute();
     const ro = new ResizeObserver(compute);
@@ -151,126 +57,76 @@ function SnakeDominoBoard({
     return () => ro.disconnect();
   }, []);
 
-  const H = tilesPerRow;
-  const totalLen = board.length;
-  const chain = chainNeighborPips(board, leftEnd, rightEnd);
-  const segments = buildBoardSegments(totalLen, H);
-  const rowUnits = boardRowUnits(segments);
-  const lastUnitIdx = rowUnits.length - 1;
-
-  const renderHorizTiles = (h: HorizSeg) => {
-    const indices = dominoBoardIndices(h.start, h.len, h.dir);
-    return indices.map((origIdx) => {
-      const tile = board[origIdx];
-      const { towardPrev, towardNext } = chain[origIdx];
-      let faceLeft = towardPrev;
-      let faceRight = towardNext;
-      if (h.dir === 'rtl') {
-        faceLeft = towardNext;
-        faceRight = towardPrev;
-      }
-      const isLastPlayed =
-        origIdx === totalLen - 1 &&
-        lastPlayedTile != null &&
-        tilesEqual(lastPlayedTile, tile);
-      return (
-        <BoardTileViz
-          key={`${tile.a}-${tile.b}-${origIdx}`}
-          left={faceLeft}
-          right={faceRight}
-          cellPx={20}
-          highlight={isLastPlayed}
-        />
-      );
-    });
-  };
+  const layout = useMemo(
+    () => buildDominoBoardLayout(board, leftEnd, rightEnd, {
+      availableWidth: containerWidth,
+      cellPx: 20,
+      horizontalPadding: 36,
+    }),
+    [board, leftEnd, rightEnd, containerWidth],
+  );
+  const lastPlacement = layout.placements.find((placement) => placement.index === board.length - 1);
+  const rightIndicatorTransform =
+    lastPlacement?.direction === 'down'
+      ? 'translate(-50%, 4px)'
+      : lastPlacement?.direction === 'rtl'
+        ? 'translate(calc(-100% - 4px), -50%)'
+        : 'translate(4px, -50%)';
 
   return (
-    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 0 }}>
-      {rowUnits.map((unit, unitIdx) => {
-        const marginTop = unitIdx > 0 ? 6 : 0;
-
-        if (unit.kind === 'bend') {
-          const { v, h } = unit;
-          const tileV = board[v.index];
-          const { towardPrev, towardNext } = chain[v.index];
-          const isLastPlayedV =
-            v.index === totalLen - 1 &&
+    <div ref={containerRef} style={{ width: '100%' }}>
+      <div style={{ position: 'relative', width: layout.width, maxWidth: '100%', height: layout.height }}>
+        {layout.placements.map((placement) => {
+          const tile = board[placement.index];
+          const isLastPlayed =
+            placement.index === board.length - 1 &&
             lastPlayedTile != null &&
-            tilesEqual(lastPlayedTile, tileV);
-          const isLastUnit = unitIdx === lastUnitIdx;
-          const verticalEl = (
-            <BoardTileViz
-              key={`vb-${v.index}`}
-              left={towardPrev}
-              right={towardNext}
-              cellPx={20}
-              highlight={isLastPlayedV}
-              forceVertical
-            />
-          );
-          const horizEl = renderHorizTiles(h);
-          const rowJustify = v.underEnd === 'right' ? 'flex-end' : 'flex-start';
-
+            tilesEqual(lastPlayedTile, tile);
           return (
             <div
-              key={`bend-${v.index}`}
+              key={`${tile.a}-${tile.b}-${placement.index}`}
+              data-domino-index={placement.index}
               style={{
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'flex-end',
-                flexWrap: 'nowrap',
-                gap: 3,
-                justifyContent: rowJustify,
-                width: '100%',
-                paddingLeft: v.underEnd === 'right' ? 10 : 0,
-                paddingRight: v.underEnd === 'left' ? 10 : 0,
-                marginTop,
+                position: 'absolute',
+                left: placement.x,
+                top: placement.y,
+                width: placement.width,
+                height: placement.height,
               }}
             >
-              {v.underEnd === 'left' && verticalEl}
-              {isLastUnit && h.dir === 'rtl' && (
-                <EndIndicatorViz value={rightEnd} isLeft={false} active={!!sidePickTile && canPlaceRight} />
-              )}
-              {horizEl}
-              {isLastUnit && h.dir === 'ltr' && (
-                <EndIndicatorViz value={rightEnd} isLeft={false} active={!!sidePickTile && canPlaceRight} />
-              )}
-              {v.underEnd === 'right' && verticalEl}
+              <BoardTileViz
+                left={placement.first}
+                right={placement.second}
+                cellPx={20}
+                highlight={isLastPlayed}
+                forceVertical={placement.orientation === 'vertical'}
+              />
             </div>
           );
-        }
-
-        const { start, len, dir } = unit.h;
-        const isFirstH = start === 0;
-        const isLastH = unitIdx === lastUnitIdx;
-        const justify = dir === 'rtl' ? 'flex-end' : 'flex-start';
-
-        return (
-          <div
-            key={`hrow-${start}-${len}-${dir}`}
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              flexWrap: 'nowrap',
-              gap: 3,
-              justifyContent: justify,
-              width: '100%',
-              marginTop,
-            }}
-          >
-            {isFirstH && <EndIndicatorViz value={leftEnd} isLeft active={!!sidePickTile && canPlaceLeft} />}
-            {isLastH && dir === 'rtl' && (
-              <EndIndicatorViz value={rightEnd} isLeft={false} active={!!sidePickTile && canPlaceRight} />
-            )}
-            {renderHorizTiles(unit.h)}
-            {isLastH && dir === 'ltr' && (
-              <EndIndicatorViz value={rightEnd} isLeft={false} active={!!sidePickTile && canPlaceRight} />
-            )}
-          </div>
-        );
-      })}
+        })}
+        <div
+          style={{
+            position: 'absolute',
+            left: layout.leftAnchor.x,
+            top: layout.leftAnchor.y,
+            transform: 'translate(calc(-100% - 4px), -50%)',
+            zIndex: 2,
+          }}
+        >
+          <EndIndicatorViz value={leftEnd} isLeft active={!!sidePickTile && canPlaceLeft} />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            left: layout.rightAnchor.x,
+            top: layout.rightAnchor.y,
+            transform: rightIndicatorTransform,
+            zIndex: 2,
+          }}
+        >
+          <EndIndicatorViz value={rightEnd} isLeft={false} active={!!sidePickTile && canPlaceRight} />
+        </div>
+      </div>
     </div>
   );
 }
