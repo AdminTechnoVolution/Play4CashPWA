@@ -13,6 +13,7 @@ describe('playPhaseGuards', () => {
     expect(canAcceptWaitingLobby('GAME_OVER')).toBe(false);
     expect(canAcceptWaitingLobby('PLAY', { outcome: 'win' })).toBe(false);
     expect(canAcceptWaitingLobby('WAITING')).toBe(true);
-    expect(canAcceptWaitingLobby('PLAY')).toBe(true);
+    expect(canAcceptWaitingLobby('PLAY')).toBe(false);
+    expect(canAcceptWaitingLobby('placement')).toBe(true);
   });
 });
