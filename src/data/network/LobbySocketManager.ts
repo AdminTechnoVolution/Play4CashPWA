@@ -7,6 +7,8 @@ import { attachVersionMismatchListener } from './socketVersionListener';
 import { instrumentSocket, releaseSocket } from './socketRegistry';
 import { SOCKET_IO_CLIENT_DEFAULTS } from './socketClientDefaults';
 import type { RoomResponse, RoomPlayer } from '../models/ApiModels';
+import type { RoomStateResponse } from '../models/ApiModels';
+import { normalizeRoomState } from './ApiService';
 
 const NAMESPACE = '/rooms';
 
@@ -34,13 +36,14 @@ function normalizeRoom(raw: any): RoomResponse {
 export class LobbySocketManager {
   private socket: Socket | null = null;
   private sessionGameId: string | null = null;
+  private sessionRoomId: string | null = null;
   private onConnectCb?: () => void;
 
-  connect(gameId: string): void {
+  connect(gameId: string, roomId?: string): void {
     this.disconnect();
 
-
     this.sessionGameId = gameId;
+    this.sessionRoomId = roomId || null;
 
     this.socket = io(buildSocketUrl(NAMESPACE), {
       ...SOCKET_IO_CLIENT_DEFAULTS,
@@ -52,12 +55,23 @@ export class LobbySocketManager {
     attachVersionMismatchListener(this.socket);
     instrumentSocket(this.socket, NAMESPACE, {
       onResync: () => {
-        if (this.sessionGameId) this.resubscribe(this.sessionGameId);
+        if (this.sessionGameId) {
+          this.resubscribe(this.sessionGameId, this.sessionRoomId || undefined);
+        } else if (this.sessionRoomId) {
+          this.requestRoomState(this.sessionRoomId);
+        }
       },
     });
 
     this.socket.on('connect', () => {
-      this.socket?.emit('subscribe', { game_id: gameId });
+      if (gameId) {
+        this.socket?.emit('subscribe', {
+          game_id: gameId,
+          ...(roomId ? { room_id: roomId } : {}),
+        });
+      } else if (roomId) {
+        this.requestRoomState(roomId);
+      }
       this.onConnectCb?.();
     });
 
@@ -75,12 +89,21 @@ export class LobbySocketManager {
     this.socket.connect();
   }
 
-  resubscribe(gameId: string): void {
-    this.socket?.emit('subscribe', { game_id: gameId });
+  resubscribe(gameId: string, roomId?: string): void {
+    this.socket?.emit('subscribe', {
+      game_id: gameId,
+      ...(roomId ? { room_id: roomId } : {}),
+    });
+  }
+
+  requestRoomState(roomId = this.sessionRoomId || ''): void {
+    if (!roomId) return;
+    this.socket?.emit('syncRoomState', { room_id: roomId });
   }
 
   disconnect(): void {
     this.sessionGameId = null;
+    this.sessionRoomId = null;
     this.socket?.off();
     this.socket?.disconnect();
     this.socket = null;
@@ -97,6 +120,30 @@ export class LobbySocketManager {
 
   onRoomUpdated(cb: (room: RoomResponse) => void): void {
     this.socket?.on('roomUpdated', (raw: unknown) => cb(normalizeRoom(raw)));
+  }
+
+  onRoomStarted(cb: (room: RoomResponse) => void): void {
+    this.socket?.on('roomStarted', (raw: unknown) => cb(normalizeRoom(raw)));
+  }
+
+  onRoomState(cb: (state: RoomStateResponse) => void): void {
+    this.socket?.on('roomState', (raw: unknown) => cb(normalizeRoomState(raw)));
+  }
+
+  onRoomStateError(cb: (reason: 'invalid' | 'notFound') => void): void {
+    this.socket?.on('rooms', (raw: unknown) => {
+      const envelope = raw as {
+        success?: boolean;
+        data?: { event?: string; reason?: string };
+      };
+      if (
+        envelope?.success === false &&
+        envelope.data?.event === 'roomStateError' &&
+        (envelope.data.reason === 'invalid' || envelope.data.reason === 'notFound')
+      ) {
+        cb(envelope.data.reason);
+      }
+    });
   }
 
   onRoomDeleted(cb: (roomId: string) => void): void {

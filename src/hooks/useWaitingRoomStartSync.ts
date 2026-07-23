@@ -6,8 +6,11 @@ import { useHalmaStore, HalmaPhase } from '../store/halmaStore';
 import { useUnoStore, UnoPhase } from '../store/unoStore';
 import { useConnectFourStore, ConnectFourPhase } from '../store/connectFourStore';
 import { handleRoomGone, resyncActivePlaySession } from '../util/playRoomSession';
+import { LobbySocketManager } from '../data/network/LobbySocketManager';
+import { getGameContext, getPlayContext, savePlayContext } from '../util/routingStorage';
+import { useAuthStore } from '../store/authStore';
+import type { RoomStateResponse } from '../data/models/ApiModels';
 
-const POLL_INTERVAL_MS = 2_000;
 const AUTO_START_GAMES = new Set(['chess', 'halma', 'domino', 'uno', 'connect-four']);
 
 function subscribeGame(game: string, onChange: () => void): () => void {
@@ -52,46 +55,92 @@ export function useWaitingRoomStartSync(
   useEffect(() => {
     if (!roomId || isSpectator || (automaticGame && !waiting)) return;
     let cancelled = false;
-    let inFlight = false;
-    let interval: number | undefined;
+    const lobbySocket = new LobbySocketManager();
+    let processing = Promise.resolve();
 
-    const tick = async () => {
-      if (cancelled || inFlight || (automaticGame && !isWaiting(gameSocketCode))) return;
-      inFlight = true;
+    const processState = async (status: RoomStateResponse) => {
+      if (
+        cancelled ||
+        status.roomId !== roomId ||
+        (automaticGame && !isWaiting(gameSocketCode))
+      ) return;
       try {
-        const status = await apiRepository.getRoomStatus(roomId);
-        if (cancelled) return;
         const roomStatus = status.status?.toLowerCase();
-        const requiredPlayers = status.playerLimit ?? 2;
+        const requiredPlayers = status.requiredPlayers ?? 2;
+
+        if (!status.isCurrentUserInRoom) {
+          handleRoomGone({ reason: 'inactive', gameSocketCode, roomId });
+          return;
+        }
 
         // Do not rely solely on `opponentJoined`: that event is not replayed after a
         // socket reconnect, leaving P1 permanently false while P2 is already ready.
-        if (roomStatus === 'waiting' && status.playerCount >= requiredPlayers) {
+        if (
+          (roomStatus === 'waiting' || roomStatus === 'started') &&
+          status.currentPlayers >= requiredPlayers
+        ) {
           // Idempotent best effort. A transient PATCH failure must not be treated as
           // a deleted room; the next tick retries while Mongo remains authoritative.
           await apiRepository.roomReady(roomId).catch(() => undefined);
         }
 
-        if (automaticGame && roomStatus === 'started') {
+        if (roomStatus === 'started' && status.canEnterPlay) {
+          const current = getPlayContext();
+          if (current) {
+            const currentUserId = useAuthStore.getState().user?.id;
+            const opponent = status.players.find(
+              (player) => !currentUserId || player.id !== currentUserId,
+            );
+            savePlayContext({
+              ...current,
+              opponentName: opponent?.username || current.opponentName,
+              hasOpponent: status.currentPlayers > 1,
+            });
+          }
+        }
+
+        if (automaticGame && roomStatus === 'started' && status.canEnterPlay) {
           await resyncActivePlaySession();
-        } else if (!automaticGame && roomStatus === 'started') {
-          window.clearInterval(interval);
         } else if (roomStatus === 'finished') {
           handleRoomGone({ reason: 'cancelled', gameSocketCode, roomId });
         }
       } catch {
-        // Network/auth/proxy interruptions are recoverable. Visibility reconnect and
-        // the next status tick retry; only an explicit terminal status exits play.
-      } finally {
-        inFlight = false;
+        // A later authoritative roomState event retries transient local work.
       }
     };
 
-    void tick();
-    interval = window.setInterval(() => void tick(), POLL_INTERVAL_MS);
+    const enqueueState = (state: RoomStateResponse) => {
+      processing = processing.then(() => processState(state));
+    };
+    const requestState = () => lobbySocket.requestRoomState(roomId);
+    const gameId = getGameContext()?.gameId || '';
+
+    lobbySocket.connect(gameId, roomId);
+    lobbySocket.onRoomState(enqueueState);
+    lobbySocket.onRoomStateError((reason) => {
+      handleRoomGone({ reason, gameSocketCode, roomId });
+    });
+    lobbySocket.onRoomUpdated((room) => {
+      if (room.id === roomId) requestState();
+    });
+    lobbySocket.onRoomStarted((room) => {
+      if (room.id === roomId) requestState();
+    });
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') requestState();
+    };
+    const onSocketResync = (event: Event) => {
+      const namespace = (event as CustomEvent<{ namespace?: string }>).detail?.namespace;
+      if (!namespace || namespace === '/rooms') requestState();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('p4c:socket-resync', onSocketResync);
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('p4c:socket-resync', onSocketResync);
+      lobbySocket.offAll();
+      lobbySocket.disconnect();
     };
   }, [automaticGame, gameSocketCode, isSpectator, roomId, waiting]);
 }

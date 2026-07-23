@@ -1,4 +1,3 @@
-import { apiRepository } from '../data/network/ApiRepository';
 import { reconnectAllStaleSockets } from '../data/network/socketRegistry';
 import type { Socket } from 'socket.io-client';
 import { useBattleshipStore } from '../store/battleshipStore';
@@ -11,7 +10,6 @@ import {
   gameSocketCodeFromPlayPath,
   teardownPlaySession,
 } from './playBackNavigation';
-import { isRoomTerminalWithWinner } from './roomLeavePrecheck';
 import { rawLineToMessageKey } from '../i18n/ApiMessageDisplay';
 
 export type RoomGoneReason =
@@ -173,18 +171,4 @@ export async function resyncActivePlaySession(): Promise<void> {
   if (isGameEndInProgress()) return;
 
   requestSyncOnActiveGameSocket(gameSocketCode, playCtx.roomId);
-
-  try {
-    const status = await apiRepository.getRoomStatus(playCtx.roomId);
-    const terminal = isRoomTerminalWithWinner(status);
-    if (terminal) {
-      setGameEndInProgress(true);
-    }
-  } catch {
-    handleRoomGone({
-      reason: 'visibility',
-      gameSocketCode,
-      roomId: playCtx.roomId,
-    });
-  }
 }

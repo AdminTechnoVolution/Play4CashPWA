@@ -85,6 +85,23 @@ export interface RoomStatusResponse {
   winnerReason?: string;
 }
 
+export interface RoomStateResponse {
+  roomId: string;
+  gameId: string;
+  gameSocketCode: string;
+  status: string;
+  players: RoomPlayer[];
+  currentPlayers: number;
+  requiredPlayers: number;
+  isCurrentUserInRoom: boolean;
+  canEnterPlay: boolean;
+  playPath: string | null;
+  betAmount: number;
+  roomName: string;
+  updatedAt: string | null;
+  startedAt: string | null;
+}
+
 // Normalized — ApiService maps players_online→playersOnline, etc.
 export interface RoomStatsResponse {
   playersOnline: number;

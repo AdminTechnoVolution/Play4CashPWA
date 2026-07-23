@@ -8,6 +8,7 @@ import type {
   RoomStatsResponse,
   RoomResponse,
   RoomStatusResponse,
+  RoomStateResponse,
   PublicUserStatsResponse,
   CreateRoomRequest,
   BattleshipPlacementRequest,
@@ -100,7 +101,7 @@ export const apiRepository = {
     return apiService.createRoom(req);
   },
 
-  async joinRoom(roomId: string): Promise<void> {
+  async joinRoom(roomId: string): Promise<RoomStateResponse> {
     return apiService.joinRoom(roomId);
   },
 
@@ -123,6 +124,10 @@ export const apiRepository = {
 
   async getRoomStatus(roomId: string): Promise<RoomStatusResponse> {
     return apiService.getRoomStatus(roomId);
+  },
+
+  async getRoomState(roomId: string): Promise<RoomStateResponse> {
+    return apiService.getRoomState(roomId);
   },
 
   async submitBattleshipPlacement(roomId: string, req: BattleshipPlacementRequest): Promise<void> {
