@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { apiRepository } from '../data/network/ApiRepository';
-import type { RoomResponse, CreateRoomRequest } from '../data/models/ApiModels';
+import type { RoomResponse, RoomStateResponse, CreateRoomRequest } from '../data/models/ApiModels';
 
 interface RoomsState {
   rooms: RoomResponse[];
@@ -10,7 +10,7 @@ interface RoomsState {
   currentGameId: string | null;
   loadRooms: (gameId: string) => Promise<void>;
   createRoom: (req: CreateRoomRequest) => Promise<string>;
-  joinRoom: (id: string) => Promise<void>;
+  joinRoom: (id: string) => Promise<RoomStateResponse>;
   spectateRoom: (id: string) => Promise<void>;
   setShowCreateDialog: (v: boolean) => void;
   // Called directly by RoomsPage socket handlers

@@ -207,7 +207,10 @@ const RoomsPage: React.FC = () => {
   const handleJoin = async (roomId: string, roomName: string, betAmount: number, opponentName: string) => {
     setJoiningId(roomId);
     try {
-      await joinRoom(roomId);
+      const joinedState = await joinRoom(roomId);
+      if (!joinedState.isCurrentUserInRoom) {
+        throw new Error('ERROR_AUTH');
+      }
       savePlayContext({
         roomId,
         betAmount,
@@ -218,7 +221,8 @@ const RoomsPage: React.FC = () => {
         isPlayer1: false,
         ...playCtxExtras,
       });
-      navigate(`/play/${gameSocketCode}`);
+      const targetSocketCode = joinedState.gameSocketCode || gameSocketCode;
+      navigate(`/play/${targetSocketCode}`);
     } catch (err) {
       setToast({ 
         isOpen: true, 

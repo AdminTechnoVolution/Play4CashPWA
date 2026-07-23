@@ -113,3 +113,68 @@ describe('apiService.getGameHistory', () => {
     expect(item.opponentNames).toEqual(['LegacyPlayer']);
   });
 });
+
+describe('apiService authoritative room state', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the started state directly from join so navigation need not wait for websocket', async () => {
+    mocks.post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: {
+          roomId: 'room-1',
+          gameId: 'game-1',
+          gameSocketCode: 'chess',
+          status: 'started',
+          players: [{ id: 'p1', username: 'A' }, { id: 'p2', username: 'B' }],
+          currentPlayers: 2,
+          requiredPlayers: 2,
+          isCurrentUserInRoom: true,
+          canEnterPlay: true,
+          playPath: '/play/chess',
+        },
+      },
+    });
+
+    const state = await apiService.joinRoom('room-1');
+
+    expect(mocks.post).toHaveBeenCalledWith('/api/rooms/room-1/join');
+    expect(state).toEqual(expect.objectContaining({
+      status: 'started',
+      gameSocketCode: 'chess',
+      canEnterPlay: true,
+      currentPlayers: 2,
+    }));
+  });
+
+  it('normalizes the authenticated HTTP state endpoint', async () => {
+    mocks.get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: {
+          room_id: 'room-2',
+          game_socket_code: 'uno',
+          status: 'waiting',
+          players: [{ id: 'p1', username: 'A' }],
+          current_players: 1,
+          required_players: 4,
+          is_current_user_in_room: true,
+          can_enter_play: false,
+        },
+      },
+    });
+
+    const state = await apiService.getRoomState('room-2');
+
+    expect(mocks.get).toHaveBeenCalledWith('/api/rooms/room-2/state');
+    expect(state).toEqual(expect.objectContaining({
+      roomId: 'room-2',
+      gameSocketCode: 'uno',
+      currentPlayers: 1,
+      requiredPlayers: 4,
+      canEnterPlay: false,
+    }));
+  });
+});

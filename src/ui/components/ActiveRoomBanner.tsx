@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { IonToast } from '@ionic/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { apiRepository } from '../../data/network/ApiRepository';
-import { savePlayContext } from '../../util/routingStorage';
+import type { RoomResponse } from '../../data/models/ApiModels';
+import { saveGameContext, savePlayContext } from '../../util/routingStorage';
 import { useT } from '../../i18n/translations';
 
 /**
@@ -15,9 +16,8 @@ import { useT } from '../../i18n/translations';
  * UX choices (intentional):
  *  - Non-intrusive `IonToast` rather than a blocking modal — the user can keep
  *    browsing the dashboard if they want.
- *  - One-shot per session: once dismissed or tapped, we don't poke again. The
- *    server is still the source of truth (unique partial index) so creating a
- *    new room while one is open is rejected with ERROR_USER_ALREADY_IN_ROOM.
+ *  - Waiting rooms remain dismissible, while a started room is authoritative
+ *    and is resumed automatically on boot, focus, or visibility restoration.
  *  - Suppressed when the user is already inside `/play/*` — we don't want to
  *    nag them while they're playing.
  */
@@ -26,31 +26,64 @@ export default function ActiveRoomBanner() {
   const t = useT();
   const navigate = useNavigate();
   const location = useLocation();
-  const checkedRef = useRef(false);
-  const [active, setActive] = useState<{ id: string; socketCode: string; roomName: string; betAmount: number } | null>(
-    null,
-  );
+  const [active, setActive] = useState<RoomResponse | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
+  const enterRoom = useCallback(
+    (room: Awaited<ReturnType<typeof apiRepository.getActiveRoom>>, replace = false) => {
+      if (!room?.socketCode) return;
+      const ownIndex = room.players.findIndex((player) => player.id === user?.id);
+      const opponent = room.players.find((player) => player.id !== user?.id);
+      savePlayContext({
+        roomId: room.id,
+        betAmount: room.betAmount,
+        roomName: room.name || '',
+        opponentName: opponent?.username || '',
+        hasOpponent: room.players.length > 1,
+        isSpectator: false,
+        isPlayer1: ownIndex === 0,
+      });
+      if (room.gameId) {
+        saveGameContext({ gameId: room.gameId, gameName: room.name || '' });
+      }
+      setDismissed(true);
+      navigate(`/play/${room.socketCode}`, { replace });
+    },
+    [navigate, user?.id],
+  );
+
   useEffect(() => {
-    if (!authHydrated || !user || checkedRef.current) return;
-    checkedRef.current = true;
-    (async () => {
+    if (!authHydrated || !user) return;
+    let cancelled = false;
+    const checkActiveRoom = async () => {
       try {
         const room = await apiRepository.getActiveRoom();
-        if (!room || !room.socketCode) return;
-        setActive({
-          id: room.id,
-          socketCode: room.socketCode,
-          roomName: room.name || '',
-          betAmount: room.betAmount || 0,
-        });
+        if (cancelled) return;
+        if (!room || !room.socketCode) {
+          setActive(null);
+          return;
+        }
+        if (room.status === 'started' && !location.pathname.startsWith('/play/')) {
+          enterRoom(room, true);
+          return;
+        }
+        setActive(room);
       } catch {
-        // Network glitch: stay silent. Worst case the user finds the room
-        // manually; we don't want a noisy error on app boot.
+        // A later focus/visibility transition retries transient failures.
       }
-    })();
-  }, [authHydrated, user]);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void checkActiveRoom();
+    };
+    void checkActiveRoom();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', checkActiveRoom);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', checkActiveRoom);
+    };
+  }, [authHydrated, enterRoom, location.pathname, user]);
 
   // Suppress while inside a play screen (the player is already where they need to be).
   const inPlay = location.pathname.startsWith('/play/');
@@ -58,17 +91,7 @@ export default function ActiveRoomBanner() {
   if (!active || dismissed || inPlay) return null;
 
   const handleResume = () => {
-    savePlayContext({
-      roomId: active.id,
-      betAmount: active.betAmount,
-      roomName: active.roomName,
-      opponentName: '',
-      hasOpponent: true,
-      isSpectator: false,
-      isPlayer1: false,
-    });
-    setDismissed(true);
-    navigate(`/play/${active.socketCode}`);
+    enterRoom(active, false);
   };
 
   return (

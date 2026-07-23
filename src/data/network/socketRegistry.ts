@@ -37,6 +37,9 @@ function triggerSocketResync(namespace: string): void {
     /* handler owns error surfacing */
   }
   useConnectionStore.getState().recordResync(namespace);
+  window.dispatchEvent(
+    new CustomEvent('p4c:socket-resync', { detail: { namespace } }),
+  );
 }
 
 export type InstrumentSocketOptions = {

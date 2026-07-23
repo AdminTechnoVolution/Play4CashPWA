@@ -9,7 +9,9 @@ import type {
   WalletResponse,
   RoomStatsResponse,
   RoomResponse,
+  RoomPlayer,
   RoomStatusResponse,
+  RoomStateResponse,
   CreateRoomRequest,
   BattleshipPlacementRequest,
   RequestWalletChangePayload,
@@ -189,8 +191,9 @@ export const apiService = {
     return data._id ?? data.id ?? '';
   },
 
-  async joinRoom(roomId: string): Promise<void> {
-    await apiClient.post<ApiResponse<void>>(`/api/rooms/${roomId}/join`);
+  async joinRoom(roomId: string): Promise<RoomStateResponse> {
+    const res = await apiClient.post<ApiResponse<any>>(`/api/rooms/${roomId}/join`);
+    return normalizeRoomState(unwrap(res.data));
   },
 
   async getActiveRoom(): Promise<RoomResponse | null> {
@@ -233,6 +236,11 @@ export const apiService = {
       winner: raw.winner,
       winnerReason: raw.winner_reason,
     };
+  },
+
+  async getRoomState(roomId: string): Promise<RoomStateResponse> {
+    const res = await apiClient.get<ApiResponse<any>>(`/api/rooms/${roomId}/state`);
+    return normalizeRoomState(unwrap(res.data));
   },
 
   // ─── Battleship ────────────────────────────────────────────────────────────
@@ -589,5 +597,34 @@ function normalizeRoom(raw: any): RoomResponse {
     // by the "active room" deep-link on app boot to know which `/play/<code>` to open.
     socketCode: raw.game_id?.socket_code ?? raw.socketCode ?? undefined,
     playerLimit: raw.player_limit ?? raw.playerLimit ?? raw.maxPlayers ?? 2,
+  };
+}
+
+export function normalizeRoomState(raw: any): RoomStateResponse {
+  const players: RoomPlayer[] = (raw.players ?? []).map((player: any) => {
+    const ref = player.playerId ?? player.user ?? player;
+    return {
+      id: String(ref._id ?? ref.id ?? ''),
+      username: ref.username ?? '',
+    };
+  });
+  return {
+    roomId: String(raw.roomId ?? raw.room_id ?? raw._id ?? raw.id ?? ''),
+    gameId: String(raw.gameId ?? raw.game_id?._id ?? raw.game_id ?? ''),
+    gameSocketCode:
+      raw.gameSocketCode ?? raw.game_socket_code ?? raw.game_id?.socket_code ?? '',
+    status: String(raw.status ?? '').toLowerCase(),
+    players,
+    currentPlayers: raw.currentPlayers ?? raw.current_players ?? players.length,
+    requiredPlayers:
+      raw.requiredPlayers ?? raw.required_players ?? raw.playerLimit ?? raw.player_limit ?? 2,
+    isCurrentUserInRoom:
+      raw.isCurrentUserInRoom ?? raw.is_current_user_in_room ?? false,
+    canEnterPlay: raw.canEnterPlay ?? raw.can_enter_play ?? false,
+    playPath: raw.playPath ?? raw.play_path ?? null,
+    betAmount: raw.betAmount ?? raw.bet_amount ?? 0,
+    roomName: raw.roomName ?? raw.room_name ?? raw.name ?? '',
+    updatedAt: raw.updatedAt ?? raw.updated_at ?? null,
+    startedAt: raw.startedAt ?? raw.started_at ?? null,
   };
 }
