@@ -8,5 +8,6 @@ export function isMatchTerminalPhase(phase: string): boolean {
 export function canAcceptWaitingLobby(phase: string, gameOver?: unknown): boolean {
   if (isMatchTerminalPhase(phase)) return false;
   if (gameOver) return false;
-  return true;
+  const normalized = String(phase).toUpperCase();
+  return normalized === 'WAITING' || normalized === 'PLACEMENT';
 }

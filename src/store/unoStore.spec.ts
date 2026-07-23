@@ -145,4 +145,24 @@ describe('useUnoStore — multi-round transitions (Phase 2)', () => {
     expect(useUnoStore.getState().phase).toBe(UnoPhase.PLAY);
     expect(useUnoStore.getState().hand.length).toBe(2);
   });
+
+  it('does not return from PLAY to WAITING on a late lobby packet', () => {
+    useUnoStore.setState({
+      phase: UnoPhase.PLAY,
+      gameOver: null,
+      statusMessage: 'uno_your_turn',
+    } as never);
+
+    useUnoStore.getState().handleUnoPayload({
+      success: true,
+      data: {
+        waitingForOpponent: true,
+        playersJoined: 3,
+        maxPlayers: 3,
+      },
+      messages: ['ws.games.waitingOpponent'],
+    });
+
+    expect(useUnoStore.getState().phase).toBe(UnoPhase.PLAY);
+  });
 });
