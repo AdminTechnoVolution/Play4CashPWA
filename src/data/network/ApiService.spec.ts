@@ -72,3 +72,44 @@ describe('apiService.recharge', () => {
     );
   });
 });
+
+describe('apiService.getGameHistory', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('maps every opponent from a multiplayer history response', async () => {
+    mocks.get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: [
+          {
+            room_id: 'room-1',
+            opponents: [
+              { username: 'Ana' },
+              { username: 'Luis' },
+              { username: 'Marta' },
+            ],
+          },
+        ],
+      },
+    });
+
+    const [item] = await apiService.getGameHistory();
+
+    expect(item.opponentNames).toEqual(['Ana', 'Luis', 'Marta']);
+  });
+
+  it('falls back to the legacy singular opponent response', async () => {
+    mocks.get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: [{ room_id: 'room-2', opponent: { username: 'LegacyPlayer' } }],
+      },
+    });
+
+    const [item] = await apiService.getGameHistory();
+
+    expect(item.opponentNames).toEqual(['LegacyPlayer']);
+  });
+});

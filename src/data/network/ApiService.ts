@@ -340,17 +340,34 @@ export const apiService = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await apiClient.get<ApiResponse<any[]>>('/api/user/history');
     const raw = unwrap(res.data);
-    return raw.map((item) => ({
-      roomId: item.room_id ?? '',
-      gameName: item.game_name ?? '',
-      gameCode: item.game_code ?? '',
-      betAmount: item.bet_amount ?? 0,
-      result: item.result ?? '',
-      prize: item.prize ?? 0,
-      lostAmount: item.lost_amount ?? item.lostAmount ?? 0,
-      opponentName: item.opponent?.username ?? '',
-      finishedAt: item.finished_at ?? item.date ?? '',
-    }));
+    return raw.map((item) => {
+      const opponentNames = Array.isArray(item.opponents)
+        ? item.opponents
+            .map((opponent: { username?: unknown }) =>
+              typeof opponent?.username === 'string' ? opponent.username.trim() : '',
+            )
+            .filter(Boolean)
+        : [];
+      const legacyOpponentName =
+        typeof item.opponent?.username === 'string' ? item.opponent.username.trim() : '';
+
+      return {
+        roomId: item.room_id ?? '',
+        gameName: item.game_name ?? '',
+        gameCode: item.game_code ?? '',
+        betAmount: item.bet_amount ?? 0,
+        result: item.result ?? '',
+        prize: item.prize ?? 0,
+        lostAmount: item.lost_amount ?? item.lostAmount ?? 0,
+        opponentNames:
+          opponentNames.length > 0
+            ? opponentNames
+            : legacyOpponentName
+              ? [legacyOpponentName]
+              : [],
+        finishedAt: item.finished_at ?? item.date ?? '',
+      };
+    });
   },
 
   async getTournaments(): Promise<TournamentSummary[]> {

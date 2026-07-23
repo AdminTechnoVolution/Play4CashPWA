@@ -621,6 +621,7 @@
   "game_history_empty": "Aucune partie pour le moment",
   "game_history_label_bet": "Mise",
   "game_history_label_opponent": "Adversaire",
+  "game_history_label_opponents": "Adversaires",
   "game_history_label_prize": "Gain",
   "game_history_label_reason": "Raison",
   "game_history_label_result": "Résultat",

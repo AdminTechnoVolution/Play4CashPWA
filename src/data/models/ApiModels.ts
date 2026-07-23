@@ -198,7 +198,7 @@ export interface GameHistoryItem {
   result: string;
   prize: number;
   lostAmount?: number;
-  opponentName: string;
+  opponentNames: string[];
   finishedAt: string;
 }
 

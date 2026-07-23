@@ -641,6 +641,7 @@
   "game_history_empty": "Aún no hay partidas",
   "game_history_label_bet": "Apuesta",
   "game_history_label_opponent": "Oponente",
+  "game_history_label_opponents": "Oponentes",
   "game_history_label_prize": "Premio",
   "game_history_label_reason": "Motivo",
   "game_history_label_result": "Resultado",
