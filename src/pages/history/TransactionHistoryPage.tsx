@@ -434,6 +434,11 @@ const TransactionHistoryPage: React.FC = () => {
                     const normalizedResult = normalizeGameHistoryResult(item);
                     const resultStyle = gameResultStyle(normalizedResult);
                     const showLostAmount = normalizedResult === 'lose' && (item.lostAmount ?? 0) > 0;
+                    const opponentsLabel =
+                      item.opponentNames.length > 1
+                        ? t('game_history_label_opponents')
+                        : t('game_history_label_opponent');
+                    const opponentsText = item.opponentNames.join(', ') || '—';
                     return (
                       <div
                         key={idx}
@@ -463,8 +468,8 @@ const TransactionHistoryPage: React.FC = () => {
                             </div>
                             <div>
                               <IonText>
-                                <p style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '14px', margin: '0 0 2px 0' }}>
-                                  {t('game_history_label_opponent')}: {item.opponentName}
+                                <p style={{ color: 'var(--sovereign-text)', fontWeight: '700', fontSize: '14px', margin: '0 0 2px 0', overflowWrap: 'anywhere' }}>
+                                  {opponentsLabel}: {opponentsText}
                                 </p>
                               </IonText>
                               <IonText>
