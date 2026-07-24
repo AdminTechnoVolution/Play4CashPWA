@@ -605,6 +605,8 @@
   "domino_status_waiting_opponent": "Waiting for an opponent…",
   "domino_status_waiting_table": "Waiting for more players…",
   "domino_tile_count": "%d tiles",
+  "multiplayer_you": "You",
+  "multiplayer_opponent_number": "Opponent %d",
   "domino_timeout_loss": "Time ran out. You lost.",
   "domino_victory": "You win!",
   "domino_victory_empty_hand": "You played all your tiles. You win!",

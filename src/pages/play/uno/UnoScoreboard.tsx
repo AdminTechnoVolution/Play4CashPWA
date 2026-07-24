@@ -28,6 +28,7 @@ interface UnoScoreboardProps {
  * that lets you skip the wait.
  */
 export default function UnoScoreboard(p: UnoScoreboardProps) {
+  const t = useT();
   const sorted = [...p.playerOrder].sort(
     (a, b) => (p.matchScores[b] ?? 0) - (p.matchScores[a] ?? 0),
   );
@@ -56,7 +57,7 @@ export default function UnoScoreboard(p: UnoScoreboardProps) {
         </div>
 
         <ul className="uno-scoreboard__list">
-          {sorted.map((id) => {
+          {sorted.map((id, index) => {
             const score = p.matchScores[id] ?? 0;
             const pct = Math.min(100, (score / Math.max(1, p.matchTargetScore)) * 100);
             const isMe = id === p.myUserId;
@@ -72,7 +73,10 @@ export default function UnoScoreboard(p: UnoScoreboardProps) {
               >
                 <div className="uno-scoreboard__row-head">
                   <span className="uno-scoreboard__name">
-                    {p.usernames[id] || id}
+                    {p.usernames[id]?.trim() ||
+                      (isMe
+                        ? t('multiplayer_you')
+                        : t('multiplayer_opponent_number').replace('%d', String(index + 1)))}
                     {isReady && <span className="uno-scoreboard__ready-tick"> ✓</span>}
                   </span>
                   <span className="uno-scoreboard__score">
@@ -104,3 +108,4 @@ export default function UnoScoreboard(p: UnoScoreboardProps) {
     </div>
   );
 }
+import { useT } from '../../../i18n/translations';

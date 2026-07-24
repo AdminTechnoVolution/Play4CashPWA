@@ -607,6 +607,8 @@
   "domino_status_waiting_opponent": "Esperando un oponente…",
   "domino_status_waiting_table": "Esperando a más jugadores…",
   "domino_tile_count": "%d fichas",
+  "multiplayer_you": "Tú",
+  "multiplayer_opponent_number": "Oponente %d",
   "domino_timeout_loss": "Se acabó el tiempo. Has perdido.",
   "domino_victory": "¡Ganaste!",
   "domino_victory_empty_hand": "Jugaste todas tus fichas. ¡Ganas!",

@@ -123,8 +123,11 @@ describe('useWaitingRoomStartSync', () => {
 
     expect(mocks.lobbyConnect).toHaveBeenCalledWith('game-1', 'room-1');
     expect(mocks.getRoomState).not.toHaveBeenCalled();
-    expect(mocks.roomReady).toHaveBeenCalledWith('room-1');
-    expect(mocks.resync).toHaveBeenCalled();
+    expect(mocks.roomReady).not.toHaveBeenCalled();
+    expect(mocks.resync).toHaveBeenCalledWith({
+      gameSocketCode: 'chess',
+      roomId: 'room-1',
+    });
     expect(mocks.savePlayContext).toHaveBeenCalledWith(
       expect.objectContaining({ hasOpponent: true, opponentName: 'Joiner' }),
     );
@@ -163,8 +166,11 @@ describe('useWaitingRoomStartSync', () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
     expect(mocks.getRoomState).toHaveBeenCalledTimes(1);
-    expect(mocks.roomReady).toHaveBeenCalledWith('room-1');
-    expect(mocks.resync).toHaveBeenCalled();
+    expect(mocks.roomReady).not.toHaveBeenCalled();
+    expect(mocks.resync).toHaveBeenCalledWith({
+      gameSocketCode: 'chess',
+      roomId: 'room-1',
+    });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(20_000);
@@ -233,6 +239,32 @@ describe('useWaitingRoomStartSync', () => {
     expect(mocks.getRoomState).toHaveBeenCalledTimes(2);
     expect(mocks.handleRoomGone).not.toHaveBeenCalled();
     expect(mocks.resync).toHaveBeenCalled();
+  });
+
+  it('does not let a hanging roomReady block a later started-state recovery', async () => {
+    let releaseReady!: () => void;
+    mocks.roomReady.mockImplementation(
+      () => new Promise<void>((resolve) => { releaseReady = resolve; }),
+    );
+    mocks.getRoomState
+      .mockResolvedValueOnce({
+        ...startedState,
+        status: 'waiting',
+        canEnterPlay: false,
+      })
+      .mockResolvedValueOnce(startedState);
+    renderHook(() => useWaitingRoomStartSync('chess', 'room-1', false));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+
+    expect(mocks.roomReady).toHaveBeenCalledTimes(1);
+    expect(mocks.resync).toHaveBeenCalledWith({
+      gameSocketCode: 'chess',
+      roomId: 'room-1',
+    });
+    releaseReady();
   });
 
   it.each([

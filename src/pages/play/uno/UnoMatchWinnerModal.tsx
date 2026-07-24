@@ -20,6 +20,7 @@ interface UnoMatchWinnerModalProps {
  * amount when applicable, and a final scoreboard so everyone sees their final standing.
  */
 export default function UnoMatchWinnerModal(p: UnoMatchWinnerModalProps) {
+  const t = useT();
   if (!p.open) return null;
 
   const sorted = [...p.playerOrder].sort(
@@ -47,7 +48,10 @@ export default function UnoMatchWinnerModal(p: UnoMatchWinnerModalProps) {
           {sorted.map((id, idx) => (
             <li key={id} className={`uno-match-winner__row ${idx === 0 ? 'uno-match-winner__row--top' : ''}`}>
               <span className="uno-match-winner__rank">{idx + 1}.</span>
-              <span className="uno-match-winner__name">{p.usernames[id] || id}</span>
+              <span className="uno-match-winner__name">
+                {p.usernames[id]?.trim() ||
+                  t('multiplayer_opponent_number').replace('%d', String(idx + 1))}
+              </span>
               <span className="uno-match-winner__score">{p.finalScores[id] ?? 0}</span>
             </li>
           ))}
@@ -60,3 +64,4 @@ export default function UnoMatchWinnerModal(p: UnoMatchWinnerModalProps) {
     </div>
   );
 }
+import { useT } from '../../../i18n/translations';

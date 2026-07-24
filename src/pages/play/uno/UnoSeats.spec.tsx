@@ -27,6 +27,22 @@ describe('UnoSeats', () => {
     expect(screen.getByText('×4')).toBeTruthy();
   });
 
+  it('renders every available identity and never falls back to a technical id', () => {
+    render(
+      <UnoSeats
+        {...baseProps}
+        playerOrder={['me', 'opp1', 'opp2', 'player-id-4']}
+        usernames={{ me: 'Me', opp1: 'Alice', opp2: 'Bob' }}
+        handCount={{ me: 5, opp1: 4, opp2: 3, 'player-id-4': 2 }}
+      />,
+    );
+    expect(screen.getByText('Me')).toBeTruthy();
+    expect(screen.getByText('Alice')).toBeTruthy();
+    expect(screen.getByText('Bob')).toBeTruthy();
+    expect(screen.queryByText('player-id-4')).toBeNull();
+    expect(screen.getByText(/opponent|oponente/i)).toBeTruthy();
+  });
+
   it('marks the local player seat', () => {
     const { container } = render(<UnoSeats {...baseProps} />);
     expect(container.querySelector('.uno-seat--self')).toBeTruthy();
