@@ -19,85 +19,71 @@
 
 .domino-table-seats__board {
   position: absolute;
-  inset: 25% 15% 23%;
+  inset: 21% 10% 20%;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: auto;
-  padding: 8px;
-  border-radius: 12px;
-  background: rgba(10, 22, 40, 0.3);
+  padding: 4px;
 }
 
 .domino-table-seat {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: clamp(54px, 18vw, 78px);
-  max-width: 78px;
+  max-width: clamp(72px, 24vw, 128px);
   box-sizing: border-box;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  padding: 4px 5px;
-  border-radius: 10px;
-  border: 1px solid rgba(201, 168, 76, 0.28);
-  background: rgba(0, 0, 0, 0.58);
-  pointer-events: auto;
+  gap: 3px;
+  padding: 1px 3px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  pointer-events: none;
 }
 
 .domino-table-seat--self {
-  border-color: rgba(201, 168, 76, 0.72);
-  background: rgba(26, 41, 64, 0.96);
+  color: #e9c349;
+  text-decoration: underline;
+  text-decoration-color: rgba(233, 195, 73, 0.55);
+  text-underline-offset: 2px;
+}
+
+.domino-table-seat--self .domino-table-seat__name {
+  color: #e9c349;
 }
 
 .domino-table-seat--current {
   border-color: #e9c349;
-  box-shadow: 0 0 12px rgba(233, 195, 73, 0.52);
+  box-shadow: 0 0 0 1px rgba(233, 195, 73, 0.24);
 }
 
-.domino-table-seat__avatar {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #263a59;
+.domino-table-seat__turn {
+  flex: 0 0 auto;
   color: #e9c349;
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 8px;
+  line-height: 1;
 }
 
 .domino-table-seat__name {
-  width: 100%;
-  margin-top: 2px;
+  min-width: 0;
+  max-width: 94px;
   overflow: hidden;
   color: #fff;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  line-height: 1.2;
-  text-align: center;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .domino-table-seat__tiles {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  margin-top: 2px;
+  flex: 0 0 auto;
   color: #a9b5cc;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
-}
-
-.domino-table-seat__mini-tile {
-  width: 7px;
-  height: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: 2px;
-  background: #171717;
 }
 
 @media (max-width: 420px) {
@@ -106,11 +92,15 @@
   }
 
   .domino-table-seats__board {
-    inset: 25% 17% 24%;
+    inset: 21% 9% 20%;
   }
 
   .domino-table-seat {
-    width: 58px;
-    padding-inline: 3px;
+    max-width: 88px;
+  }
+
+  .domino-table-seat__name,
+  .domino-table-seat__tiles {
+    font-size: 9px;
   }
 }
