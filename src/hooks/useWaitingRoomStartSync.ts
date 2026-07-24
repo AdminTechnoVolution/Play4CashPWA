@@ -12,6 +12,7 @@ import { useAuthStore } from '../store/authStore';
 import type { RoomStateResponse } from '../data/models/ApiModels';
 
 const AUTO_START_GAMES = new Set(['chess', 'halma', 'domino', 'uno', 'connect-four']);
+const WAITING_ROOM_HTTP_POLL_MS = 10_000;
 
 function subscribeGame(game: string, onChange: () => void): () => void {
   switch (game) {
@@ -57,6 +58,7 @@ export function useWaitingRoomStartSync(
     let cancelled = false;
     const lobbySocket = new LobbySocketManager();
     let processing = Promise.resolve();
+    let httpPollInFlight = false;
 
     const processState = async (status: RoomStateResponse) => {
       if (
@@ -112,6 +114,22 @@ export function useWaitingRoomStartSync(
     const enqueueState = (state: RoomStateResponse) => {
       processing = processing.then(() => processState(state));
     };
+    const pollStateOverHttp = async () => {
+      if (
+        cancelled ||
+        httpPollInFlight ||
+        (automaticGame && !isWaiting(gameSocketCode))
+      ) return;
+
+      httpPollInFlight = true;
+      try {
+        enqueueState(await apiRepository.getRoomState(roomId));
+      } catch {
+        // WebSocket remains authoritative; retry transient HTTP failures next tick.
+      } finally {
+        httpPollInFlight = false;
+      }
+    };
     const requestState = () => lobbySocket.requestRoomState(roomId);
     const gameId = getGameContext()?.gameId || '';
 
@@ -135,8 +153,15 @@ export function useWaitingRoomStartSync(
     };
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('p4c:socket-resync', onSocketResync);
+    const httpPollTimer = automaticGame
+      ? window.setInterval(
+          () => void pollStateOverHttp(),
+          WAITING_ROOM_HTTP_POLL_MS,
+        )
+      : undefined;
     return () => {
       cancelled = true;
+      if (httpPollTimer !== undefined) window.clearInterval(httpPollTimer);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('p4c:socket-resync', onSocketResync);
       lobbySocket.offAll();
