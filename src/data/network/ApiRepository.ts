@@ -25,6 +25,7 @@ import type {
   TournamentBracketResponse,
   ContactUsSubmitPayload,
   ContactUsSubmitResponse,
+  ContactRequestItem,
 } from '../models/ApiModels';
 
 const ACCOUNT_CACHE_TTL_MS = 30_000;
@@ -196,6 +197,10 @@ export const apiRepository = {
 
   async submitContactUs(payload: ContactUsSubmitPayload): Promise<ContactUsSubmitResponse> {
     return apiService.submitContactUs(payload);
+  },
+
+  async getMyContactRequests(): Promise<ContactRequestItem[]> {
+    return apiService.getMyContactRequests();
   },
 
   async unregisterTournament(id: string): Promise<unknown> {
