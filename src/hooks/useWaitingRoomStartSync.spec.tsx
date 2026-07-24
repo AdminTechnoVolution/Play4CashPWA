@@ -151,20 +151,115 @@ describe('useWaitingRoomStartSync', () => {
     expect(mocks.requestRoomState).toHaveBeenCalledWith('room-1');
   });
 
-  it('does not create a polling loop and cleans up on unmount', async () => {
-    const setIntervalSpy = vi.spyOn(window, 'setInterval');
-    const { rerender, unmount } = renderHook(() =>
+  it('polls HTTP every 10 seconds while waiting and cleans up on unmount', async () => {
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+    const { unmount } = renderHook(() =>
       useWaitingRoomStartSync('chess', 'room-1', false),
     );
     await flushAsyncWork();
 
-    rerender();
-    expect(setIntervalSpy).not.toHaveBeenCalled();
     expect(mocks.getRoomState).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(mocks.getRoomState).toHaveBeenCalledTimes(1);
+    expect(mocks.roomReady).toHaveBeenCalledWith('room-1');
+    expect(mocks.resync).toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(mocks.getRoomState).toHaveBeenCalledTimes(3);
 
     unmount();
+    expect(clearIntervalSpy).toHaveBeenCalled();
     expect(mocks.lobbyOffAll).toHaveBeenCalled();
     expect(mocks.lobbyDisconnect).toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(mocks.getRoomState).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops polling when the game leaves the waiting phase', async () => {
+    renderHook(() => useWaitingRoomStartSync('chess', 'room-1', false));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(mocks.getRoomState).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      useChessStore.setState({ phase: ChessPhase.PLAY });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(mocks.getRoomState).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not overlap slow HTTP polls', async () => {
+    let resolveRequest!: (state: typeof startedState) => void;
+    mocks.getRoomState.mockImplementation(
+      () => new Promise((resolve) => { resolveRequest = resolve; }),
+    );
+    renderHook(() => useWaitingRoomStartSync('chess', 'room-1', false));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(mocks.getRoomState).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRequest(startedState);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(mocks.getRoomState).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries after a transient HTTP error', async () => {
+    mocks.getRoomState
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce(startedState);
+    renderHook(() => useWaitingRoomStartSync('chess', 'room-1', false));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(mocks.getRoomState).toHaveBeenCalledTimes(2);
+    expect(mocks.handleRoomGone).not.toHaveBeenCalled();
+    expect(mocks.resync).toHaveBeenCalled();
+  });
+
+  it.each([
+    { roomId: '', spectator: false, phase: ChessPhase.WAITING },
+    { roomId: 'room-1', spectator: true, phase: ChessPhase.WAITING },
+    { roomId: 'room-1', spectator: false, phase: ChessPhase.PLAY },
+  ])('does not poll outside an active player waiting popup: %o', async ({
+    roomId,
+    spectator,
+    phase,
+  }) => {
+    useChessStore.setState({ phase });
+    renderHook(() => useWaitingRoomStartSync('chess', roomId, spectator));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(mocks.getRoomState).not.toHaveBeenCalled();
+  });
+
+  it('does not add the waiting-room HTTP poll to battleship', async () => {
+    renderHook(() => useWaitingRoomStartSync('battleship', 'room-1', false));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(mocks.getRoomState).not.toHaveBeenCalled();
   });
 
   it('does not enter play when the authenticated user is not in the room', async () => {
