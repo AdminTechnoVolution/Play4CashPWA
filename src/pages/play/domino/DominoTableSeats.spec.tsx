@@ -21,8 +21,14 @@ describe('DominoTableSeats', () => {
         </DominoTableSeats>,
       );
       const seats = [...container.querySelectorAll<HTMLElement>('.domino-table-seat')];
+      const board = container.querySelector('[data-region="domino-board"]');
+      const perimeter = container.querySelector('[data-region="player-perimeter"]');
       expect(seats).toHaveLength(count);
       expect(new Set(seats.map((seat) => `${seat.style.left}:${seat.style.top}`)).size).toBe(count);
+      expect(board).toBeTruthy();
+      expect(perimeter).toBeTruthy();
+      expect(board?.contains(perimeter)).toBe(false);
+      expect(board?.querySelector('.domino-table-seat')).toBeNull();
       expect(screen.getByText('BOARD')).toBeTruthy();
     },
   );
