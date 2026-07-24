@@ -267,6 +267,38 @@ describe('useWaitingRoomStartSync', () => {
     releaseReady();
   });
 
+  it('actively resyncs a full room that still reports WAITING and zero seats remaining', async () => {
+    let releaseReady!: () => void;
+    mocks.roomReady.mockImplementation(
+      () => new Promise<void>((resolve) => { releaseReady = resolve; }),
+    );
+    mocks.getRoomState.mockResolvedValue({
+      ...startedState,
+      status: 'waiting',
+      currentPlayers: 2,
+      requiredPlayers: 2,
+      canEnterPlay: false,
+    });
+    renderHook(() => useWaitingRoomStartSync('chess', 'room-1', false));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(mocks.roomReady).toHaveBeenCalledWith('room-1');
+    expect(mocks.resync).toHaveBeenCalledWith({
+      gameSocketCode: 'chess',
+      roomId: 'room-1',
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(mocks.resync).toHaveBeenCalledTimes(3);
+    expect(mocks.roomReady).toHaveBeenCalledTimes(1);
+    releaseReady();
+  });
+
   it.each([
     { roomId: '', spectator: false, phase: ChessPhase.WAITING },
     { roomId: 'room-1', spectator: true, phase: ChessPhase.WAITING },

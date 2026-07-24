@@ -111,8 +111,13 @@ export function useWaitingRoomStartSync(
           roomStatus === 'waiting' &&
           status.currentPlayers >= requiredPlayers
         ) {
-          // Idempotent best effort. Do not block authoritative state processing:
-          // a stalled PATCH must not hold every later roomState/get_state retry.
+          // A full roster can still be reported as waiting while the game namespace
+          // is finishing its start lease. Actively join/get_state there: that path
+          // marks this socket ready, reconciles start and returns private state.
+          if (automaticGame) {
+            await resyncActivePlaySession({ gameSocketCode, roomId });
+          }
+          // REST readiness remains an idempotent, non-blocking secondary trigger.
           confirmRoomReady();
         } else if (roomStatus === 'finished') {
           handleRoomGone({ reason: 'cancelled', gameSocketCode, roomId });
