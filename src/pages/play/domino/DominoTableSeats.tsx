@@ -20,8 +20,13 @@ export default function DominoTableSeats({ players, children }: DominoTableSeats
 
   return (
     <div className="domino-table-seats" data-player-count={players.length}>
-      <div className="domino-table-seats__board">{children}</div>
-      <div className="domino-table-seats__ring" aria-label="players" role="list">
+      <div className="domino-table-seats__board" data-region="domino-board">{children}</div>
+      <div
+        className="domino-table-seats__ring"
+        aria-label="players"
+        role="list"
+        data-region="player-perimeter"
+      >
         {players.map((player, index) => {
           const slot = slots[index] ?? slots[0];
           return (

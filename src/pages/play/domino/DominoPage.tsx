@@ -40,6 +40,8 @@ interface SnakeBoardProps {
   canPlaceRight: boolean;
 }
 
+const BOARD_TILE_CELL_PX = 17;
+
 function SnakeDominoBoard({
   board, leftEnd, rightEnd, lastPlayedTile, sidePickTile, canPlaceLeft, canPlaceRight,
 }: SnakeBoardProps) {
@@ -61,8 +63,8 @@ function SnakeDominoBoard({
   const layout = useMemo(
     () => buildDominoBoardLayout(board, leftEnd, rightEnd, {
       availableWidth: containerWidth,
-      cellPx: 20,
-      horizontalPadding: 36,
+      cellPx: BOARD_TILE_CELL_PX,
+      horizontalPadding: 16,
     }),
     [board, leftEnd, rightEnd, containerWidth],
   );
@@ -76,7 +78,15 @@ function SnakeDominoBoard({
 
   return (
     <div ref={containerRef} style={{ width: '100%' }}>
-      <div style={{ position: 'relative', width: layout.width, maxWidth: '100%', height: layout.height }}>
+      <div
+        style={{
+          position: 'relative',
+          width: layout.width,
+          maxWidth: '100%',
+          height: layout.height,
+          marginInline: 'auto',
+        }}
+      >
         {layout.placements.map((placement) => {
           const tile = board[placement.index];
           const isLastPlayed =
@@ -98,7 +108,7 @@ function SnakeDominoBoard({
               <BoardTileViz
                 left={placement.first}
                 right={placement.second}
-                cellPx={20}
+                cellPx={BOARD_TILE_CELL_PX}
                 highlight={isLastPlayed}
                 forceVertical={placement.orientation === 'vertical'}
               />

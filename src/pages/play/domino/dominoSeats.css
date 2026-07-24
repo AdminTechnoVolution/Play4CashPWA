@@ -1,7 +1,7 @@
 .domino-table-seats {
   position: relative;
   width: 100%;
-  min-height: clamp(300px, 52vh, 480px);
+  min-height: clamp(330px, 58vh, 540px);
   overflow: hidden;
   border-radius: 18px;
   border: 1px solid rgba(201, 168, 76, 0.22);
@@ -12,20 +12,27 @@
 
 .domino-table-seats__ring {
   position: absolute;
-  inset: 6px;
+  inset: 0;
   z-index: 3;
   pointer-events: none;
 }
 
 .domino-table-seats__board {
   position: absolute;
-  inset: 21% 10% 20%;
+  inset: 28px 0;
   z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   overflow: auto;
-  padding: 4px;
+  padding: 6px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(233, 195, 73, 0.42) transparent;
+}
+
+.domino-table-seats__board > ion-text {
+  display: block;
+  margin-top: 45%;
+  text-align: center;
+  transform: translateY(-50%);
 }
 
 .domino-table-seat {
@@ -42,6 +49,41 @@
   border-radius: 5px;
   background: transparent;
   pointer-events: none;
+}
+
+/* Player UI occupies dedicated top/bottom rails; the felt interior is tile-only. */
+.domino-table-seats[data-player-count='1'] .domino-table-seat:nth-child(1),
+.domino-table-seats[data-player-count='2'] .domino-table-seat:nth-child(1),
+.domino-table-seats[data-player-count='3'] .domino-table-seat:nth-child(1) {
+  left: 50% !important;
+  top: calc(100% - 13px) !important;
+}
+
+.domino-table-seats[data-player-count='2'] .domino-table-seat:nth-child(2) {
+  left: 50% !important;
+  top: 13px !important;
+}
+
+.domino-table-seats[data-player-count='3'] .domino-table-seat:nth-child(2),
+.domino-table-seats[data-player-count='4'] .domino-table-seat:nth-child(2) {
+  left: 25% !important;
+  top: 13px !important;
+}
+
+.domino-table-seats[data-player-count='3'] .domino-table-seat:nth-child(3),
+.domino-table-seats[data-player-count='4'] .domino-table-seat:nth-child(3) {
+  left: 75% !important;
+  top: 13px !important;
+}
+
+.domino-table-seats[data-player-count='4'] .domino-table-seat:nth-child(1) {
+  left: 25% !important;
+  top: calc(100% - 13px) !important;
+}
+
+.domino-table-seats[data-player-count='4'] .domino-table-seat:nth-child(4) {
+  left: 75% !important;
+  top: calc(100% - 13px) !important;
 }
 
 .domino-table-seat--self {
@@ -88,11 +130,7 @@
 
 @media (max-width: 420px) {
   .domino-table-seats {
-    min-height: 330px;
-  }
-
-  .domino-table-seats__board {
-    inset: 21% 9% 20%;
+    min-height: 380px;
   }
 
   .domino-table-seat {
