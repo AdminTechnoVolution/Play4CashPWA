@@ -587,6 +587,8 @@
   "domino_status_waiting_opponent": "En attente d'un adversaire…",
   "domino_status_waiting_table": "En attente d'autres joueurs…",
   "domino_tile_count": "%d tuiles",
+  "multiplayer_you": "Vous",
+  "multiplayer_opponent_number": "Adversaire %d",
   "domino_timeout_loss": "Le temps est écoulé. Vous avez perdu.",
   "domino_victory": "Vous avez gagné !",
   "domino_victory_empty_hand": "Vous avez joué toutes vos tuiles. Vous gagnez !",

@@ -1,7 +1,7 @@
 import { orderPlayersForTable, getSeatLayout } from './unoSeatLayout';
+import { useT } from '../../../i18n/translations';
 
 interface SeatProps {
-  playerId: string;
   username: string;
   cardCount: number;
   isCurrentTurn: boolean;
@@ -18,7 +18,7 @@ interface SeatProps {
 }
 
 function Seat(p: SeatProps) {
-  const initials = (p.username || '?').slice(0, 2).toUpperCase();
+  const initials = p.username.slice(0, 2).toUpperCase();
   return (
     <div
       className={[
@@ -30,7 +30,7 @@ function Seat(p: SeatProps) {
       style={{ left: `${p.slotX}%`, top: `${p.slotY}%` }}
     >
       <div className="uno-seat__avatar">{initials}</div>
-      <div className="uno-seat__name">{p.username || p.playerId}</div>
+      <div className="uno-seat__name">{p.username}</div>
       <div className="uno-seat__cards" aria-label={`${p.cardCount} cards`}>
         <span className="uno-seat__minicard" />
         <span>×{p.cardCount}</span>
@@ -69,6 +69,7 @@ interface UnoSeatsProps {
  * Positions follow `unoSeatLayout` rules for 2–10 players.
  */
 export default function UnoSeats(p: UnoSeatsProps) {
+  const t = useT();
   const ordered = orderPlayersForTable(p.playerOrder, p.myUserId);
   const slots = getSeatLayout(ordered.length);
 
@@ -80,8 +81,12 @@ export default function UnoSeats(p: UnoSeatsProps) {
         return (
           <Seat
             key={id}
-            playerId={id}
-            username={p.usernames[id] || ''}
+            username={
+              p.usernames[id]?.trim() ||
+              (isSelf
+                ? t('multiplayer_you')
+                : t('multiplayer_opponent_number').replace('%d', String(index)))
+            }
             cardCount={p.handCount[id] ?? 0}
             isCurrentTurn={p.currentTurnPlayerId === id}
             isEliminated={p.eliminatedPlayers.includes(id)}

@@ -587,6 +587,8 @@
   "domino_status_waiting_opponent": "Aguardando um oponente…",
   "domino_status_waiting_table": "Aguardando mais jogadores…",
   "domino_tile_count": "%d pedras",
+  "multiplayer_you": "Você",
+  "multiplayer_opponent_number": "Oponente %d",
   "domino_timeout_loss": "O tempo acabou. Você perdeu.",
   "domino_victory": "Você ganhou!",
   "domino_victory_empty_hand": "Você jogou todas as peças. Você ganhou!",

@@ -652,7 +652,13 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
 
     const opponents =
       handCountObj && Object.keys(handCountObj).length > 0
-        ? opponentsFromHandCount(data, handCountObj, myUserId, initialOpponentName)
+        ? opponentsFromHandCount(
+            data,
+            handCountObj,
+            myUserId,
+            initialOpponentName,
+            get().opponents,
+          )
         : get().opponents;
 
     const rawTurnUsername = String(data?.currentTurnUsername || data?.current_turn_username || '').trim();

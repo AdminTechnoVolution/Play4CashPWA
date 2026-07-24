@@ -59,6 +59,17 @@ export function useWaitingRoomStartSync(
     const lobbySocket = new LobbySocketManager();
     let processing = Promise.resolve();
     let httpPollInFlight = false;
+    let roomReadyInFlight = false;
+
+    const confirmRoomReady = () => {
+      if (roomReadyInFlight || cancelled) return;
+      roomReadyInFlight = true;
+      void apiRepository.roomReady(roomId)
+        .catch(() => undefined)
+        .finally(() => {
+          roomReadyInFlight = false;
+        });
+    };
 
     const processState = async (status: RoomStateResponse) => {
       if (
@@ -77,15 +88,6 @@ export function useWaitingRoomStartSync(
 
         // Do not rely solely on `opponentJoined`: that event is not replayed after a
         // socket reconnect, leaving P1 permanently false while P2 is already ready.
-        if (
-          (roomStatus === 'waiting' || roomStatus === 'started') &&
-          status.currentPlayers >= requiredPlayers
-        ) {
-          // Idempotent best effort. A transient PATCH failure must not be treated as
-          // a deleted room; the next tick retries while Mongo remains authoritative.
-          await apiRepository.roomReady(roomId).catch(() => undefined);
-        }
-
         if (roomStatus === 'started' && status.canEnterPlay) {
           const current = getPlayContext();
           if (current) {
@@ -99,10 +101,19 @@ export function useWaitingRoomStartSync(
               hasOpponent: status.currentPlayers > 1,
             });
           }
-        }
 
-        if (automaticGame && roomStatus === 'started' && status.canEnterPlay) {
-          await resyncActivePlaySession();
+          // A started room already has enough readiness to enter play. Never place
+          // its private-state recovery behind a potentially hanging roomReady PATCH.
+          if (automaticGame) {
+            await resyncActivePlaySession({ gameSocketCode, roomId });
+          }
+        } else if (
+          roomStatus === 'waiting' &&
+          status.currentPlayers >= requiredPlayers
+        ) {
+          // Idempotent best effort. Do not block authoritative state processing:
+          // a stalled PATCH must not hold every later roomState/get_state retry.
+          confirmRoomReady();
         } else if (roomStatus === 'finished') {
           handleRoomGone({ reason: 'cancelled', gameSocketCode, roomId });
         }

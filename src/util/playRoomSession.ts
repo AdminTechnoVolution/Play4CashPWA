@@ -132,7 +132,7 @@ export function handleRoomGone(opts: HandleRoomGoneOptions): void {
   });
 }
 
-function requestSyncOnActiveGameSocket(gameSocketCode: string, roomId: string): void {
+export function requestSyncOnActiveGameSocket(gameSocketCode: string, roomId: string): void {
   switch (gameSocketCode) {
     case 'chess':
       (window as unknown as { chessSocket?: { requestSync: (id: string) => void } }).chessSocket
@@ -162,13 +162,15 @@ function requestSyncOnActiveGameSocket(gameSocketCode: string, roomId: string): 
  * After tab wake / bfcache: reconnect transports, re-join/sync active play room,
  * redirect home if the room is invalid (no forfeit/money modal).
  */
-export async function resyncActivePlaySession(): Promise<void> {
+export async function resyncActivePlaySession(
+  target?: { gameSocketCode: string; roomId: string },
+): Promise<void> {
   reconnectAllStaleSockets();
 
-  const playCtx = getPlayContext();
-  const gameSocketCode = gameSocketCodeFromPlayPath();
-  if (!playCtx?.roomId || !gameSocketCode) return;
+  const gameSocketCode = target?.gameSocketCode || gameSocketCodeFromPlayPath();
+  const roomId = target?.roomId || getPlayContext()?.roomId;
+  if (!roomId || !gameSocketCode) return;
   if (isGameEndInProgress()) return;
 
-  requestSyncOnActiveGameSocket(gameSocketCode, playCtx.roomId);
+  requestSyncOnActiveGameSocket(gameSocketCode, roomId);
 }

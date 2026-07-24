@@ -4,6 +4,7 @@ import {
   GAME_END_OWN_TIMEOUT_REASONS,
   normalizedGameEndReason,
 } from '../../../i18n/ApiMessageDisplay';
+import { t } from '../../../i18n/translations';
 
 export type DominoBoardEnd = { tiles: DominoTile[]; leftEnd: number; rightEnd: number };
 
@@ -134,9 +135,17 @@ export function opponentsFromHandCount(
   handCount: Record<string, number> | null | undefined,
   myUserId: string,
   initialOpponentName: string,
+  existingOpponents: { username: string; tileCount: number }[] = [],
 ): { username: string; tileCount: number }[] {
   if (!handCount || typeof handCount !== 'object') return [];
   const idToName = new Map<string, string>();
+  const usernames = data?.usernames;
+  if (usernames && typeof usernames === 'object' && !Array.isArray(usernames)) {
+    Object.entries(usernames).forEach(([id, username]) => {
+      const name = String(username ?? '').trim();
+      if (id.trim() && name) idToName.set(id.trim(), name);
+    });
+  }
   const players = data?.players;
   if (Array.isArray(players)) {
     players.forEach((p: any) => {
@@ -146,6 +155,13 @@ export function opponentsFromHandCount(
       if (id && un) idToName.set(id, un);
     });
   }
+  const playerOrder = Array.isArray(data?.playerOrder)
+    ? data.playerOrder.map((id: unknown) => String(id ?? '').trim())
+    : Object.keys(handCount);
+  playerOrder.forEach((id: string, index: number) => {
+    const legacyName = String(data?.[`player${index + 1}`] ?? '').trim();
+    if (id && legacyName && !idToName.has(id)) idToName.set(id, legacyName);
+  });
   const result: { username: string; tileCount: number }[] = [];
   let idx = 1;
   for (const key of Object.keys(handCount)) {
@@ -154,7 +170,10 @@ export function opponentsFromHandCount(
     const named = idToName.get(key);
     let label = named;
     if (!label) {
-      label = result.length === 0 && initialOpponentName.trim().length > 0 ? initialOpponentName : `Opp ${idx}`;
+      label =
+        existingOpponents[result.length]?.username?.trim() ||
+        (result.length === 0 ? initialOpponentName.trim() : '') ||
+        t('multiplayer_opponent_number').replace('%d', String(idx));
     }
     result.push({ username: label, tileCount: count });
     idx++;

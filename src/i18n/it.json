@@ -587,6 +587,8 @@
   "domino_status_waiting_opponent": "In attesa di un avversario…",
   "domino_status_waiting_table": "In attesa di altri giocatori…",
   "domino_tile_count": "%d tessere",
+  "multiplayer_you": "Tu",
+  "multiplayer_opponent_number": "Avversario %d",
   "domino_timeout_loss": "Tempo scaduto. Hai perso.",
   "domino_victory": "Hai vinto!",
   "domino_victory_empty_hand": "Hai giocato tutte le tessere. Hai vinto!",
