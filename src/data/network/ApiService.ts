@@ -28,6 +28,7 @@ import type {
   TournamentBracketMatch,
   ContactUsSubmitPayload,
   ContactUsSubmitResponse,
+  ContactRequestItem,
 } from '../models/ApiModels';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -374,6 +375,17 @@ export const apiService = {
               ? [legacyOpponentName]
               : [],
         finishedAt: item.finished_at ?? item.date ?? '',
+        auditAdjustment: item.audit_adjustment
+          ? {
+              kind: item.audit_adjustment.kind,
+              amount: Number(item.audit_adjustment.amount ?? 0),
+              reason: String(item.audit_adjustment.reason ?? ''),
+              createdAt: String(item.audit_adjustment.created_at ?? ''),
+              affectedUsernames: Array.isArray(item.audit_adjustment.affected_usernames)
+                ? item.audit_adjustment.affected_usernames.map(String)
+                : [],
+            }
+          : null,
       };
     });
   },
@@ -447,6 +459,22 @@ export const apiService = {
     const res = await apiClient.post<ApiResponse<any>>('/api/contact-us', req);
     const raw = unwrap(res.data);
     return { id: raw._id ?? raw.id ?? '' };
+  },
+
+  async getMyContactRequests(): Promise<ContactRequestItem[]> {
+    const res = await apiClient.get<ApiResponse<any[]>>('/api/contact-us/mine');
+    const raw = unwrap(res.data);
+    return raw.map((item) => ({
+      id: String(item._id ?? item.id ?? ''),
+      type: item.type,
+      message: String(item.message ?? ''),
+      allGames: !!item.all_games,
+      gameLabels: Array.isArray(item.game_labels) ? item.game_labels.map(String) : [],
+      status: item.status,
+      reviewResponse: String(item.public_response ?? item.admin_notes ?? ''),
+      createdAt: String(item.createdAt ?? item.created_at ?? ''),
+      updatedAt: String(item.updatedAt ?? item.updated_at ?? ''),
+    }));
   },
 };
 

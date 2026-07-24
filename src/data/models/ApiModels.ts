@@ -217,6 +217,13 @@ export interface GameHistoryItem {
   lostAmount?: number;
   opponentNames: string[];
   finishedAt: string;
+  auditAdjustment?: {
+    kind: 'balance_removed' | 'balance_refunded';
+    amount: number;
+    reason: string;
+    createdAt: string;
+    affectedUsernames: string[];
+  } | null;
 }
 
 export interface TournamentHistoryItem {
@@ -503,4 +510,18 @@ export interface ContactUsSubmitPayload {
 
 export interface ContactUsSubmitResponse {
   id: string;
+}
+
+export type ContactRequestStatus = 'new' | 'read' | 'resolved';
+
+export interface ContactRequestItem {
+  id: string;
+  type: ContactUsType;
+  message: string;
+  allGames: boolean;
+  gameLabels: string[];
+  status: ContactRequestStatus;
+  reviewResponse: string;
+  createdAt: string;
+  updatedAt: string;
 }

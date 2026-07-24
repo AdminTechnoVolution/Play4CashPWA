@@ -19,6 +19,9 @@ import {
   IonRefresher,
   IonRefresherContent,
   RefresherEventDetail,
+  IonButton,
+  IonToast,
+  IonAlert,
 } from '@ionic/react';
 import { AppBackButton } from '../../navigation/AppBackButton';
 import {
@@ -30,6 +33,10 @@ import {
   checkmarkCircleOutline,
   closeCircleOutline,
   hourglassOutline,
+  copyOutline,
+  checkmarkOutline,
+  returnDownBackOutline,
+  removeCircleOutline,
 } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
@@ -60,6 +67,29 @@ const TransactionHistoryPage: React.FC = () => {
   const [withdrawalsLoaded, setWithdrawalsLoaded] = useState(false);
   const [gamesLoaded, setGamesLoaded] = useState(false);
   const [tournamentsLoaded, setTournamentsLoaded] = useState(false);
+  const [copiedRoomId, setCopiedRoomId] = useState('');
+  const [selectedAuditAdjustment, setSelectedAuditAdjustment] = useState<GameHistoryItem['auditAdjustment']>(null);
+
+  const copyRoomId = async (roomId: string) => {
+    if (!roomId) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(roomId);
+      } else {
+        const input = document.createElement('textarea');
+        input.value = roomId;
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        input.remove();
+      }
+      setCopiedRoomId(roomId);
+    } catch {
+      setCopiedRoomId('');
+    }
+  };
 
   const loadDeposits = useCallback(async () => {
     setDepositsLoading(true);
@@ -513,19 +543,101 @@ const TransactionHistoryPage: React.FC = () => {
                           </div>
                         </div>
 
-                        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <IonIcon icon={timeOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }} />
-                          <IonText>
-                            <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>
-                              {formatDate(item.finishedAt)}
-                            </span>
-                          </IonText>
+                        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                            <IonIcon icon={timeOutline} style={{ color: 'var(--sovereign-text-muted)', fontSize: '13px' }} />
+                            <IonText>
+                              <span style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px' }}>
+                                {formatDate(item.finishedAt)}
+                              </span>
+                            </IonText>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {!!item.auditAdjustment && (
+                            <IonButton
+                              fill="clear"
+                              size="small"
+                              aria-label={t(item.auditAdjustment.kind === 'balance_removed'
+                                ? 'game_history_balance_removed'
+                                : 'game_history_balance_refunded')}
+                              onClick={() => setSelectedAuditAdjustment(item.auditAdjustment)}
+                              style={{
+                                minHeight: '30px',
+                                margin: 0,
+                                color: item.auditAdjustment.kind === 'balance_removed'
+                                  ? 'var(--sovereign-error)'
+                                  : '#4caf50',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                              }}
+                            >
+                              <IonIcon
+                                icon={item.auditAdjustment.kind === 'balance_removed'
+                                  ? removeCircleOutline
+                                  : returnDownBackOutline}
+                                style={{ marginRight: 4 }}
+                              />
+                              {t(item.auditAdjustment.kind === 'balance_removed'
+                                ? 'game_history_balance_removed'
+                                : 'game_history_balance_refunded')}
+                            </IonButton>
+                          )}
+                          {!!item.roomId && (
+                            <IonButton
+                              fill="clear"
+                              size="small"
+                              aria-label={t('game_history_copy_room_id')}
+                              title={t('game_history_copy_room_id')}
+                              onClick={() => void copyRoomId(item.roomId)}
+                              style={{
+                                minHeight: '30px',
+                                margin: 0,
+                                color: copiedRoomId === item.roomId ? '#4caf50' : 'var(--sovereign-gold)',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                              }}
+                            >
+                              <span style={{ marginRight: '5px' }}>
+                                {t('game_history_game_id_short')}: {item.roomId.slice(0, 6)}…
+                              </span>
+                              <IonIcon
+                                icon={copiedRoomId === item.roomId ? checkmarkOutline : copyOutline}
+                              />
+                            </IonButton>
+                          )}
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                 </IonList>
-              )}
+      )}
+      <IonToast
+        isOpen={!!copiedRoomId}
+        message={t('game_history_room_id_copied')}
+        duration={1800}
+        position="bottom"
+        onDidDismiss={() => setCopiedRoomId('')}
+      />
+      <IonAlert
+        isOpen={!!selectedAuditAdjustment}
+        onDidDismiss={() => setSelectedAuditAdjustment(null)}
+        header={selectedAuditAdjustment?.kind === 'balance_removed'
+          ? t('game_history_balance_removed')
+          : t('game_history_balance_refunded')}
+        message={selectedAuditAdjustment
+          ? [
+              `${t('game_history_audit_amount')}: $${formatUSD(selectedAuditAdjustment.amount)}`,
+              `${t('game_history_audit_affected')}: ${selectedAuditAdjustment.affectedUsernames.join(', ') || '—'}`,
+              selectedAuditAdjustment.reason,
+              t(selectedAuditAdjustment.kind === 'balance_removed'
+                ? 'game_history_audit_removed_explanation'
+                : 'game_history_audit_refunded_explanation'),
+            ].filter(Boolean).join('<br/><br/>')
+          : ''}
+        buttons={[t('ok')]}
+        cssClass="sovereign-alert"
+      />
             </>
           )}
 

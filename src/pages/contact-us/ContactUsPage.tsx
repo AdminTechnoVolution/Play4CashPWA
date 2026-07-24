@@ -17,6 +17,10 @@ import {
   IonToggle,
   IonItem,
   IonLabel,
+  IonSegment,
+  IonSegmentButton,
+  IonBadge,
+  IonButton,
 } from '@ionic/react';
 import {
   chevronDownOutline,
@@ -24,6 +28,7 @@ import {
   mailOutline,
   gameControllerOutline,
   chatbubbleOutline,
+  refreshOutline,
 } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
 import { SovereignPrimaryButton } from '../../ui/components/SovereignButton';
@@ -31,7 +36,7 @@ import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { AppBackButton } from '../../navigation/AppBackButton';
 import { useT } from '../../i18n/translations';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
-import type { ContactUsType, GameResponse } from '../../data/models/ApiModels';
+import type { ContactRequestItem, ContactUsType, GameResponse } from '../../data/models/ApiModels';
 import '../../ui/theme/variables.css';
 
 const MESSAGE_MIN = 10;
@@ -58,6 +63,24 @@ const ContactUsPage: React.FC = () => {
   const [alertMessage, setAlertMessage] = useState('');
 
   const [validationError, setValidationError] = useState('');
+  const [view, setView] = useState<'new' | 'mine'>('new');
+  const [requests, setRequests] = useState<ContactRequestItem[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+
+  const loadRequests = async () => {
+    setRequestsLoading(true);
+    try {
+      setRequests(await apiRepository.getMyContactRequests());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('error_try_later_message'));
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'mine') void loadRequests();
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     (async () => {
@@ -118,6 +141,7 @@ const ContactUsPage: React.FC = () => {
       setSelectedGameIds(new Set());
       setAlertMessage(t('contact_us_success'));
       setAlertOpen(true);
+      setRequests([]);
     } catch (err) {
       const msg = formatApiMessageForDisplay(
         err instanceof Error ? err.message : null,
@@ -160,6 +184,21 @@ const ContactUsPage: React.FC = () => {
             animation: 'fadeInUp 0.5s ease',
           }}
         >
+          <IonSegment
+            value={view}
+            onIonChange={(event) => setView(event.detail.value as 'new' | 'mine')}
+            style={{ marginBottom: '20px' }}
+          >
+            <IonSegmentButton value="new">
+              <IonLabel>{t('contact_us_new_request')}</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="mine">
+              <IonLabel>{t('contact_us_my_requests')}</IonLabel>
+            </IonSegmentButton>
+          </IonSegment>
+
+          {view === 'new' ? (
+          <>
           <CollapsibleCard
             icon={mailOutline}
             title={t('contact_us_type_label')}
@@ -304,6 +343,88 @@ const ContactUsPage: React.FC = () => {
           >
             {t('contact_us_submit')}
           </SovereignPrimaryButton>
+          </>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <IonText>
+                  <h2 style={{ color: 'var(--sovereign-text)', fontSize: 18, margin: 0 }}>
+                    {t('contact_us_my_requests')}
+                  </h2>
+                </IonText>
+                <IonButton
+                  fill="clear"
+                  aria-label={t('contact_us_refresh_requests')}
+                  onClick={() => void loadRequests()}
+                  disabled={requestsLoading}
+                >
+                  <IonIcon slot="icon-only" icon={refreshOutline} />
+                </IonButton>
+              </div>
+              {requestsLoading ? (
+                [0, 1, 2].map((index) => (
+                  <IonSkeletonText key={index} animated style={{ height: 140, borderRadius: 14, marginBottom: 12 }} />
+                ))
+              ) : requests.length === 0 ? (
+                <IonText>
+                  <p style={{ ...hintStyle, textAlign: 'center', padding: '36px 0' }}>
+                    {t('contact_us_requests_empty')}
+                  </p>
+                </IonText>
+              ) : requests.map((request) => {
+                const statusColor =
+                  request.status === 'resolved' ? '#4caf50' :
+                    request.status === 'read' ? 'var(--sovereign-gold)' : '#8a9bbf';
+                return (
+                  <div
+                    key={request.id}
+                    style={{
+                      background: 'var(--sovereign-surface)',
+                      border: '1px solid var(--sovereign-border)',
+                      borderRadius: 14,
+                      padding: 16,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                      <IonText>
+                        <strong style={{ color: 'var(--sovereign-text)', fontSize: 14 }}>
+                          {t(`contact_us_type_${request.type}`)}
+                        </strong>
+                      </IonText>
+                      <IonBadge style={{ background: `${statusColor}20`, color: statusColor }}>
+                        {t(`contact_us_status_${request.status}`)}
+                      </IonBadge>
+                    </div>
+                    <IonText>
+                      <p style={{ color: 'var(--sovereign-text)', fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                        {request.message}
+                      </p>
+                    </IonText>
+                    <IonText>
+                      <p style={{ ...hintStyle, marginBottom: 10 }}>
+                        {request.allGames
+                          ? t('contact_us_all_games')
+                          : request.gameLabels.join(', ') || '—'}
+                        {' · '}
+                        {request.createdAt ? new Date(request.createdAt).toLocaleString() : '—'}
+                      </p>
+                    </IonText>
+                    <div style={{ borderTop: '1px solid var(--sovereign-border)', paddingTop: 10 }}>
+                      <IonText>
+                        <strong style={{ color: 'var(--sovereign-gold)', fontSize: 12 }}>
+                          {t('contact_us_review_result')}
+                        </strong>
+                        <p style={{ color: 'var(--sovereign-text-muted)', fontSize: 13, lineHeight: 1.5, marginBottom: 0, whiteSpace: 'pre-wrap' }}>
+                          {request.reviewResponse || t('contact_us_review_pending')}
+                        </p>
+                      </IonText>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           <div style={{ height: '40px' }} />
         </div>
