@@ -2,15 +2,18 @@ import type { Socket } from 'socket.io-client';
 
 const RESYNC_THROTTLE_MS = 1500;
 
-const lastResyncByNamespace = new Map<string, number>();
+// Throttle per transport, not per namespace. A newly-created game socket must never
+// inherit the throttle window from the stale socket it replaced, otherwise the first
+// authoritative recovery request can be silently discarded.
+const lastResyncBySocket = new WeakMap<Socket, number>();
 const pendingResyncBySocket = new WeakMap<Socket, { namespace: string; roomId: string }>();
 const resyncConnectListenerInstalled = new WeakSet<Socket>();
 
 function emitConnectedSocketResync(socket: Socket, namespace: string, roomId: string): void {
   const now = Date.now();
-  const last = lastResyncByNamespace.get(namespace) ?? 0;
+  const last = lastResyncBySocket.get(socket) ?? 0;
   if (now - last < RESYNC_THROTTLE_MS) return;
-  lastResyncByNamespace.set(namespace, now);
+  lastResyncBySocket.set(socket, now);
   socket.emit('get_state', { room_id: roomId });
 }
 
@@ -40,5 +43,7 @@ export function emitSocketResync(
 }
 
 export function clearSocketResyncThrottle(namespace: string): void {
-  lastResyncByNamespace.delete(namespace);
+  // WeakMap entries disappear with their socket. Keep the namespace argument for
+  // compatibility with existing managers.
+  void namespace;
 }

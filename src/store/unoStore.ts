@@ -280,8 +280,8 @@ export const useUnoStore = create<UnoStore>((set, get) => ({
         apiRepository.roomReady(roomId).catch(() => {});
       }
     });
-    socket.connect(roomId);
     socket.setOnGamePayload((raw) => get().handleUnoPayload(raw));
+    socket.connect(roomId);
 
     set({
       ...initialState,
