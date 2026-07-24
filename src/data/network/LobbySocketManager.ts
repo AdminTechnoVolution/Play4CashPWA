@@ -11,6 +11,7 @@ import type { RoomStateResponse } from '../models/ApiModels';
 import { normalizeRoomState } from './ApiService';
 
 const NAMESPACE = '/rooms';
+const SUBSCRIBE_RETRY_MS = 1_000;
 
 function normalizeRoom(raw: any): RoomResponse {
   const players: RoomPlayer[] = (raw.players ?? []).map((p: any) => {
@@ -38,12 +39,40 @@ export class LobbySocketManager {
   private sessionGameId: string | null = null;
   private sessionRoomId: string | null = null;
   private onConnectCb?: () => void;
+  private onRoomCreatedCb?: (room: RoomResponse) => void;
+  private onRoomUpdatedCb?: (room: RoomResponse) => void;
+  private onRoomStartedCb?: (room: RoomResponse) => void;
+  private onRoomStateCb?: (state: RoomStateResponse) => void;
+  private onRoomStateErrorCb?: (reason: 'invalid' | 'notFound') => void;
+  private onRoomDeletedCb?: (roomId: string) => void;
+  private subscribeRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private subscribedGameId: string | null = null;
+
+  private clearSubscribeRetry(): void {
+    if (this.subscribeRetryTimer) clearTimeout(this.subscribeRetryTimer);
+    this.subscribeRetryTimer = null;
+  }
+
+  private subscribeUntilAcknowledged(): void {
+    const gameId = this.sessionGameId;
+    if (!gameId || !this.socket?.connected || this.subscribedGameId === gameId) return;
+    this.socket.emit('subscribe', {
+      game_id: gameId,
+      ...(this.sessionRoomId ? { room_id: this.sessionRoomId } : {}),
+    });
+    this.clearSubscribeRetry();
+    this.subscribeRetryTimer = setTimeout(
+      () => this.subscribeUntilAcknowledged(),
+      SUBSCRIBE_RETRY_MS,
+    );
+  }
 
   connect(gameId: string, roomId?: string): void {
     this.disconnect();
 
     this.sessionGameId = gameId;
     this.sessionRoomId = roomId || null;
+    this.subscribedGameId = null;
 
     this.socket = io(buildSocketUrl(NAMESPACE), {
       ...SOCKET_IO_CLIENT_DEFAULTS,
@@ -65,14 +94,43 @@ export class LobbySocketManager {
 
     this.socket.on('connect', () => {
       if (gameId) {
-        this.socket?.emit('subscribe', {
-          game_id: gameId,
-          ...(roomId ? { room_id: roomId } : {}),
-        });
+        this.subscribedGameId = null;
+        this.subscribeUntilAcknowledged();
       } else if (roomId) {
         this.requestRoomState(roomId);
       }
       this.onConnectCb?.();
+    });
+
+    this.socket.on('rooms', (raw: unknown) => {
+      const envelope = raw as {
+        success?: boolean;
+        data?: { event?: string; game_id?: string; reason?: string };
+      };
+      if (
+        envelope?.success === true &&
+        envelope.data?.event === 'subscribed' &&
+        String(envelope.data.game_id || '') === String(this.sessionGameId || '')
+      ) {
+        this.subscribedGameId = String(envelope.data.game_id);
+        this.clearSubscribeRetry();
+      }
+      if (
+        envelope?.success === false &&
+        envelope.data?.event === 'roomStateError' &&
+        (envelope.data.reason === 'invalid' || envelope.data.reason === 'notFound')
+      ) {
+        this.onRoomStateErrorCb?.(envelope.data.reason);
+      }
+    });
+    this.socket.on('roomCreated', (raw: unknown) => this.onRoomCreatedCb?.(normalizeRoom(raw)));
+    this.socket.on('roomUpdated', (raw: unknown) => this.onRoomUpdatedCb?.(normalizeRoom(raw)));
+    this.socket.on('roomStarted', (raw: unknown) => this.onRoomStartedCb?.(normalizeRoom(raw)));
+    this.socket.on('roomState', (raw: unknown) => this.onRoomStateCb?.(normalizeRoomState(raw)));
+    this.socket.on('roomDeleted', (raw: unknown) => {
+      const payload = raw as { id?: string } | string;
+      const id = typeof payload === 'string' ? payload : (payload?.id ?? '');
+      if (id) this.onRoomDeletedCb?.(id);
     });
 
     this.socket.on('connect_error', async (err: Error) => {
@@ -90,10 +148,10 @@ export class LobbySocketManager {
   }
 
   resubscribe(gameId: string, roomId?: string): void {
-    this.socket?.emit('subscribe', {
-      game_id: gameId,
-      ...(roomId ? { room_id: roomId } : {}),
-    });
+    this.sessionGameId = gameId;
+    this.sessionRoomId = roomId || null;
+    this.subscribedGameId = null;
+    this.subscribeUntilAcknowledged();
   }
 
   requestRoomState(roomId = this.sessionRoomId || ''): void {
@@ -102,6 +160,8 @@ export class LobbySocketManager {
   }
 
   disconnect(): void {
+    this.clearSubscribeRetry();
+    this.subscribedGameId = null;
     this.sessionGameId = null;
     this.sessionRoomId = null;
     this.socket?.off();
@@ -115,43 +175,27 @@ export class LobbySocketManager {
   }
 
   onRoomCreated(cb: (room: RoomResponse) => void): void {
-    this.socket?.on('roomCreated', (raw: unknown) => cb(normalizeRoom(raw)));
+    this.onRoomCreatedCb = cb;
   }
 
   onRoomUpdated(cb: (room: RoomResponse) => void): void {
-    this.socket?.on('roomUpdated', (raw: unknown) => cb(normalizeRoom(raw)));
+    this.onRoomUpdatedCb = cb;
   }
 
   onRoomStarted(cb: (room: RoomResponse) => void): void {
-    this.socket?.on('roomStarted', (raw: unknown) => cb(normalizeRoom(raw)));
+    this.onRoomStartedCb = cb;
   }
 
   onRoomState(cb: (state: RoomStateResponse) => void): void {
-    this.socket?.on('roomState', (raw: unknown) => cb(normalizeRoomState(raw)));
+    this.onRoomStateCb = cb;
   }
 
   onRoomStateError(cb: (reason: 'invalid' | 'notFound') => void): void {
-    this.socket?.on('rooms', (raw: unknown) => {
-      const envelope = raw as {
-        success?: boolean;
-        data?: { event?: string; reason?: string };
-      };
-      if (
-        envelope?.success === false &&
-        envelope.data?.event === 'roomStateError' &&
-        (envelope.data.reason === 'invalid' || envelope.data.reason === 'notFound')
-      ) {
-        cb(envelope.data.reason);
-      }
-    });
+    this.onRoomStateErrorCb = cb;
   }
 
   onRoomDeleted(cb: (roomId: string) => void): void {
-    this.socket?.on('roomDeleted', (raw: unknown) => {
-      const payload = raw as { id?: string } | string;
-      const id = typeof payload === 'string' ? payload : (payload?.id ?? '');
-      if (id) cb(id);
-    });
+    this.onRoomDeletedCb = cb;
   }
 
   offAll(): void {

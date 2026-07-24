@@ -174,7 +174,6 @@ const RoomsPage: React.FC = () => {
     // Own the socket lifecycle directly — same pattern as game pages
     const socket = new LobbySocketManager();
     lobbySocketRef.current = socket;
-    socket.connect(gameId);
 
     socket.onConnect(() => {
       // socket is live — future room changes will arrive in real time
@@ -190,6 +189,7 @@ const RoomsPage: React.FC = () => {
     socket.onRoomDeleted((roomId) => {
       removeRoom(roomId);
     });
+    socket.connect(gameId);
 
     return () => {
       socket.offAll();
