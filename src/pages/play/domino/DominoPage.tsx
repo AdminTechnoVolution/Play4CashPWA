@@ -24,6 +24,7 @@ import { buildDominoBoardLayout } from './dominoBoardLayout';
 import GameSound from '../../../ui/game/GameSound';
 import { registerPlayBackConsumer } from '../../../util/playBackNavigation';
 import { shouldSuppressRoomNotFound } from '../../../util/playRoomSession';
+import DominoTableSeats, { type DominoSeatPlayer } from './DominoTableSeats';
 
 function tilesEqual(t1: DominoTile, t2: DominoTile) {
   return (t1.a === t2.a && t1.b === t2.b) || (t1.a === t2.b && t1.b === t2.a);
@@ -269,6 +270,24 @@ export default function DominoPage({
   const showWaitingOverlay = store.phase === DominoPhase.WAITING && !store.gameOver;
   const showPlayBottom =
     store.phase === DominoPhase.PLAY && !showWaitingOverlay;
+  const tablePlayers = useMemo<DominoSeatPlayer[]>(() => {
+    const opponents = store.opponents.map((op) => ({
+      name: op.username,
+      tileCount: op.tileCount,
+      isSelf: false,
+      isCurrentTurn: !!store.turnHolder && store.turnHolder === op.username,
+    }));
+    if (isSpectator) return opponents;
+    return [
+      {
+        name: user?.username?.trim() || t('multiplayer_you'),
+        tileCount: store.myHand.length,
+        isSelf: true,
+        isCurrentTurn: isMyTurn,
+      },
+      ...opponents,
+    ];
+  }, [isMyTurn, isSpectator, store.myHand.length, store.opponents, store.turnHolder, t, user?.username]);
 
   const incomingGreetingMessage = useMemo(
     () => formatIncomingFloatingGreeting(store.chatGreetingOverlay, lastMsg),
@@ -396,26 +415,7 @@ export default function DominoPage({
               />
             )}
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {store.opponents.map((op) => (
-                <div key={op.username} style={{ padding: '4px 10px', background: '#131f35', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <IonText style={{ color: '#8a9bbf', fontSize: 12 }}>
-                    {op.username}: {formatCatalogInteger(t('domino_tile_count'), op.tileCount)}
-                  </IonText>
-                </div>
-              ))}
-            </div>
-
-            <div
-              style={{
-                borderRadius: 12,
-                padding: 8,
-                minHeight: 80,
-                border: '1px solid rgba(255,255,255,0.12)',
-                background: 'rgba(19, 31, 53, 0.55)',
-              }}
-            >
-              <IonText style={{ color: '#8a9bbf', fontSize: 11, marginBottom: 6, display: 'block' }}>{t('play_room_label')}</IonText>
+            <DominoTableSeats players={tablePlayers}>
               {(store.board || []).length === 0 ? (
                 <IonText style={{ color: '#4a5a7a', fontSize: 13 }}>{t('domino_board_empty')}</IonText>
               ) : (
@@ -429,7 +429,7 @@ export default function DominoPage({
                   canPlaceRight={canPlaceRight}
                 />
               )}
-            </div>
+            </DominoTableSeats>
 
             <IonText style={{ color: '#8a9bbf', fontSize: 12, textAlign: 'center', display: 'block' }}>
               {formatCatalogInteger(t('domino_boneyard_count'), store.boneyardCount)}
