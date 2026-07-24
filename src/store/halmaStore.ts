@@ -352,18 +352,7 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
       }
 
       socketManager = new HalmaSocketManager();
-      
-      socketManager.connect(roomId);
-      if (hasOpponent && !isSpectator) {
-        apiRepository.readyRoom(roomId).catch(() => {});
-        socketManager.requestSync(roomId);
-      }
-      if (isSpectator) {
-        setTimeout(() => {
-          if (get().phase === HalmaPhase.WAITING) socketManager?.requestSync(roomId);
-        }, 1500);
-      }
-      
+
       socketManager.onGameUpdate((json: any) => {
         const data = json.data || json;
         applyIncomingStateVersion(halmaStateVersionTracker, data);
@@ -548,6 +537,17 @@ export const useHalmaStore = create<HalmaUiState & HalmaStoreActions>((set, get)
           }
         }
       });
+
+      socketManager.connect(roomId);
+      if (hasOpponent && !isSpectator) {
+        apiRepository.readyRoom(roomId).catch(() => {});
+        socketManager.requestSync(roomId);
+      }
+      if (isSpectator) {
+        setTimeout(() => {
+          if (get().phase === HalmaPhase.WAITING) socketManager?.requestSync(roomId);
+        }, 1500);
+      }
     },
 
     onCellTap(row, col, roomId) {

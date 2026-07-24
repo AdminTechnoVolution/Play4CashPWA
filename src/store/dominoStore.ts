@@ -331,8 +331,10 @@ export const useDominoStore = create<DominoStore>((set, get) => ({
       }
     });
 
-    socket.connect(roomId);
+    // Install the payload consumer before connect: the server can answer `join`
+    // immediately, and losing that first private snapshot leaves the UI in WAITING.
     socket.setOnGamePayload((raw) => get().handleDominoPayload(raw));
+    socket.connect(roomId);
 
     set({
       socket,
