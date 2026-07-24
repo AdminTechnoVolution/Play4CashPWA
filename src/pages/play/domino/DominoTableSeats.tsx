@@ -21,10 +21,9 @@ export default function DominoTableSeats({ players, children }: DominoTableSeats
   return (
     <div className="domino-table-seats" data-player-count={players.length}>
       <div className="domino-table-seats__board">{children}</div>
-      <div className="domino-table-seats__ring" aria-label="players">
+      <div className="domino-table-seats__ring" aria-label="players" role="list">
         {players.map((player, index) => {
           const slot = slots[index] ?? slots[0];
-          const initials = player.name.slice(0, 2).toUpperCase();
           return (
             <div
               key={`${player.isSelf ? 'self' : 'opponent'}-${index}-${player.name}`}
@@ -36,13 +35,15 @@ export default function DominoTableSeats({ players, children }: DominoTableSeats
               style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
               data-seat-index={index}
               data-self={player.isSelf ? 'true' : 'false'}
+              role="listitem"
+              aria-current={player.isCurrentTurn ? 'true' : undefined}
+              aria-label={`${player.name}, ${player.tileCount} tiles${player.isCurrentTurn ? ', current turn' : ''}`}
             >
-              <div className="domino-table-seat__avatar" aria-hidden>{initials}</div>
+              {player.isCurrentTurn && (
+                <span className="domino-table-seat__turn" aria-hidden>▶</span>
+              )}
               <div className="domino-table-seat__name" title={player.name}>{player.name}</div>
-              <div className="domino-table-seat__tiles" aria-label={`${player.tileCount} tiles`}>
-                <span className="domino-table-seat__mini-tile" aria-hidden />
-                <span>×{player.tileCount}</span>
-              </div>
+              <span className="domino-table-seat__tiles" aria-hidden>×{player.tileCount}</span>
             </div>
           );
         })}

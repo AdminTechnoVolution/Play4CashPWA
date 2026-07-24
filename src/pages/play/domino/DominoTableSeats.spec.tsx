@@ -35,6 +35,10 @@ describe('DominoTableSeats', () => {
     );
     expect(container.querySelectorAll('.domino-table-seat--self')).toHaveLength(1);
     expect(container.querySelectorAll('.domino-table-seat--current')).toHaveLength(1);
+    expect(container.querySelector('[aria-current="true"]')).toBeTruthy();
+    expect(container.querySelectorAll('.domino-table-seat__turn')).toHaveLength(1);
+    expect(container.querySelector('.domino-table-seat__avatar')).toBeNull();
+    expect(container.querySelector('.domino-table-seat__mini-tile')).toBeNull();
     expect(screen.getByText('Player 4')).toBeTruthy();
   });
 });
