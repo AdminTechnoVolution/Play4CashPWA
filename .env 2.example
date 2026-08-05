@@ -1,5 +1,5 @@
 # Must match an entry in the API ALLOWED_ORIGINS when using cookies (httpOnly refresh).
-VITE_API_URL=https://p4c-api.techno-volution.com
+VITE_API_URL=https://api.play4cash.net
 VITE_GOOGLE_CLIENT_ID=your-google-client-id-here
 
 # In Azure App Service, set the same keys as Application Settings (Configuration).

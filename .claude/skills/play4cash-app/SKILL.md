@@ -29,7 +29,7 @@
 
 | Flavor | BASE_URL |
 |--------|----------|
-| `dev` | `https://p4c-api.techno-volution.com` |
+| `dev` | `https://api.play4cash.net` |
 | `prod` | `https://p4c-agazhsdng5fuexaq.mexicocentral-01.azurewebsites.net` |
 
 `buildConfigField("String", "BASE_URL", ...)` inyecta la URL en `BuildConfig`.
