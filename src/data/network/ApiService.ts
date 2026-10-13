@@ -17,6 +17,8 @@ import type {
   RequestWalletChangePayload,
   ConfirmWalletChangeRequest,
   RechargeRequest,
+  RechargeIntentRequest,
+  RechargeIntentResponse,
   WithdrawalRequest,
   VerifyWithdrawalRequest,
   RechargeHistoryItem,
@@ -284,6 +286,15 @@ export const apiService = {
     if (!res.data?.success) {
       throw new Error(res.data?.messages?.[0] ?? res.data?.message ?? 'error_try_later_message');
     }
+  },
+
+  // POST /api/transactions/recharge/intent — reserve an exact amount before sending funds.
+  async createRechargeIntent(req: RechargeIntentRequest): Promise<RechargeIntentResponse> {
+    const res = await apiClient.post<ApiResponse<RechargeIntentResponse>>(
+      '/api/transactions/recharge/intent',
+      req,
+    );
+    return unwrap(res.data);
   },
 
   // Android: POST /api/transactions/recharge with { txId, coin }

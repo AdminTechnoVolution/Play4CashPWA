@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   refreshAccount: vi.fn(),
   getUserAccount: vi.fn(),
   getWallets: vi.fn(),
+  createRechargeIntent: vi.fn(),
   recharge: vi.fn(),
   formatApiMessageForDisplay: vi.fn((value: unknown) => {
     if (value instanceof Error) return value.message;
@@ -99,6 +100,7 @@ vi.mock('../../data/network/ApiRepository', () => ({
   apiRepository: {
     getUserAccount: mocks.getUserAccount,
     getWallets: mocks.getWallets,
+    createRechargeIntent: mocks.createRechargeIntent,
     recharge: mocks.recharge,
   },
 }));
@@ -153,6 +155,11 @@ async function openRechargeForm() {
 
   await screen.findByText('done_recharge_done');
   fireEvent.click(screen.getByText('done_recharge_done'));
+
+  await screen.findByText('recharge_intent_reserve_button');
+  fireEvent.change(screen.getByPlaceholderText('label_amount'), { target: { value: '50' } });
+  fireEvent.click(screen.getByText('recharge_intent_reserve_button'));
+
   await screen.findByText('verify_button');
 }
 
@@ -176,6 +183,14 @@ describe('AddFundsPage idempotency', () => {
         isActive: true,
       },
     ]);
+    mocks.createRechargeIntent.mockReset().mockResolvedValue({
+      intentId: 'intent-1',
+      coin: 'USDT',
+      network: 'TRC20',
+      address: 'T123',
+      exactAmount: 50.0034,
+      expiresAt: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+    });
     mocks.recharge.mockReset().mockRejectedValue(new Error('pending approval'));
   });
 
@@ -251,5 +266,70 @@ describe('AddFundsPage idempotency', () => {
 
     expect(firstKey).toBe('55555555-5555-4555-8555-555555555555');
     expect(secondKey).toBe(firstKey);
+  });
+});
+
+describe('AddFundsPage deposit reservation', () => {
+  beforeEach(() => {
+    mocks.navigate.mockReset();
+    mocks.refreshAccount.mockReset();
+    mocks.getUserAccount.mockResolvedValue({ walletNetwork: 'trc20' });
+    mocks.getWallets.mockResolvedValue([
+      {
+        coin: 'USDT',
+        network: 'TRC20',
+        displayLabel: 'TRC20',
+        address: 'T123',
+        isActive: true,
+        minAmount: 10,
+      },
+    ]);
+    mocks.recharge.mockReset().mockRejectedValue(new Error('pending approval'));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('reserves an exact amount for the selected coin/network before showing the txId form', async () => {
+    mocks.createRechargeIntent.mockReset().mockResolvedValue({
+      intentId: 'intent-1',
+      coin: 'USDT',
+      network: 'TRC20',
+      address: 'T123',
+      exactAmount: 50.0034,
+      expiresAt: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+    });
+
+    await openRechargeForm();
+
+    expect(mocks.createRechargeIntent).toHaveBeenCalledWith({
+      coin: 'USDT',
+      network: 'TRC20',
+      amount: 50,
+    });
+    expect(screen.getByText('50.0034 USDT')).toBeTruthy();
+  });
+
+  it('shows the expired state and hides the txId form once the reservation lapses', async () => {
+    mocks.createRechargeIntent.mockReset().mockResolvedValue({
+      intentId: 'intent-1',
+      coin: 'USDT',
+      network: 'TRC20',
+      address: 'T123',
+      exactAmount: 50.0034,
+      expiresAt: new Date(Date.now() + 500).toISOString(),
+    });
+
+    render(<AddFundsPage />);
+    await screen.findByText('done_recharge_done');
+    fireEvent.click(screen.getByText('done_recharge_done'));
+    await screen.findByText('recharge_intent_reserve_button');
+    fireEvent.change(screen.getByPlaceholderText('label_amount'), { target: { value: '50' } });
+    fireEvent.click(screen.getByText('recharge_intent_reserve_button'));
+    await screen.findByText('verify_button');
+
+    await screen.findByText('recharge_intent_expired_title', undefined, { timeout: 3000 });
+    expect(screen.queryByText('verify_button')).toBeNull();
   });
 });

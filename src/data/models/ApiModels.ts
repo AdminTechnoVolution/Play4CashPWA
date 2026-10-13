@@ -152,6 +152,25 @@ export interface RechargeRequest {
   idempotencyKey?: string;
 }
 
+// POST /api/transactions/recharge/intent — reserves an exact deposit amount before funds are sent.
+export interface RechargeIntentRequest {
+  coin: string;
+  network: string;
+  amount: number;
+}
+
+export interface RechargeIntentResponse {
+  intentId: string;
+  coin: string;
+  network: string;
+  /** Shared platform wallet address to send funds to. */
+  address: string;
+  /** Exact amount (with a small unique fingerprint) the user must send. */
+  exactAmount: number;
+  /** Reservation deadline — the intent stops being claimable after this. */
+  expiresAt: string;
+}
+
 // POST /api/user/request-wallet-change — { wallet, coin, network }; OTP emailed.
 export interface RequestWalletChangePayload {
   wallet: string;
