@@ -1,4 +1,6 @@
-import PaymentsPage from './pages/payments/PaymentsPage';
+import DepositPage from './pages/payments/DepositPage';
+import WithdrawalPage from './pages/payments/WithdrawalPage';
+import PaymentHistoryPage from './pages/payments/PaymentHistoryPage';
 import { useEffect } from 'react';
 import { IonApp, setupIonicReact } from '@ionic/react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
@@ -73,10 +75,10 @@ export default function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/contact-us" element={<ContactUsPage />} />
-            <Route path="/history" element={<PaymentsPage />} />
-            <Route path="/add-funds" element={<PaymentsPage />} />
-            <Route path="/withdrawal" element={<PaymentsPage />} />
-            <Route path="/withdrawal-verify" element={<PaymentsPage />} />
+            <Route path="/history" element={<PaymentHistoryPage />} />
+            <Route path="/add-funds" element={<DepositPage />} />
+            <Route path="/withdrawal" element={<WithdrawalPage />} />
+            <Route path="/withdrawal-verify" element={<WithdrawalPage />} />
             <Route path="/rooms/:gameSocketCode" element={<RoomsPage />} />
             <Route path="/play/:gameSocketCode" element={<PlayPage />} />
             <Route path="/tournaments" element={<TournamentsPage />} />

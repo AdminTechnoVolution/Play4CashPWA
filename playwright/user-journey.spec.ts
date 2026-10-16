@@ -32,23 +32,27 @@ test.describe('User journey: navigate the current PWA', () => {
   test('navigates to Add Funds', async ({ page }) => {
     await page.getByText('Add funds', { exact: true }).click();
     await page.waitForURL('**/add-funds');
-    await expect(page.getByText('Pagos de prueba · NOWPayments sandbox')).toBeVisible();
-    await expect(page.getByText('Red de USDT', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Crear depósito', exact: true })).toBeDisabled();
+    await expect(page.getByText('Test payments · NOWPayments sandbox')).toBeVisible();
+    await expect(page.getByText('USDT network', { exact: true })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /TRC20/ })).toBeChecked();
+    await expect(page.getByRole('button', { name: 'Create deposit', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: '25', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Create deposit', exact: true })).toBeEnabled();
   });
 
   test('navigates to Request Withdrawal', async ({ page }) => {
     await page.getByText('Request Withdrawal', { exact: true }).click();
     await page.waitForURL('**/withdrawal');
-    await expect(page.getByText('Recibes', { exact: false })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Calcular comisión' })).toBeDisabled();
+    await expect(page.getByText('You receive', { exact: false })).toHaveCount(0);
+    await expect(page.getByRole('radio', { name: /TRC20/ })).toBeChecked();
+    await expect(page.getByRole('button', { name: 'Calculate fee' })).toBeDisabled();
   });
 
   test('navigates to the current USDT history', async ({ page }) => {
     await page.getByText('History', { exact: true }).click();
     await page.waitForURL('**/history');
-    await expect(page.locator('ion-title').filter({ hasText: 'Movimientos USDT' })).toBeVisible();
-    await expect(page.getByText('Disponible:', { exact: false })).toBeVisible();
+    await expect(page.locator('ion-title').filter({ hasText: 'USDT activity' })).toBeVisible();
+    await expect(page.getByText('No activity yet')).toBeVisible();
   });
 
   test('navigates to Contact Us, checks My Requests, and submits a new one', async ({ page }) => {
