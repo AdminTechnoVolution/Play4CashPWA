@@ -193,7 +193,7 @@ type BattleshipStore = BattleshipStoreState & BattleshipStoreActions;
 /** GET /rooms/:id/status every 10s while alone in placement — catches opponent join if socket lags. */
 const BS_OPPONENT_STATUS_POLL_MS = 10_000;
 
-let battleshipOpponentPollInterval: ReturnType<typeof setInterval> | null = null;
+let battleshipOpponentPollInterval: number | null = null;
 
 function clearBattleshipOpponentPoll() {
   if (battleshipOpponentPollInterval) {

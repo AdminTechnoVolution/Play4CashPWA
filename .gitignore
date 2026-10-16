@@ -109,3 +109,6 @@ Desktop.ini
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+azure-appsettings.example.json
+.env.example
+.env.example

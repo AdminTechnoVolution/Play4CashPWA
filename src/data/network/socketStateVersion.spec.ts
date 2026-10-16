@@ -22,6 +22,13 @@ describe('socketStateVersion', () => {
     expect(onGap).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores older snapshots without replacing current state', () => {
+    const tracker = createStateVersionTracker(vi.fn());
+    applyIncomingStateVersion(tracker, { stateVersion: 10 });
+    expect(applyIncomingStateVersion(tracker, { stateVersion: 9 })).toBe(false);
+    expect(tracker.lastVersion).toBe(10);
+  });
+
   it('resets tracker', () => {
     const tracker = createStateVersionTracker(vi.fn());
     applyIncomingStateVersion(tracker, { stateVersion: 10 });

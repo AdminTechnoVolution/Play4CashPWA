@@ -1,3 +1,4 @@
+import { attachReliableCommands } from './reliableCommands';
 import type { Socket } from 'socket.io-client';
 import { useConnectionStore } from '../../store/connectionStore';
 import { attachAuthExpiredListener } from './socketAuthExpiredListener';
@@ -21,6 +22,7 @@ import { attachAuthExpiredListener } from './socketAuthExpiredListener';
  */
 
 const liveSockets = new Map<string, Socket>();
+const commandCleanups = new Map<string, () => void>();
 const resyncHandlers = new Map<string, () => void>();
 
 export function registerSocketResync(namespace: string, handler: () => void): () => void {
@@ -55,6 +57,10 @@ export function instrumentSocket(
   namespace: string,
   options?: InstrumentSocketOptions,
 ): void {
+  commandCleanups.get(namespace)?.();
+  commandCleanups.delete(namespace);
+  const cleanup = attachReliableCommands(socket, namespace, () => triggerSocketResync(namespace));
+  if (cleanup) commandCleanups.set(namespace, cleanup);
   liveSockets.set(namespace, socket);
   const setStatus = useConnectionStore.getState().setStatus;
 
@@ -97,6 +103,8 @@ export function instrumentSocket(
  * Call from `SocketManager.disconnect()` to keep the banner clean on intentional teardown.
  */
 export function releaseSocket(namespace: string): void {
+  commandCleanups.get(namespace)?.();
+  commandCleanups.delete(namespace);
   liveSockets.delete(namespace);
   resyncHandlers.delete(namespace);
   useConnectionStore.getState().setStatus(namespace, undefined);

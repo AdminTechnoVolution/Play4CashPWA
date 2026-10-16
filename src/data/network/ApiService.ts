@@ -82,7 +82,7 @@ export const apiService = {
       id: raw._id ?? raw.id ?? '',
       email: raw.email ?? '',
       username: raw.username ?? '',
-      balance: raw.balance ?? 0,
+      balance: Number(raw.balance ?? 0),
       walletAddress: raw.wallet_address?.wallet ?? raw.wallet ?? '',
       walletCoin: raw.wallet_address?.coin ?? 'USDT',
       walletNetwork: raw.wallet_address?.network ?? '',
@@ -187,7 +187,7 @@ export const apiService = {
         ? globalThis.crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await apiClient.post<ApiResponse<any>>('/api/rooms', req, {
+    const res = await apiClient.post<ApiResponse<any>>('/api/rooms', { ...req, bet_amount: String(req.bet_amount) }, {
       headers: { 'Idempotency-Key': idempKey },
     });
     const data = unwrap(res.data);

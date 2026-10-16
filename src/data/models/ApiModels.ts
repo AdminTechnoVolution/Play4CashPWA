@@ -114,7 +114,7 @@ export interface RoomStatsResponse {
 // POST /api/rooms — Android: { game_id, bet_amount, public, name, player_limit? }
 export interface CreateRoomRequest {
   game_id: string;
-  bet_amount: number;
+  bet_amount: number | string;
   public: boolean;
   name: string;
   player_limit?: number;

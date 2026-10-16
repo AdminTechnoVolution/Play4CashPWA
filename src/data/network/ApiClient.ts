@@ -69,6 +69,7 @@ bareClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (import.meta.env.VITE_RELIABLE_COMMANDS === 'true') config.headers.set('X-P4C-Command-Protocol', '1');
   config.headers.set('accept-language', getLanguage());
   config.headers.set('X-App-Version', __APP_VERSION__);
   const token = getAccessToken();
