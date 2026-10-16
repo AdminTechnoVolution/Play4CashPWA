@@ -1,3 +1,4 @@
+import { errorMessageText } from '../data/network/errorMessage';
 import { t, hasKey } from './translations';
 
 /** Matches server English prose to the same entries as `ws.*` keys in our catalog. */
@@ -293,11 +294,11 @@ export function formatSocketMessageForDisplay(
 }
 
 export function formatApiMessageForDisplay(
-  raw: string | null | undefined,
+  raw: unknown,
   emptyFallbackKey: string = 'error_try_later_message',
   opts?: { minBet?: number },
 ): string {
-  const trimmed = (raw || '').trim();
+  const trimmed = errorMessageText(raw);
   if (!trimmed) return t(emptyFallbackKey);
   return resolveApiMessageLine(trimmed, opts);
 }

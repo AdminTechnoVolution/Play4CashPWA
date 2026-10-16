@@ -1,7 +1,8 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosHeaders, AxiosInstance, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { BASE_URL, REQUEST_TIMEOUT_MS } from '../../config/api.config';
 import { getAccessToken, getLanguage, saveTokens } from '../auth/AuthSessionStore';
 import type { ApiResponse } from '../models/ApiModels';
+import { errorMessageText } from './errorMessage';
 import { checkAppMinVersion } from '../../pwa/versionContract';
 
 export const bareClient: AxiosInstance = axios.create({
@@ -23,9 +24,8 @@ let refreshPromise: Promise<void> | null = null;
 async function doRefresh(): Promise<void> {
   const res = await bareClient.post<ApiResponse<{ token: string; refreshToken?: string }>>('/api/login/refresh', {});
   const token = res.data?.data?.token;
-  if (token) {
-    saveTokens(token);
-  }
+  if (typeof token !== 'string' || !token.trim()) throw new Error('error_session_expired');
+  saveTokens(token);
 }
 
 export async function requestRefreshCookieCleared(): Promise<void> {
@@ -50,16 +50,7 @@ export async function refreshAccessTokenWithLock(): Promise<void> {
 }
 
 function extractErrorMessage(error: AxiosError): string {
-  const body = error.response?.data as ApiResponse<unknown> | undefined;
-  if (body?.message) return body.message;
-  if (body?.messages && body.messages.length > 0) return body.messages[0];
-  return error.message ?? 'Unknown error';
-}
-
-function isMissingTokenResponse(error: AxiosError): boolean {
-  const body = error.response?.data as ApiResponse<unknown> | undefined;
-  const message = String(body?.message ?? body?.messages?.[0] ?? '').trim().toLowerCase();
-  return message === 'no token provided' || message === 'no auth token provided';
+  return errorMessageText(error.response?.data) || errorMessageText(error.message) || 'error_try_later_message';
 }
 
 bareClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -102,7 +93,7 @@ apiClient.interceptors.response.use(
   },
   async (error: AxiosError) => {
     inspectMinVersionHeader(error.response);
-    const originalRequest = error.config as AxiosRequestConfig & { _retried?: boolean };
+    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
 
     if (!error.response) {
       throw new Error('error_connection_failed');
@@ -110,18 +101,28 @@ apiClient.interceptors.response.use(
 
     const status = error.response.status;
 
-    if (status === 401 && !originalRequest._retried) {
-      if (isMissingTokenResponse(error)) {
-        throw new Error('error_try_later_message');
-      }
+    if (status === 401 && originalRequest && !originalRequest._retried) {
       originalRequest._retried = true;
       try {
-        await refreshAccessTokenWithLock();
-        return apiClient(originalRequest);
+        const headers = AxiosHeaders.from(originalRequest.headers);
+        const current = getAccessToken();
+        // A concurrent refresh may already have replaced the token used by this request.
+        if (!current || headers.get('Authorization') === `Bearer ${current}`) {
+          await refreshAccessTokenWithLock();
+        }
+        const renewed = getAccessToken();
+        if (!renewed) throw new Error('error_session_expired');
+        headers.set('Authorization', `Bearer ${renewed}`);
+        originalRequest.headers = headers;
       } catch {
         emitAuthFailureEvent();
         throw new Error('error_session_expired');
       }
+      return apiClient(originalRequest);
+    }
+    if (status === 401) {
+      emitAuthFailureEvent();
+      throw new Error('error_session_expired');
     }
 
     if (status >= 500) {

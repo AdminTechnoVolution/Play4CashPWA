@@ -1,0 +1,17 @@
+[
+  {
+    "name": "VITE_RELIABLE_COMMANDS",
+    "value": "true",
+    "slotSetting": false
+  },
+  {
+    "name": "VITE_API_URL",
+    "value": "",
+    "slotSetting": false
+  },
+  {
+    "name": "VITE_GOOGLE_CLIENT_ID",
+    "value": "",
+    "slotSetting": false
+  }
+]
