@@ -17,6 +17,8 @@ export function applyIncomingStateVersion(
   const v = incoming?.stateVersion;
   if (v == null || !Number.isFinite(v)) return true;
 
+  if (v < tracker.lastVersion) return false;
+
   if (tracker.lastVersion > 0 && v > tracker.lastVersion + 1) {
     tracker.onGap();
     tracker.lastVersion = v;

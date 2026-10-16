@@ -29,13 +29,13 @@
 
 **Variables de entorno (.env):**
 ```
-VITE_API_URL=https://p4c-api.techno-volution.com
+VITE_API_URL=https://api.play4cash.net
 VITE_GOOGLE_CLIENT_ID=181290647568-...
 ```
 
 **api.config.ts — Constantes críticas:**
 ```typescript
-BASE_URL = import.meta.env.VITE_API_URL || 'https://p4c-api.techno-volution.com'
+BASE_URL = import.meta.env.VITE_API_URL || 'https://api.play4cash.net'
 SOCKET_TIMEOUT_MS = 20_000
 REQUEST_TIMEOUT_MS = 180_000
 TOKEN_LEEWAY_S = 60

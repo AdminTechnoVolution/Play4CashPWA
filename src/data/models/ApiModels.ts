@@ -114,7 +114,7 @@ export interface RoomStatsResponse {
 // POST /api/rooms — Android: { game_id, bet_amount, public, name, player_limit? }
 export interface CreateRoomRequest {
   game_id: string;
-  bet_amount: number;
+  bet_amount: number | string;
   public: boolean;
   name: string;
   player_limit?: number;
@@ -150,6 +150,25 @@ export interface RechargeRequest {
   coin: string;
   /** Stable per-submit key so retries do not duplicate the recharge. */
   idempotencyKey?: string;
+}
+
+// POST /api/transactions/recharge/intent — reserves an exact deposit amount before funds are sent.
+export interface RechargeIntentRequest {
+  coin: string;
+  network: string;
+  amount: number;
+}
+
+export interface RechargeIntentResponse {
+  intentId: string;
+  coin: string;
+  network: string;
+  /** Shared platform wallet address to send funds to. */
+  address: string;
+  /** Exact amount (with a small unique fingerprint) the user must send. */
+  exactAmount: number;
+  /** Reservation deadline — the intent stops being claimable after this. */
+  expiresAt: string;
 }
 
 // POST /api/user/request-wallet-change — { wallet, coin, network }; OTP emailed.

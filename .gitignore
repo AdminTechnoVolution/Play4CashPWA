@@ -102,3 +102,13 @@ temp/
 ehthumbs.db
 Desktop.ini
 .env
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+azure-appsettings.example.json
+.env.example
+.env.example

@@ -1,9 +1,12 @@
 {
   "name": "play4cash-pwa",
   "private": true,
-  "version": "1.0.68",
+  "version": "1.0.69",
   "type": "module",
   "scripts": {
+    "test:e2e": "playwright test --ui",
+    "preinstall": "node scripts/guard-package-manager.mjs preinstall",
+    "postinstall": "node scripts/guard-package-manager.mjs postinstall",
     "dev": "vite",
     "build": "tsc && vite build",
     "build:azure": "npm run build && node scripts/prepare-azure-deploy.mjs",
@@ -15,12 +18,15 @@
     "version:bump:major": "npm version major --no-git-tag-version",
     "version:print": "node -p \"require('./package.json').version\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run"
   },
   "dependencies": {
     "@ionic/react": "^8.3.0",
     "@react-oauth/google": "^0.12.1",
-    "axios": "^1.7.9",
+    "axios": "^1.19.0",
+    "cypress": "^15.20.0",
     "ionicons": "^7.4.0",
     "jwt-decode": "^4.0.0",
     "qrcode.react": "^4.2.0",
@@ -31,8 +37,10 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/node": "^26.1.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

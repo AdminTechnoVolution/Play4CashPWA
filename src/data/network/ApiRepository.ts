@@ -15,6 +15,8 @@ import type {
   RequestWalletChangePayload,
   ConfirmWalletChangeRequest,
   RechargeRequest,
+  RechargeIntentRequest,
+  RechargeIntentResponse,
   WithdrawalRequest,
   VerifyWithdrawalRequest,
   RechargeHistoryItem,
@@ -145,6 +147,10 @@ export const apiRepository = {
     } finally {
       accountCache = null;
     }
+  },
+
+  async createRechargeIntent(req: RechargeIntentRequest): Promise<RechargeIntentResponse> {
+    return apiService.createRechargeIntent(req);
   },
 
   async recharge(req: RechargeRequest): Promise<void> {

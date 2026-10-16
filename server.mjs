@@ -198,12 +198,23 @@ function buildContentSecurityPolicy() {
     ...appOrigins.filter((origin) => origin !== 'self'),
     ...GOOGLE_ORIGINS.slice(0, 3),
   ]);
+  // No 'unsafe-inline' here: the Vite build emits no inline <script> tags (entry
+  // and env-config.js are both external <script src=...>), there's no
+  // dangerouslySetInnerHTML/inline script injection anywhere in src/, and Google
+  // Identity Services loads as an external script + sandboxed iframe. Keeping
+  // this directive out is real XSS mitigation, not just defense-in-depth.
   const scriptSrc = unique([
     "'self'",
-    "'unsafe-inline'",
     ...GOOGLE_ORIGINS.slice(0, 2),
   ]);
-  const styleSrc = ["'self'", "'unsafe-inline'"];
+  // style-src still needs 'unsafe-inline': the UI uses React's `style={{...}}`
+  // prop pervasively, which renders as inline `style="..."` attributes governed
+  // by this directive. Removing it would require migrating the whole app off
+  // inline styles (CSS modules/classes) — out of scope for a CSP hardening pass.
+  // Google Identity Services loads its own stylesheet from accounts.google.com
+  // (style-src-elem falls back to style-src) — without it, GSI's stylesheet is
+  // silently blocked.
+  const styleSrc = ["'self'", "'unsafe-inline'", GOOGLE_ORIGINS[0]];
   const imgSrc = unique([
     "'self'",
     'data:',
