@@ -1,40 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { fakeLogin, mockAnonymousSession } from './helpers';
 
-/**
- * Full authenticated user journey against the REAL running backend (API +
- * Gateway, both with ENABLE_FAKE_LOGIN=true) — no route mocking of page data
- * here. The point of this spec is to prove the real app, wired to the real
- * backend, works end to end: log in, then walk through every major
- * authenticated section and confirm each one renders without erroring.
- *
- * Each test logs in as its OWN user (see beforeEach) rather than sharing one
- * cached session across tests. That's deliberate, not just caution: this
- * app's access token lives only in memory and never survives a page load, so
- * EVERY page load calls POST /api/login/refresh — and refresh tokens are
- * single-use with reuse-detection (see AuthService.refreshToken in
- * Play4CashApi). Two independent tests replaying the SAME saved cookie both
- * try to redeem the SAME refresh token: whichever runs first rotates it and
- * silently REVOKES THE WHOLE SESSION FAMILY, so every other test sharing that
- * cookie gets 401'd and bounced to /login. A shared `storageState`/
- * `cy.session()`-style cache was tried first (in both the Cypress and an
- * earlier Playwright draft of this suite) and reproduced exactly that: most
- * tests time out waiting for dashboard content because they silently landed
- * on the login page instead. Logging in fresh per test costs one extra HTTP
- * call and sidesteps the whole class of failure.
- *
- * Every selector below was checked against the real running app before being
- * committed here; the gotchas that came up are called out inline:
- *   - `getByText('Deposits')` is ambiguous — it substring-matches the "No
- *     deposits yet" empty-state text too (Playwright text matching is
- *     case-insensitive by default). Use `{ exact: true }`.
- *   - IonSegmentButton's inner label intercepts pointer events meant for the
- *     segment button itself — click the `ion-segment-button[value=...]` host,
- *     not the label text.
- *   - "Request Withdraw" (the submit button) is a substring of "Request
- *     Withdrawal" (the page's own IonTitle) — scope to the button element.
- *   - ion-textarea in this app does NOT use shadow DOM, so a plain
- *     `page.locator('textarea')` reaches the real input directly.
+/** Browser journey: deterministic API fixtures by default, or an explicit localhost real backend.
+ * Fixture mode verifies UI and requests, not MongoDB, the gateway or NOWPayments itself.
  */
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -42,7 +10,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.goto('/dashboard');
 });
 
-test.describe('User journey: log in and navigate the whole app', () => {
+test.describe('User journey: navigate the current PWA', () => {
   test('logs in for real and lands on the dashboard', async ({ page }) => {
     await expect(page.getByText('PLAY4CASH').first()).toBeVisible();
     // A fresh fake-login user starts at $0.00 — assert the shape, not a fixed
@@ -64,30 +32,23 @@ test.describe('User journey: log in and navigate the whole app', () => {
   test('navigates to Add Funds', async ({ page }) => {
     await page.getByText('Add funds', { exact: true }).click();
     await page.waitForURL('**/add-funds');
-    await expect(page.getByText('Important Information')).toBeVisible();
+    await expect(page.getByText('Pagos de prueba · NOWPayments sandbox')).toBeVisible();
+    await expect(page.getByText('Red de USDT', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Crear depósito', exact: true })).toBeDisabled();
   });
 
   test('navigates to Request Withdrawal', async ({ page }) => {
     await page.getByText('Request Withdrawal', { exact: true }).click();
     await page.waitForURL('**/withdrawal');
-    await expect(page.getByText('Available balance')).toBeVisible();
-    // Not a bare text match — "Request Withdraw" is also a substring of this
-    // page's own IonTitle ("Request Withdrawal"). Scope to the actual button.
-    await expect(page.getByRole('button', { name: 'Request Withdraw' })).toBeVisible();
+    await expect(page.getByText('Recibes', { exact: false })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Calcular comisión' })).toBeDisabled();
   });
 
-  test('navigates to History and switches tabs', async ({ page }) => {
+  test('navigates to the current USDT history', async ({ page }) => {
     await page.getByText('History', { exact: true }).click();
     await page.waitForURL('**/history');
-    // exact:true — a bare match also hits "No deposits yet" (case-insensitive
-    // substring match on "deposits").
-    await expect(page.getByText('Deposits', { exact: true })).toBeVisible();
-
-    // IonSegmentButton's inner label intercepts clicks meant for the segment
-    // button itself — target the segment-button host by its `value`.
-    await page.locator('ion-segment-button[value="withdrawals"]').click();
-    await page.locator('ion-segment-button[value="games"]').click();
-    await page.locator('ion-segment-button[value="tournaments"]').click();
+    await expect(page.locator('ion-title').filter({ hasText: 'Movimientos USDT' })).toBeVisible();
+    await expect(page.getByText('Disponible:', { exact: false })).toBeVisible();
   });
 
   test('navigates to Contact Us, checks My Requests, and submits a new one', async ({ page }) => {

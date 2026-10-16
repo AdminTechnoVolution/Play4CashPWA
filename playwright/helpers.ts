@@ -1,3 +1,4 @@
+import { installBrowserApi } from './browser-api.fixture';
 import type { Page } from '@playwright/test';
 
 /**
@@ -17,8 +18,12 @@ import type { Page } from '@playwright/test';
  */
 export async function fakeLogin(page: Page, localPart?: string): Promise<string> {
   const email = `${localPart || `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}`}@play4cash.test`;
+  if ((process.env.P4C_E2E_MODE || 'mock') === 'mock') {
+    await installBrowserApi(page, email);
+    return email;
+  }
   const res = await page.request.post('/api/login/fake', { data: { email } });
-  if (res.status() !== 200) {
+  if (![200, 201].includes(res.status())) {
     throw new Error(`fakeLogin failed: ${res.status()} ${await res.text()}`);
   }
   return email;
