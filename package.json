@@ -1,7 +1,7 @@
 {
   "name": "play4cash-pwa",
   "private": true,
-  "version": "1.0.70",
+  "version": "1.0.71",
   "type": "module",
   "scripts": {
     "test:e2e": "playwright test",
