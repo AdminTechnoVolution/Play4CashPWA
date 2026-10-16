@@ -117,7 +117,7 @@ const RoomsPage: React.FC = () => {
 
   const [filter, setFilter] = useState<'all' | 'waiting' | 'started'>('all');
   const [createName, setCreateName] = useState('');
-  const [createBet, setCreateBet] = useState(minBetNum);
+  const [createBet, setCreateBet] = useState(String(minBetNum));
   const [createLimit, setCreateLimit] = useState(2);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -149,7 +149,7 @@ const RoomsPage: React.FC = () => {
   useEffect(() => {
     if (showCreateDialog) {
       setCreateName('');
-      setCreateBet(minBetNum);
+      setCreateBet(String(minBetNum));
       setCreateLimit(catalogGame?.minPlayers ?? createRoomPlayerOptions?.[0] ?? 2);
       setCreateError('');
     }
@@ -267,11 +267,11 @@ const RoomsPage: React.FC = () => {
       setCreateError(t('room_error_name_required'));
       return;
     }
-    if (createBet < minBetNum) {
+    if (!/^\d{1,18}(\.\d{1,6})?$/.test(createBet) || Number(createBet) < minBetNum) {
       setCreateError(formatRoomBetMinMessage(minBetNum));
       return;
     }
-    if (createBet > userBalanceNum) {
+    if (Number(createBet) > userBalanceNum) {
       setCreateError(t('room_bet_exceeds_balance_error').replace('%s', `$${formatUSD(userBalanceNum)}`));
       return;
     }
@@ -290,7 +290,7 @@ const RoomsPage: React.FC = () => {
       
       savePlayContext({
         roomId,
-        betAmount: createBet,
+        betAmount: Number(createBet),
         roomName,
         opponentName: 'Waiting',
         hasOpponent: false,
@@ -300,7 +300,7 @@ const RoomsPage: React.FC = () => {
       });
       
       setCreateName('');
-      setCreateBet(minBetNum);
+      setCreateBet(String(minBetNum));
       setCreateLimit(2);
       navigate(`/play/${gameSocketCode}`);
     } catch (err) {
@@ -722,7 +722,7 @@ const RoomsPage: React.FC = () => {
                 <IonInput
                   type="number"
                   value={String(createBet)}
-                  onIonInput={(e) => setCreateBet(parseFloat(e.detail.value ?? '0') || 0)}
+                  onIonInput={(e) => setCreateBet(String(e.detail.value ?? ''))}
                   min={String(minBetNum)}
                   max={String(userBalanceNum)}
                   step="0.01"

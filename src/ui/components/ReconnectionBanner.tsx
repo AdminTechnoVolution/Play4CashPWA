@@ -17,6 +17,23 @@ export default function ReconnectionBanner() {
   const t = useT();
   const isAnyReconnecting = useConnectionStore((s) => s.isAnyReconnecting());
   const [show, setShow] = useState(false);
+  const [commandNotice, setCommandNotice] = useState('');
+  const [pendingCommands, setPendingCommands] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const update = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (detail.reason) setCommandNotice(detail.reason);
+      setPendingCommands(current => ({ ...current, [detail.namespace]: detail.count }));
+    };
+    window.addEventListener('p4c:command-pending', update);
+    return () => window.removeEventListener('p4c:command-pending', update);
+  }, []);
+  useEffect(() => {
+    if (!commandNotice) return;
+    const timer = setTimeout(() => setCommandNotice(''), 10000);
+    return () => clearTimeout(timer);
+  }, [commandNotice]);
+  const pending = Object.values(pendingCommands).some(count => count > 0);
 
   useEffect(() => {
     if (!isAnyReconnecting) {
@@ -27,7 +44,7 @@ export default function ReconnectionBanner() {
     return () => window.clearTimeout(id);
   }, [isAnyReconnecting]);
 
-  if (!show) return null;
+  if (!show && !pending && !commandNotice) return null;
 
   return (
     <div
@@ -50,7 +67,7 @@ export default function ReconnectionBanner() {
       }}
     >
       <span aria-hidden style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#1a1a1a', marginRight: 8, opacity: 0.6 }} />
-      {t('reconnection_banner_message')}
+      {commandNotice || (pending ? 'Jugada pendiente de confirmación…' : t('reconnection_banner_message'))}
     </div>
   );
 }

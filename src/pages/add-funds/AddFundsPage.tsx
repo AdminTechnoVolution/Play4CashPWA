@@ -22,7 +22,7 @@ import GenericErrorModal from '../../ui/components/GenericErrorModal';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import { AppBackButton } from '../../navigation/AppBackButton';
 import '../../ui/theme/variables.css';
-import type { WalletResponse } from '../../data/models/ApiModels';
+import type { RechargeIntentResponse, WalletResponse } from '../../data/models/ApiModels';
 import { useT } from '../../i18n/translations';
 
 const AddFundsPage: React.FC = () => {
@@ -37,7 +37,13 @@ const AddFundsPage: React.FC = () => {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Step 2 form
+  // Step 2: amount → reservation
+  const [amount, setAmount] = useState('');
+  const [isReserving, setIsReserving] = useState(false);
+  const [intent, setIntent] = useState<RechargeIntentResponse | null>(null);
+  const [remainingMs, setRemainingMs] = useState(0);
+
+  // Step 3 form
   const [txId, setTxId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -83,6 +89,16 @@ const AddFundsPage: React.FC = () => {
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Step 3 countdown until the reservation expires.
+  useEffect(() => {
+    if (!intent) return;
+    const expiresAtMs = new Date(intent.expiresAt).getTime();
+    const tick = () => setRemainingMs(Math.max(0, expiresAtMs - Date.now()));
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [intent]);
+
   const selectedWallet = wallets[selectedWalletIndex] ?? null;
   const depositAddress = selectedWallet?.address ?? '';
 
@@ -95,6 +111,34 @@ const AddFundsPage: React.FC = () => {
     } catch {
       /* clipboard not available */
     }
+  };
+
+  const handleReserve = () => {
+    const parsed = Number(amount);
+    if (!amount.trim() || !Number.isFinite(parsed) || parsed <= 0) {
+      setAlertMessage(t('recharge_error_amount_invalid'));
+      setAlertOpen(true);
+      return;
+    }
+    if (!selectedWallet) return;
+
+    setIsReserving(true);
+    (async () => {
+      try {
+        const result = await apiRepository.createRechargeIntent({
+          coin: selectedWallet.coin || 'usdt',
+          network: selectedWallet.network,
+          amount: parsed,
+        });
+        setIntent(result);
+        setStep(3);
+      } catch (err: any) {
+        setAlertMessage(formatApiMessageForDisplay(err.message, 'error_try_later_message'));
+        setAlertOpen(true);
+      } finally {
+        setIsReserving(false);
+      }
+    })();
   };
 
   const handleSubmit = () => {
@@ -128,6 +172,8 @@ const AddFundsPage: React.FC = () => {
       }
     })();
   };
+
+  const isExpired = step === 3 && !!intent && remainingMs <= 0;
 
   return (
     <IonPage>
@@ -204,110 +250,212 @@ const AddFundsPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Deposit address (read-only + copy) */}
-                <div style={{ marginBottom: '24px' }}>
-                  <SectionLabel>{t('deposit_address')}</SectionLabel>
-                  <div
-                    style={{
-                      ...inputStyleBase,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      cursor: depositAddress ? 'pointer' : 'default',
-                    }}
-                    onClick={handleCopyAddress}
-                  >
-                    <span
-                      style={{
-                        flex: 1,
-                        color: 'var(--sovereign-text)',
-                        fontSize: '13px',
-                        wordBreak: 'break-all',
-                        fontFamily: 'monospace',
-                      }}
-                    >
-                      {depositAddress || '—'}
-                    </span>
-                    {depositAddress && (
-                      <IonIcon
-                        icon={copied ? checkmarkOutline : copyOutline}
-                        style={{
-                          color: copied ? '#4caf50' : 'var(--sovereign-gold)',
-                          fontSize: '20px',
-                          flexShrink: 0,
-                          transition: 'color 0.2s',
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-
                 {/* Continue to step 2 */}
                 <SovereignPrimaryButton
                   onClick={() => setStep(2)}
-                  disabled={walletsLoading || !depositAddress}
+                  disabled={walletsLoading || !selectedWallet}
                   expand="block"
                 >
                   {t('done_recharge_done')}
                 </SovereignPrimaryButton>
               </div>
             </>
-          ) : (
+          ) : step === 2 ? (
             <>
-              {/* Step 2: Important information */}
-              <div style={cardStyle}>
-                <IonText>
-                  <p style={{ ...cardTitleStyle, fontSize: '15px' }}>{t('important_information')}</p>
-                </IonText>
-                <IonText>
-                  <p style={{ color: 'var(--sovereign-text)', fontSize: '13px', margin: '12px 0 0 0', lineHeight: '1.6' }}>
-                    {t('add_funds_step2_important_info_text')}
-                  </p>
-                </IonText>
-              </div>
-
-              {/* Step 2: Recharge form */}
+              {/* Step 2: how much to deposit */}
               <div style={cardStyle}>
                 <IonText>
                   <p style={{ ...cardTitleStyle, fontSize: '15px', marginBottom: '16px' }}>
-                    {t('add_funds_form_title')}
+                    {t('recharge_intent_amount_title')}
                   </p>
                 </IonText>
 
-                {/* Transaction ID */}
-                <div style={{ marginBottom: '16px' }}>
-                  <SectionLabel>{t('label_transaction_id')}</SectionLabel>
+                <div style={{ marginBottom: selectedWallet?.minAmount ? '8px' : '24px' }}>
+                  <SectionLabel>{t('label_amount')}</SectionLabel>
                   <IonInput
-                    value={txId}
-                    onIonInput={(e) => {
-                      rechargeIdempotencyKeyRef.current = null;
-                      setTxId(e.detail.value ?? '');
-                    }}
-                    placeholder={t('label_transaction_id')}
+                    value={amount}
+                    type="number"
+                    inputmode="decimal"
+                    onIonInput={(e) => setAmount(e.detail.value ?? '')}
+                    placeholder={t('label_amount')}
                     style={inputStyle}
                   />
                 </div>
+                {!!selectedWallet?.minAmount && (
+                  <IonText>
+                    <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: '0 0 24px 0' }}>
+                      {t('recharge_intent_minimum_hint').replace('%s', `${selectedWallet.minAmount} ${selectedWallet.coin || 'USDT'}`)}
+                    </p>
+                  </IonText>
+                )}
 
-                {/* Coin (read-only) */}
-                <div style={{ marginBottom: '24px' }}>
-                  <SectionLabel>{t('label_coin')}</SectionLabel>
-                  <IonInput
-                    value={t('value_coin_usdt')}
-                    readonly
-                    style={inputStyle}
-                  />
-                </div>
-
-                {/* Submit */}
                 <SovereignPrimaryButton
-                  onClick={handleSubmit}
-                  loading={isSubmitting}
-                  disabled={isSubmitting}
+                  onClick={handleReserve}
+                  loading={isReserving}
+                  disabled={isReserving}
                   expand="block"
                 >
-                  {isSubmitting ? '...' : t('verify_button')}
+                  {isReserving ? '...' : t('recharge_intent_reserve_button')}
                 </SovereignPrimaryButton>
               </div>
+            </>
+          ) : (
+            <>
+              {/* Step 3: exact amount + address + countdown */}
+              <div style={cardStyle}>
+                <IonText>
+                  <p style={{ ...cardTitleStyle, fontSize: '15px' }}>
+                    {isExpired ? t('recharge_intent_expired_title') : t('recharge_intent_exact_amount_title')}
+                  </p>
+                </IonText>
+
+                {isExpired ? (
+                  <>
+                    <IonText>
+                      <p style={{ color: 'var(--sovereign-text)', fontSize: '13px', margin: '12px 0 20px 0', lineHeight: '1.6' }}>
+                        {t('recharge_intent_expired_text')}
+                      </p>
+                    </IonText>
+                    <SovereignPrimaryButton
+                      onClick={() => {
+                        setIntent(null);
+                        setTxId('');
+                        setStep(2);
+                      }}
+                      expand="block"
+                    >
+                      {t('recharge_intent_reserve_again_button')}
+                    </SovereignPrimaryButton>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        ...inputStyleBase,
+                        margin: '12px 0',
+                        textAlign: 'center',
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        color: 'var(--sovereign-gold)',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {intent?.exactAmount} {intent?.coin}
+                    </div>
+                    <IonText>
+                      <p style={{ color: 'var(--sovereign-text)', fontSize: '13px', margin: '0 0 16px 0', lineHeight: '1.6' }}>
+                        {t('recharge_intent_exact_amount_warning')}
+                      </p>
+                    </IonText>
+
+                    {/* Deposit address (read-only + copy) */}
+                    <div style={{ marginBottom: '12px' }}>
+                      <SectionLabel>{t('deposit_address')}</SectionLabel>
+                      <div
+                        style={{
+                          ...inputStyleBase,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: depositAddress ? 'pointer' : 'default',
+                        }}
+                        onClick={handleCopyAddress}
+                      >
+                        <span
+                          style={{
+                            flex: 1,
+                            color: 'var(--sovereign-text)',
+                            fontSize: '13px',
+                            wordBreak: 'break-all',
+                            fontFamily: 'monospace',
+                          }}
+                        >
+                          {intent?.address || depositAddress || '—'}
+                        </span>
+                        {depositAddress && (
+                          <IonIcon
+                            icon={copied ? checkmarkOutline : copyOutline}
+                            style={{
+                              color: copied ? '#4caf50' : 'var(--sovereign-gold)',
+                              fontSize: '20px',
+                              flexShrink: 0,
+                              transition: 'color 0.2s',
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <IonText>
+                      <p style={{ color: 'var(--sovereign-text-muted)', fontSize: '12px', margin: '0 0 4px 0' }}>
+                        {t('recharge_intent_expires_label')}: {formatRemaining(remainingMs)}
+                      </p>
+                    </IonText>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIntent(null);
+                        setTxId('');
+                        setStep(2);
+                      }}
+                      style={linkButtonStyle}
+                    >
+                      {t('recharge_intent_change_amount_link')}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Step 3: transaction id + submit */}
+              {!isExpired && (
+                <div style={cardStyle}>
+                  <IonText>
+                    <p style={{ color: 'var(--sovereign-text)', fontSize: '13px', margin: '0 0 16px 0', lineHeight: '1.6' }}>
+                      {t('add_funds_step2_important_info_text')}
+                    </p>
+                  </IonText>
+
+                  <IonText>
+                    <p style={{ ...cardTitleStyle, fontSize: '15px', marginBottom: '16px' }}>
+                      {t('add_funds_form_title')}
+                    </p>
+                  </IonText>
+
+                  {/* Transaction ID */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <SectionLabel>{t('label_transaction_id')}</SectionLabel>
+                    <IonInput
+                      value={txId}
+                      onIonInput={(e) => {
+                        rechargeIdempotencyKeyRef.current = null;
+                        setTxId(e.detail.value ?? '');
+                      }}
+                      placeholder={t('label_transaction_id')}
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Coin (read-only) */}
+                  <div style={{ marginBottom: '24px' }}>
+                    <SectionLabel>{t('label_coin')}</SectionLabel>
+                    <IonInput
+                      value={t('value_coin_usdt')}
+                      readonly
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Submit */}
+                  <SovereignPrimaryButton
+                    onClick={handleSubmit}
+                    loading={isSubmitting}
+                    disabled={isSubmitting}
+                    expand="block"
+                  >
+                    {isSubmitting ? '...' : t('verify_button')}
+                  </SovereignPrimaryButton>
+                </div>
+              )}
             </>
           )}
 
@@ -337,6 +485,15 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     </label>
   </IonText>
 );
+
+/* ── Helpers ── */
+
+function formatRemaining(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
 
 /* ── Styles ── */
 
@@ -371,6 +528,18 @@ const inputStyle = {
   border: '1px solid var(--sovereign-border)',
   borderRadius: '10px',
 } as React.CSSProperties;
+
+const linkButtonStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  marginTop: '4px',
+  color: 'var(--sovereign-gold)',
+  fontSize: '13px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  textDecoration: 'underline',
+};
 
 export default AddFundsPage;
 
