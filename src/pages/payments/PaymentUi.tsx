@@ -36,6 +36,18 @@ export function formatUsdt(value?: string): string {
 
 export const isValidAmount = (value: string) => usdtAmount.test(value) && /[1-9]/.test(value);
 
+const DEPOSIT_SUGGESTION_STEPS = [25, 50, 100, 250, 500, 1000];
+/**
+ * Quick deposit amounts for a network: the first clears its minimum by at least 2 USDT, rounded up to a multiple
+ * of 5 (12.13 → 15), followed by the usual steps above it. Without a known minimum, keep the default ladder.
+ */
+export function suggestedDepositAmounts(minDeposit?: string): string[] {
+  const minimum = Number(minDeposit);
+  if (!minDeposit || !Number.isFinite(minimum) || minimum <= 0) return ['10', '25', '50', '100'];
+  const first = Math.ceil((minimum + 2) / 5) * 5;
+  return [first, ...DEPOSIT_SUGGESTION_STEPS.filter(step => step > first)].slice(0, 4).map(String);
+}
+
 /** Estimates are shown in cents, rounding fees up and credits down so the screen never promises more than settles. */
 export const approxFee = (value: number | string) => (Math.ceil(Number(value) * 100) / 100).toFixed(2);
 export const approxCredit = (value: number | string) => (Math.floor(Number(value) * 100) / 100).toFixed(2);

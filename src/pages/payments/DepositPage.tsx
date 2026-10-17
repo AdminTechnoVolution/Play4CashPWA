@@ -11,12 +11,11 @@ import { useT } from '../../i18n/translations';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import {
-  approxCredit, approxFee, BalanceHero, cheapestNetwork, failedStatuses, fieldInputStyle, formatUsdt, isValidAmount, Label, NetworkPicker, Notice, OrderHeader,
+  approxCredit, approxFee, BalanceHero, cheapestNetwork, failedStatuses, fieldInputStyle, formatUsdt, isValidAmount, Label, NetworkPicker, suggestedDepositAmounts, Notice, OrderHeader,
   PaymentsLayout, Receipt, requestKey, Steps, success, terminal, useOrderPolling,
 } from './PaymentUi';
 import type { Balance } from './PaymentUi';
 
-const quickAmounts = ['10', '25', '50', '100'];
 
 /** 0 = waiting for payment, 1 = confirming on chain, 3 = credited (all stages done). */
 function progressStep(status: string): number {
@@ -65,6 +64,7 @@ const DepositPage: React.FC = () => {
   const validAmount = isValidAmount(amount);
   const minimum = networks?.find(n => n.network === network)?.minDeposit;
   const belowMinimum = (value: string) => !!minimum && isValidAmount(value) && Number(value) < Number(minimum);
+  const quickAmounts = suggestedDepositAmounts(minimum);
 
   const createDeposit = async () => {
     setLoading(true); setError('');
