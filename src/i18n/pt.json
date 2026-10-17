@@ -1212,5 +1212,7 @@
   "deposit_cheapest": "Mais barata",
   "deposit_fee_note": "Taxa estimada com base em depósitos recentes. Ao criar o depósito, você verá quanto será creditado.",
   "deposit_expected_fee": "Taxa de rede e serviço ≈",
-  "deposit_expected_credit": "Você receberá ≈"
+  "deposit_expected_credit": "Você receberá ≈",
+  "withdraw_trc20_only": "Os saques são enviados apenas pela rede TRC20 (Tron). Use um endereço Tron, que começa com “T”.",
+  "WITHDRAWAL_NETWORK_UNAVAILABLE": "Os saques estão disponíveis apenas pela rede TRC20."
 }

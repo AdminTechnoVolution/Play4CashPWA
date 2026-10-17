@@ -1212,5 +1212,7 @@
   "deposit_cheapest": "Più economica",
   "deposit_fee_note": "Commissione stimata in base ai depositi recenti. Creando il deposito vedrai quanto verrà accreditato.",
   "deposit_expected_fee": "Commissione di rete e servizio ≈",
-  "deposit_expected_credit": "Riceverai ≈"
+  "deposit_expected_credit": "Riceverai ≈",
+  "withdraw_trc20_only": "I prelievi vengono inviati solo sulla rete TRC20 (Tron). Usa un indirizzo Tron, che inizia con «T».",
+  "WITHDRAWAL_NETWORK_UNAVAILABLE": "I prelievi sono disponibili solo sulla rete TRC20."
 }

@@ -1249,5 +1249,7 @@
   "deposit_cheapest": "Lowest fee",
   "deposit_fee_note": "Fee estimated from recent deposits. You will see how much will be credited when you create the deposit.",
   "deposit_expected_fee": "Network and service fee ≈",
-  "deposit_expected_credit": "You will receive ≈"
+  "deposit_expected_credit": "You will receive ≈",
+  "withdraw_trc20_only": "Withdrawals are sent only on the TRC20 (Tron) network. Use a Tron address, which starts with “T”.",
+  "WITHDRAWAL_NETWORK_UNAVAILABLE": "Withdrawals are only available on the TRC20 network."
 }

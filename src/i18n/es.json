@@ -1252,5 +1252,7 @@
   "deposit_cheapest": "Más barata",
   "deposit_fee_note": "Comisión estimada según depósitos recientes. Al crear el depósito verás cuánto se acreditará.",
   "deposit_expected_fee": "Comisión de red y servicio ≈",
-  "deposit_expected_credit": "Recibirás ≈"
+  "deposit_expected_credit": "Recibirás ≈",
+  "withdraw_trc20_only": "Los retiros se envían solo por la red TRC20 (Tron). Usa una dirección de Tron, que empieza por «T».",
+  "WITHDRAWAL_NETWORK_UNAVAILABLE": "Los retiros solo están disponibles por la red TRC20."
 }

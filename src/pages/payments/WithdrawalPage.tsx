@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { IonInput } from '@ionic/react';
 import {
-  alertCircleOutline, checkmarkCircle, closeCircleOutline, hourglassOutline, mailOutline, paperPlaneOutline,
+  alertCircleOutline, checkmarkCircle, closeCircleOutline, hourglassOutline, informationCircleOutline, mailOutline, paperPlaneOutline,
   shieldCheckmarkOutline, timeOutline, warningOutline,
 } from 'ionicons/icons';
 import { paymentsApi } from '../../data/network/PaymentsApi';
@@ -45,8 +45,10 @@ const WithdrawalPage: React.FC = () => {
     let active = true;
     (async () => {
       try {
-        const [funds, rows] = await Promise.all([paymentsApi.balance(), paymentsApi.networks()]);
+        const [funds, all] = await Promise.all([paymentsApi.balance(), paymentsApi.networks()]);
         if (!active) return;
+        // Payouts only leave on TRC20, where provider liquidity settles; the server enforces it too.
+        const rows = all.filter(n => n.withdrawable !== false);
         setBalance(funds); setNetworks(rows); setNetwork(rows[0]?.network ?? '');
         const id = sessionStorage.getItem(`${storageKey}:order`);
         if (id) { const current = await paymentsApi.order(id); if (active) setOrder(current); }
@@ -101,6 +103,9 @@ const WithdrawalPage: React.FC = () => {
         <div className="p4c-card">
           <p className="p4c-card-title">{t('withdrawal_destination')}</p>
           <NetworkPicker networks={networks} value={network} disabled={loading} onChange={setNetwork} />
+          {networks?.length === 1 && networks[0].network === 'TRC20' && (
+            <Notice icon={informationCircleOutline}><p>{t('withdraw_trc20_only')}</p></Notice>
+          )}
 
           <Label htmlFor="withdraw-address">{t('withdraw_address_label')}</Label>
           <div className="p4c-field">

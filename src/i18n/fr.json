@@ -1212,5 +1212,7 @@
   "deposit_cheapest": "Moins chère",
   "deposit_fee_note": "Frais estimés d’après les dépôts récents. Vous verrez le montant crédité en créant le dépôt.",
   "deposit_expected_fee": "Frais de réseau et de service ≈",
-  "deposit_expected_credit": "Vous recevrez ≈"
+  "deposit_expected_credit": "Vous recevrez ≈",
+  "withdraw_trc20_only": "Les retraits sont envoyés uniquement sur le réseau TRC20 (Tron). Utilisez une adresse Tron, qui commence par « T ».",
+  "WITHDRAWAL_NETWORK_UNAVAILABLE": "Les retraits ne sont disponibles que sur le réseau TRC20."
 }

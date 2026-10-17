@@ -1212,5 +1212,7 @@
   "deposit_cheapest": "Günstigste",
   "deposit_fee_note": "Gebühr geschätzt anhand aktueller Einzahlungen. Beim Erstellen der Einzahlung siehst du den Gutschriftbetrag.",
   "deposit_expected_fee": "Netzwerk- und Servicegebühr ≈",
-  "deposit_expected_credit": "Du erhältst ≈"
+  "deposit_expected_credit": "Du erhältst ≈",
+  "withdraw_trc20_only": "Auszahlungen werden nur über das TRC20-Netzwerk (Tron) gesendet. Verwende eine Tron-Adresse, die mit „T“ beginnt.",
+  "WITHDRAWAL_NETWORK_UNAVAILABLE": "Auszahlungen sind nur über das TRC20-Netzwerk möglich."
 }
