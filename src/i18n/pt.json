@@ -1207,5 +1207,10 @@
   "PAYMENTS_USER_NOT_ACTIVE": "Sua conta não está ativa para pagamentos.",
   "USER_NOT_ACTIVE": "Sua conta não está ativa.",
   "NOWPAYMENTS_REJECTED": "O provedor rejeitou a operação. Verifique o endereço e a rede.",
-  "NOWPAYMENTS_REQUEST_UNRESOLVED": "Não foi possível contatar o provedor de pagamentos. Tente novamente em alguns minutos."
+  "NOWPAYMENTS_REQUEST_UNRESOLVED": "Não foi possível contatar o provedor de pagamentos. Tente novamente em alguns minutos.",
+  "deposit_fee_from": "a partir de ≈ %s",
+  "deposit_cheapest": "Mais barata",
+  "deposit_fee_note": "Taxa estimada com base em depósitos recentes. Ao criar o depósito, você verá quanto será creditado.",
+  "deposit_expected_fee": "Taxa de rede e serviço ≈",
+  "deposit_expected_credit": "Você receberá ≈"
 }

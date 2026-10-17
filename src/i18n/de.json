@@ -1207,5 +1207,10 @@
   "PAYMENTS_USER_NOT_ACTIVE": "Dein Konto ist für Zahlungen nicht aktiv.",
   "USER_NOT_ACTIVE": "Dein Konto ist nicht aktiv.",
   "NOWPAYMENTS_REJECTED": "Der Anbieter hat den Vorgang abgelehnt. Prüfe Adresse und Netzwerk.",
-  "NOWPAYMENTS_REQUEST_UNRESOLVED": "Der Zahlungsanbieter ist nicht erreichbar. Bitte versuche es in ein paar Minuten erneut."
+  "NOWPAYMENTS_REQUEST_UNRESOLVED": "Der Zahlungsanbieter ist nicht erreichbar. Bitte versuche es in ein paar Minuten erneut.",
+  "deposit_fee_from": "ab ≈ %s",
+  "deposit_cheapest": "Günstigste",
+  "deposit_fee_note": "Gebühr geschätzt anhand aktueller Einzahlungen. Beim Erstellen der Einzahlung siehst du den Gutschriftbetrag.",
+  "deposit_expected_fee": "Netzwerk- und Servicegebühr ≈",
+  "deposit_expected_credit": "Du erhältst ≈"
 }

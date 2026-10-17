@@ -1244,5 +1244,10 @@
   "PAYMENTS_USER_NOT_ACTIVE": "Your account is not active for payments.",
   "USER_NOT_ACTIVE": "Your account is not active.",
   "NOWPAYMENTS_REJECTED": "The provider rejected the operation. Check the address and network.",
-  "NOWPAYMENTS_REQUEST_UNRESOLVED": "We couldn’t reach the payment provider. Please try again in a few minutes."
+  "NOWPAYMENTS_REQUEST_UNRESOLVED": "We couldn’t reach the payment provider. Please try again in a few minutes.",
+  "deposit_fee_from": "from ≈ %s",
+  "deposit_cheapest": "Lowest fee",
+  "deposit_fee_note": "Fee estimated from recent deposits. You will see how much will be credited when you create the deposit.",
+  "deposit_expected_fee": "Network and service fee ≈",
+  "deposit_expected_credit": "You will receive ≈"
 }

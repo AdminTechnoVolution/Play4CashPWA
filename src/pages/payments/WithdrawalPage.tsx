@@ -13,7 +13,7 @@ import { useDashboardStore } from '../../store/dashboardStore';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import {
   BalanceHero, chains, failedStatuses, fieldInputStyle, formatUsdt, isValidAmount, Label, NetworkPicker, Notice, OrderHeader,
-  PaymentsLayout, requestKey, ReturnRequestCard, Steps, success, terminal, useOrderPolling,
+  PaymentsLayout, Receipt, requestKey, ReturnRequestCard, Steps, success, terminal, useOrderPolling,
 } from './PaymentUi';
 import type { Balance } from './PaymentUi';
 
@@ -262,17 +262,6 @@ const NetworkTag: React.FC<{ network: string }> = ({ network }) => (
     <span className="p4c-network-dot" style={{ background: chains[network]?.color ?? 'var(--sovereign-gold)' }} />
     {network}{chains[network] ? ` · ${chains[network].name}` : ''}
   </span>
-);
-
-const Receipt: React.FC<{ rows: Array<[string, React.ReactNode, boolean?]> }> = ({ rows }) => (
-  <div className="p4c-receipt">
-    {rows.map(([label, value, strong]) => (
-      <div key={label} className={`p4c-receipt-row${strong ? ' p4c-receipt-row--strong' : ''}`}>
-        <span>{label}</span>
-        <span>{value}</span>
-      </div>
-    ))}
-  </div>
 );
 
 const CountdownRing: React.FC<{ remaining: number; label: string }> = ({ remaining, label }) => {

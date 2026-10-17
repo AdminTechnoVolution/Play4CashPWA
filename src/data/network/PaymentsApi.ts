@@ -1,8 +1,9 @@
 import { apiClient } from './ApiClient';
 import type { ApiResponse } from '../models/ApiModels';
-export interface PaymentNetwork { network: string; currency: string; asset: 'USDT' }
+/** depositFee: approximate fee = fixed + amount × rate, from recent provider quotes (absent without history). */
+export interface PaymentNetwork { network: string; currency: string; asset: 'USDT'; depositFee?: { fixed: string; rate: string } }
 export interface PaymentOrder { id: string; kind: 'deposit' | 'withdrawal'; network: string; amount: string; fee?: string;
-  net?: string; credited?: string; status: string; address?: string; payAmount?: string; createdAt: string; reviewReason?: string }
+  net?: string; credited?: string; status: string; address?: string; payAmount?: string; expectedCredit?: string; createdAt: string; reviewReason?: string }
 export interface WithdrawalQuote { id: string; network: string; address: string; net: string; fee: string; amount: string; expiresAt: string }
 export const paymentsApi = {
   async requestReturn(key: string, reason: string) {

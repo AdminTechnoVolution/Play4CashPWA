@@ -11,8 +11,8 @@ import { useT } from '../../i18n/translations';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { SovereignPrimaryButton, SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import {
-  BalanceHero, failedStatuses, fieldInputStyle, formatUsdt, isValidAmount, Label, NetworkPicker, Notice, OrderHeader, PaymentsLayout,
-  requestKey, Steps, success, terminal, useOrderPolling,
+  approxCredit, approxFee, BalanceHero, cheapestNetwork, failedStatuses, fieldInputStyle, formatUsdt, isValidAmount, Label, NetworkPicker, Notice, OrderHeader,
+  PaymentsLayout, Receipt, requestKey, Steps, success, terminal, useOrderPolling,
 } from './PaymentUi';
 import type { Balance } from './PaymentUi';
 
@@ -44,7 +44,7 @@ const DepositPage: React.FC = () => {
       try {
         const [funds, rows] = await Promise.all([paymentsApi.balance(), paymentsApi.networks()]);
         if (!active) return;
-        setBalance(funds); setNetworks(rows); setNetwork(rows[0]?.network ?? '');
+        setBalance(funds); setNetworks(rows); setNetwork(cheapestNetwork(rows, '') ?? rows[0]?.network ?? '');
         const id = sessionStorage.getItem(`${storageKey}:order`);
         if (id) { const current = await paymentsApi.order(id); if (active) setOrder(current); }
       } catch (e) {
@@ -85,7 +85,7 @@ const DepositPage: React.FC = () => {
       {!order ? (
         <div className="p4c-card">
           <p className="p4c-card-title">{t('recharge_intent_amount_title')}</p>
-          <NetworkPicker networks={networks} value={network} disabled={loading} onChange={setNetwork} />
+          <NetworkPicker networks={networks} value={network} disabled={loading} feeAmount={amount} onChange={setNetwork} />
 
           <Label>{t('deposit_amount_label')}</Label>
           <div className={`p4c-field${amount && !validAmount ? ' p4c-field--error' : ''}`}>
@@ -112,6 +112,9 @@ const DepositPage: React.FC = () => {
     </PaymentsLayout>
   );
 };
+
+/** Fee implied by the provider quote: what the user sends minus what is expected to settle. */
+const quotedFee = (order: PaymentOrder) => Math.max(0, Number(order.payAmount ?? order.amount) - Number(order.expectedCredit));
 
 const DepositOrderCard: React.FC<{ order: PaymentOrder; onNew: () => void; onHome: () => void }> = ({ order, onNew, onHome }) => {
   const t = useT();
@@ -155,6 +158,12 @@ const DepositOrderCard: React.FC<{ order: PaymentOrder; onNew: () => void; onHom
         <>
           <Label>{t('recharge_intent_exact_amount_title')}</Label>
           <div className="p4c-amount-box p4c-mono">{formatUsdt(order.payAmount ?? order.amount)} <small>USDT</small></div>
+          {order.expectedCredit && (
+            <Receipt rows={[
+              [t('deposit_expected_fee'), <span className="p4c-mono">{approxFee(quotedFee(order))} USDT</span>],
+              [t('deposit_expected_credit'), <span className="p4c-mono">{approxCredit(order.expectedCredit)} USDT</span>, true],
+            ]} />
+          )}
 
           <div className="p4c-qr"><div><QRCodeSVG value={order.address} size={176} /></div></div>
 

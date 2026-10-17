@@ -34,6 +34,23 @@ export function formatUsdt(value?: string): string {
 
 export const isValidAmount = (value: string) => usdtAmount.test(value) && /[1-9]/.test(value);
 
+/** Estimates are shown in cents, rounding fees up and credits down so the screen never promises more than settles. */
+export const approxFee = (value: number | string) => (Math.ceil(Number(value) * 100) / 100).toFixed(2);
+export const approxCredit = (value: number | string) => (Math.floor(Number(value) * 100) / 100).toFixed(2);
+
+/** Approximate deposit fee for `amount` (0 when not entered): fixed network part + service rate. */
+export function estimateDepositFee(network: PaymentNetwork, amount: string): number | null {
+  if (!network.depositFee) return null;
+  return Number(network.depositFee.fixed) + (isValidAmount(amount) ? Number(amount) : 0) * Number(network.depositFee.rate);
+}
+
+/** The network with the lowest estimated fee, only when at least two can be compared. */
+export function cheapestNetwork(networks: PaymentNetwork[], amount: string): string | null {
+  const priced = networks.map(n => [n.network, estimateDepositFee(n, amount)] as const).filter((row): row is readonly [string, number] => row[1] !== null);
+  if (priced.length < 2) return null;
+  return priced.reduce((best, row) => (row[1] < best[1] ? row : best))[0];
+}
+
 /** Reuses the idempotency key while the same request is retried, so a double tap never creates two operations. */
 export function requestKey(storageKey: string, input: unknown): string {
   const serialized = JSON.stringify(input);
@@ -131,10 +148,13 @@ export const BalanceHero: React.FC<{ balance: Balance | null; direction: 'deposi
   );
 };
 
-export const NetworkPicker: React.FC<{ networks: PaymentNetwork[] | null; value: string; disabled?: boolean; onChange: (network: string) => void }> = ({
-  networks, value, disabled, onChange,
-}) => {
+/** `feeAmount` turns on deposit fee estimates for the amount being typed. */
+export const NetworkPicker: React.FC<{
+  networks: PaymentNetwork[] | null; value: string; disabled?: boolean; feeAmount?: string; onChange: (network: string) => void;
+}> = ({ networks, value, disabled, feeAmount, onChange }) => {
   const t = useT();
+  const showFees = feeAmount !== undefined && !!networks?.some(n => n.depositFee);
+  const cheapest = showFees && networks ? cheapestNetwork(networks, feeAmount) : null;
   return (
     <>
       <Label id="payment-network-label">{t('deposit_network_label')}</Label>
@@ -145,10 +165,11 @@ export const NetworkPicker: React.FC<{ networks: PaymentNetwork[] | null; value:
       ) : networks.length === 0 ? (
         <p className="p4c-hint" style={{ marginBottom: '20px' }}>{t('deposit_networks_empty')}</p>
       ) : (
-        <div role="radiogroup" aria-labelledby="payment-network-label" className="p4c-networks">
+        <div role="radiogroup" aria-labelledby="payment-network-label" className={`p4c-networks${cheapest ? ' p4c-networks--badged' : ''}`}>
           {networks.map(n => {
             const chain = chains[n.network];
             const selected = n.network === value;
+            const fee = showFees ? estimateDepositFee(n, feeAmount) : null;
             return (
               <button key={n.network} type="button" role="radio" aria-checked={selected} disabled={disabled}
                 className="p4c-network" onClick={() => onChange(n.network)}>
@@ -157,12 +178,19 @@ export const NetworkPicker: React.FC<{ networks: PaymentNetwork[] | null; value:
                   {n.network}
                 </span>
                 <span className="p4c-network-chain">{chain?.name ?? n.network}</span>
+                {fee !== null && (
+                  <span className={`p4c-network-fee p4c-mono${n.network === cheapest ? ' p4c-network-fee--best' : ''}`}>
+                    {isValidAmount(feeAmount ?? '') ? `≈ ${approxFee(fee)} USDT` : t('deposit_fee_from').replace('%s', `${approxFee(fee)} USDT`)}
+                  </span>
+                )}
+                {n.network === cheapest && <span className="p4c-network-badge">{t('deposit_cheapest')}</span>}
                 {selected && <IonIcon icon={checkmarkCircle} className="p4c-network-check" />}
               </button>
             );
           })}
         </div>
       )}
+      {showFees && <p className="p4c-hint" style={{ marginTop: '-10px', marginBottom: '18px' }}>{t('deposit_fee_note')}</p>}
     </>
   );
 };
@@ -201,6 +229,17 @@ export const OrderHeader: React.FC<{ order: PaymentOrder; label: string; icon: s
     </>
   );
 };
+
+export const Receipt: React.FC<{ rows: Array<[string, React.ReactNode, boolean?]> }> = ({ rows }) => (
+  <div className="p4c-receipt">
+    {rows.map(([label, value, strong]) => (
+      <div key={label} className={`p4c-receipt-row${strong ? ' p4c-receipt-row--strong' : ''}`}>
+        <span>{label}</span>
+        <span>{value}</span>
+      </div>
+    ))}
+  </div>
+);
 
 export const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id);
 
