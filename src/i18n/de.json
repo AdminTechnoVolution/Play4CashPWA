@@ -1117,6 +1117,8 @@
   "deposit_networks_empty": "Derzeit sind keine USDT-Netzwerke verfügbar. Bitte versuche es später erneut.",
   "deposit_amount_label": "Einzahlungsbetrag",
   "deposit_create_button": "Einzahlung erstellen",
+  "deposit_below_network_minimum": "Das Minimum für %s beträgt %s USDT.",
+  "deposit_network_minimum": "Min. %s USDT",
   "deposit_daily_limit_hint": "Maximal %s USDT an Einzahlungen alle 24 Stunden.",
   "deposit_only_usdt_warning": "Sende nur USDT über das %s-Netzwerk. Andere Coins oder Netzwerke werden nicht gutgeschrieben und die Mittel können verloren gehen.",
   "deposit_net_credit_note": "Dein Guthaben wird mit dem bestätigten Nettobetrag gutgeschrieben. Dieser Bildschirm aktualisiert sich automatisch.",

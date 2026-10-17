@@ -63,6 +63,8 @@ const DepositPage: React.FC = () => {
   });
 
   const validAmount = isValidAmount(amount);
+  const minimum = networks?.find(n => n.network === network)?.minDeposit;
+  const belowMinimum = (value: string) => !!minimum && isValidAmount(value) && Number(value) < Number(minimum);
 
   const createDeposit = async () => {
     setLoading(true); setError('');
@@ -88,7 +90,7 @@ const DepositPage: React.FC = () => {
       {!order ? (
         <div className="p4c-card">
           <p className="p4c-card-title">{t('recharge_intent_amount_title')}</p>
-          <NetworkPicker networks={networks} value={network} disabled={loading} feeAmount={amount} onChange={setNetwork} />
+          <NetworkPicker networks={networks} value={network} disabled={loading} feeAmount={amount} showMinimum onChange={setNetwork} />
 
           <Label>{t('deposit_amount_label')}</Label>
           <div className={`p4c-field${amount && !validAmount ? ' p4c-field--error' : ''}`}>
@@ -98,16 +100,18 @@ const DepositPage: React.FC = () => {
           </div>
           <div className="p4c-chips">
             {quickAmounts.map(value => (
-              <button key={value} type="button" className="p4c-chip" aria-pressed={amount === value} disabled={loading} onClick={() => setAmount(value)}>
+              <button key={value} type="button" className="p4c-chip" aria-pressed={amount === value} disabled={loading || belowMinimum(value)} onClick={() => setAmount(value)}>
                 {value}
               </button>
             ))}
           </div>
           {amount && !validAmount
             ? <p className="p4c-hint p4c-hint--error">{t('recharge_error_amount_invalid')}</p>
-            : <p className="p4c-hint">{depositLimit ? t('deposit_daily_limit_hint').replace('%s', formatUsdt(depositLimit)) : ''}</p>}
+            : belowMinimum(amount)
+              ? <p className="p4c-hint p4c-hint--error">{t('deposit_below_network_minimum').replace('%s', network).replace('%s', formatUsdt(minimum))}</p>
+              : <p className="p4c-hint">{depositLimit ? t('deposit_daily_limit_hint').replace('%s', formatUsdt(depositLimit)) : ''}</p>}
 
-          <SovereignPrimaryButton onClick={createDeposit} loading={loading} disabled={!validAmount || !network}>
+          <SovereignPrimaryButton onClick={createDeposit} loading={loading} disabled={!validAmount || !network || belowMinimum(amount)}>
             {t('deposit_create_button')}
           </SovereignPrimaryButton>
         </div>

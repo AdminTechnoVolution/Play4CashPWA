@@ -1117,6 +1117,8 @@
   "deposit_networks_empty": "Aucun réseau USDT n’est disponible pour le moment. Réessayez plus tard.",
   "deposit_amount_label": "Montant à déposer",
   "deposit_create_button": "Créer le dépôt",
+  "deposit_below_network_minimum": "Le minimum sur %s est de %s USDT.",
+  "deposit_network_minimum": "Min. %s USDT",
   "deposit_daily_limit_hint": "Maximum %s USDT de dépôts toutes les 24 heures.",
   "deposit_only_usdt_warning": "Envoyez uniquement de l’USDT sur le réseau %s. Toute autre monnaie ou réseau ne sera pas crédité et les fonds pourraient être perdus.",
   "deposit_net_credit_note": "Votre solde sera crédité du montant net confirmé. Cet écran se met à jour automatiquement.",

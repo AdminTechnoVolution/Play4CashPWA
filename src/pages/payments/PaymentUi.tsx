@@ -27,10 +27,11 @@ export const failedStatuses = new Set(['rejected', 'failed', 'refunded', 'expire
 export const success = '#4caf50';
 export const usdtAmount = /^\d{1,18}(\.\d{1,6})?$/;
 
-/** Money strings arrive with 6 decimals; show at least 2 and drop trailing zeros. */
+/** Money strings arrive with 6 decimals; show at least 2, drop trailing zeros and group thousands like formatUSD. */
 export function formatUsdt(value?: string): string {
   const [whole = '0', fraction = ''] = (value ?? '0').split('.');
-  return `${whole}.${fraction.replace(/0+$/, '').padEnd(2, '0')}`;
+  // Grouped on the string, not via Number, so 18-digit amounts keep every digit.
+  return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${fraction.replace(/0+$/, '').padEnd(2, '0')}`;
 }
 
 export const isValidAmount = (value: string) => usdtAmount.test(value) && /[1-9]/.test(value);
@@ -151,8 +152,8 @@ export const BalanceHero: React.FC<{ balance: Balance | null; direction: 'deposi
 
 /** `feeAmount` turns on deposit fee estimates for the amount being typed. */
 export const NetworkPicker: React.FC<{
-  networks: PaymentNetwork[] | null; value: string; disabled?: boolean; feeAmount?: string; onChange: (network: string) => void;
-}> = ({ networks, value, disabled, feeAmount, onChange }) => {
+  networks: PaymentNetwork[] | null; value: string; disabled?: boolean; feeAmount?: string; showMinimum?: boolean; onChange: (network: string) => void;
+}> = ({ networks, value, disabled, feeAmount, showMinimum, onChange }) => {
   const t = useT();
   const showFees = feeAmount !== undefined && !!networks?.some(n => n.depositFee);
   const cheapest = showFees && networks ? cheapestNetwork(networks, feeAmount) : null;
@@ -179,6 +180,9 @@ export const NetworkPicker: React.FC<{
                   {n.network}
                 </span>
                 <span className="p4c-network-chain">{chain?.name ?? n.network}</span>
+                {showMinimum && n.minDeposit && (
+                  <span className="p4c-network-chain p4c-mono">{t('deposit_network_minimum').replace('%s', formatUsdt(n.minDeposit))}</span>
+                )}
                 {fee !== null && (
                   <span className={`p4c-network-fee p4c-mono${n.network === cheapest ? ' p4c-network-fee--best' : ''}`}>
                     {isValidAmount(feeAmount ?? '') ? `≈ ${approxFee(fee)} USDT` : t('deposit_fee_from').replace('%s', `${approxFee(fee)} USDT`)}

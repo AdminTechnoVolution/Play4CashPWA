@@ -1117,6 +1117,8 @@
   "deposit_networks_empty": "Não há redes USDT disponíveis no momento. Tente novamente mais tarde.",
   "deposit_amount_label": "Valor a depositar",
   "deposit_create_button": "Criar depósito",
+  "deposit_below_network_minimum": "O mínimo em %s é %s USDT.",
+  "deposit_network_minimum": "Mín. %s USDT",
   "deposit_daily_limit_hint": "Máximo de %s USDT em depósitos a cada 24 horas.",
   "deposit_only_usdt_warning": "Envie apenas USDT pela rede %s. Qualquer outra moeda ou rede não será creditada e os fundos podem ser perdidos.",
   "deposit_net_credit_note": "Seu saldo será creditado com o valor líquido confirmado. Esta tela se atualiza automaticamente.",
