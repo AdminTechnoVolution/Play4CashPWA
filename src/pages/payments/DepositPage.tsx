@@ -37,9 +37,12 @@ const DepositPage: React.FC = () => {
   const [order, setOrder] = useState<PaymentOrder | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [depositLimit, setDepositLimit] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    // Informational only: without it the form still works and the API still enforces the limit.
+    paymentsApi.limits().then(limits => { if (active) setDepositLimit(limits.depositLimit24h); }).catch(() => {});
     (async () => {
       try {
         const [funds, rows] = await Promise.all([paymentsApi.balance(), paymentsApi.networks()]);
@@ -100,7 +103,9 @@ const DepositPage: React.FC = () => {
               </button>
             ))}
           </div>
-          <p className="p4c-hint p4c-hint--error">{amount && !validAmount ? t('recharge_error_amount_invalid') : ''}</p>
+          {amount && !validAmount
+            ? <p className="p4c-hint p4c-hint--error">{t('recharge_error_amount_invalid')}</p>
+            : <p className="p4c-hint">{depositLimit ? t('deposit_daily_limit_hint').replace('%s', formatUsdt(depositLimit)) : ''}</p>}
 
           <SovereignPrimaryButton onClick={createDeposit} loading={loading} disabled={!validAmount || !network}>
             {t('deposit_create_button')}

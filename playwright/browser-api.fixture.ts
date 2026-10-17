@@ -25,6 +25,7 @@ export async function installBrowserApi(page: Page, email: string): Promise<void
       '/api/transactions/recharge/history', '/api/transactions/withdrawal/history', '/api/user/history'].includes(pathname)) return reply([]);
     if (pathname === '/api/contact-us' && request.method() === 'POST') return reply({ _id: 'browser-contact-fixture' });
     if (pathname === '/api/payments/balance') return reply({ available: '100.000000', reserved: '0.000000' });
+    if (pathname === '/api/payments/limits') return reply({ depositLimit24h: '1000.000000' });
     if (pathname === '/api/payments/networks') return reply([{ network: 'TRC20', currency: 'usdttrc20', asset: 'USDT' }]);
     if (pathname === '/api/payments/deposits' && request.method() === 'POST') return reply({ id: '507f1f77bcf86cd799439013', kind: 'deposit', network: 'TRC20', amount: '10.000000', payAmount: '10.000000', address: 'BROWSER_FIXTURE_NOT_A_REAL_WALLET', status: 'waiting', createdAt: new Date().toISOString() });
     return route.fulfill({ status: 501, contentType: 'application/json', body: JSON.stringify({ message: `Browser fixture missing: ${request.method()} ${pathname}` }) });

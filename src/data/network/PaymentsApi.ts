@@ -11,6 +11,7 @@ export const paymentsApi = {
   },
   async networks() { return (await apiClient.get<ApiResponse<PaymentNetwork[]>>('/api/payments/networks')).data.data ?? []; },
   async balance() { return (await apiClient.get<ApiResponse<{ available: string; reserved: string }>>('/api/payments/balance')).data.data!; },
+  async limits() { return (await apiClient.get<ApiResponse<{ depositLimit24h: string }>>('/api/payments/limits')).data.data!; },
   async history() { return (await apiClient.get<ApiResponse<PaymentOrder[]>>('/api/payments/orders')).data.data ?? []; },
   async order(id: string) { return (await apiClient.get<ApiResponse<PaymentOrder>>(`/api/payments/orders/${id}`)).data.data!; },
   async deposit(key: string, network: string, amount: string) {
