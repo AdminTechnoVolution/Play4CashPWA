@@ -206,6 +206,8 @@ export default function UnoPage(props: UnoPageProps) {
   const waitingBody = tStatus(statusMessage);
 
   const timerLow = turnTimeLeft > 0 && turnTimeLeft <= 10;
+  // Cancelled before play (stakes refunded) is not a result; UNO itself has no draws.
+  const matchCancelled = gameOver?.outcome === 'match_cancelled';
 
   const incomingGreetingMessage = useMemo(
     () => formatIncomingFloatingGreeting(chatGreetingOverlay, lastMsg),
@@ -465,9 +467,15 @@ export default function UnoPage(props: UnoPageProps) {
           <IonAlert
             isOpen={phase === UnoPhase.GAME_OVER && !!gameOver && !matchWinnerId}
             backdropDismiss={false}
-            header={gameOver?.youWon ? t('bs_you_won') : gameOver?.isDraw ? t('bs_draw') : t('bs_you_lost')}
+            header={
+              matchCancelled
+                ? t('bs_match_cancelled_title')
+                : gameOver?.youWon ? t('uno_you_won_match') : t('uno_you_lost_match')
+            }
             message={
-              gameOver?.reason ? formatApiMessageForDisplay(gameOver.reason, '') : ''
+              matchCancelled
+                ? t('bs_match_cancelled')
+                : gameOver?.reason ? formatApiMessageForDisplay(gameOver.reason, '') : ''
             }
             buttons={[{ text: t('ok'), handler: () => props.onLeaveRequest() }]}
           />

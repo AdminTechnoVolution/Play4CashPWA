@@ -25,10 +25,11 @@ export function attachReliableCommands(socket: Socket, namespace: string, resync
     window.dispatchEvent(new CustomEvent('p4c:command-pending', { detail: { namespace, count: pending.size, reason } }));
   };
   const send = socket.emit.bind(socket);
+  let currentRoom = '';
   socket.emit = ((event: string, ...args: unknown[]) => {
     if (event === 'join' && args[0] && typeof args[0] === 'object') {
       const roomId = (args[0] as Record<string, unknown>).room_id;
-      if (typeof roomId === 'string') send('command_state', { roomId });
+      if (typeof roomId === 'string') { currentRoom = roomId; send('command_state', { roomId }); }
     }
     if (!MUTATIONS.has(event)) return send(event, ...args);
     const payload = args[0] as Record<string, unknown> | undefined;
@@ -64,18 +65,22 @@ export function attachReliableCommands(socket: Socket, namespace: string, resync
   on('command_ack', (ack: { commandId: string; roomId: string; status: string; version: number; reason?: string }) => {
     const command = pending.get(ack.commandId);
     if (!command || command.roomId !== ack.roomId) return;
+    // Leftover commands from other rooms are only cleared; they must not alarm or resync this match.
+    const current = ack.roomId === currentRoom;
     if (ack.status === 'unknown') {
       if (canRetryCommand(command, ack.version)) {
         send(command.event, { ...command.payload, commandId: command.commandId, expectedVersion: command.expectedVersion });
         return;
       }
-      pending.delete(ack.commandId); publish('La jugada no se aplicó; se recuperó el estado actual.'); resync(); return;
+      pending.delete(ack.commandId); publish(current ? 'La jugada no se aplicó; se recuperó el estado actual.' : undefined);
+      if (current) resync();
+      return;
     }
     if (!['accepted', 'rejected'].includes(ack.status)) return;
     versions.set(ack.roomId, Math.max(versions.get(ack.roomId) ?? 0, ack.version));
     pending.delete(ack.commandId);
-    publish(ack.status === 'rejected' ? 'La jugada fue rechazada; se recuperó el estado actual.' : undefined);
-    if (ack.status === 'rejected') resync();
+    publish(ack.status === 'rejected' && current ? 'La jugada fue rechazada; se recuperó el estado actual.' : undefined);
+    if (ack.status === 'rejected' && current) resync();
   });
   const recover = () => {
     for (const command of pending.values()) send('command_status', { roomId: command.roomId, commandId: command.commandId });

@@ -43,6 +43,7 @@ describe('recoverable browser commands', () => {
   it('does not replay an obsolete move as a new action', () => {
     const { socket, sent, receive } = fixture(); const resync = vi.fn();
     const cleanup = attachReliableCommands(socket, '/chess', resync);
+    socket.emit('join', { room_id: 'room-a' });
     receive('command_state', { roomId: 'room-a', version: 4 });
     socket.emit('move', { room_id: 'room-a', from: 'e2', to: 'e4' });
     const original = sent.find(p => p.event === 'move')!.payload;
@@ -60,5 +61,25 @@ describe('recoverable browser commands', () => {
     expect(apply).toHaveBeenCalledTimes(2); expect(resync).toHaveBeenCalledOnce();
     const beforeCleanup = vi.getTimerCount();
     socket.off(); cleanup?.(); expect(vi.getTimerCount()).toBe(beforeCleanup - 1);
+  });
+  it('clears a leftover command from another room without alarming or resyncing the current match', () => {
+    localStorage.setItem('p4c:commands:fixture-player:/chess', JSON.stringify([
+      { commandId: 'old-command', roomId: 'room-old', event: 'move', payload: { room_id: 'room-old' }, expectedVersion: 2 },
+    ]));
+    const notices: any[] = [];
+    const listen = (event: Event) => notices.push((event as CustomEvent).detail);
+    window.addEventListener('p4c:command-pending', listen);
+    const { socket, sent, receive } = fixture(); const resync = vi.fn();
+    const cleanup = attachReliableCommands(socket, '/chess', resync);
+    socket.emit('join', { room_id: 'room-new' });
+    expect(sent.filter(p => p.event === 'command_status').map(p => p.payload.commandId)).toEqual(['old-command']);
+    receive('command_ack', { commandId: 'old-command', roomId: 'room-old', status: 'rejected', reason: 'MATCH_NOT_ACTIVE', version: 3 });
+    expect(JSON.parse(localStorage.getItem('p4c:commands:fixture-player:/chess')!)).toEqual([]);
+    expect(resync).not.toHaveBeenCalled();
+    expect(notices[notices.length - 1]).toEqual({ namespace: '/chess', count: 0, reason: undefined });
+    vi.advanceTimersByTime(10_000);
+    expect(sent.filter(p => p.event === 'command_status')).toHaveLength(1);
+    window.removeEventListener('p4c:command-pending', listen);
+    cleanup?.();
   });
 });

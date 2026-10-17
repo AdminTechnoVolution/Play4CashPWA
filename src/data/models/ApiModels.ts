@@ -267,7 +267,8 @@ export interface TournamentHistoryItem {
 
 // ─── Socket game state ─────────────────────────────────────────────────────────
 export interface GameOverPayload {
-  outcome: 'win' | 'lose' | 'draw';
+  /** `match_cancelled`: the match never started (stakes refunded); no result. */
+  outcome: 'win' | 'lose' | 'draw' | 'match_cancelled';
   youWon: boolean;
   isDraw: boolean;
   winner?: string;

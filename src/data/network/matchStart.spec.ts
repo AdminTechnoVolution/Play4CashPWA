@@ -98,6 +98,37 @@ describe('match start barrier', () => {
     expect(pending('room-a')).toBe(false);
     cleanup?.();
   });
+  it('fetches the missed snapshot when the server reports it is still waiting for this player', () => {
+    const { socket, receive, events } = fixture(); const resync = vi.fn();
+    const cleanup = attachMatchStart(socket, '/uno', resync);
+    socket.on('uno', vi.fn());
+    socket.emit('join', { room_id: 'room-a' });
+    receive('uno', { success: true, data: { waitingForOpponent: true } });
+    receive('match_start_state', { roomId: 'room-a', phase: 'preparing' });
+    expect(resync).toHaveBeenCalledOnce(); expect(pending('room-a')).toBe(true);
+    vi.advanceTimersByTime(2000);
+    expect(resync).toHaveBeenCalledTimes(2);
+    receive('uno', { success: true, data: { gameStarted: true, isSpectator: false, hand: [] } });
+    expect(events('initial_state_ack')).toHaveLength(1);
+    cleanup?.();
+  });
+  it('asks for the state again when a join is never answered, a bounded number of times', () => {
+    const { socket, receive } = fixture(); const resync = vi.fn();
+    const cleanup = attachMatchStart(socket, '/uno', resync);
+    socket.on('uno', vi.fn());
+    socket.emit('join', { room_id: 'room-a' });
+    vi.advanceTimersByTime(4000);
+    expect(resync).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(2000);
+    expect(resync).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(60_000);
+    expect(resync).toHaveBeenCalledTimes(5);
+    socket.emit('join', { room_id: 'room-a' });
+    receive('uno', { success: true, data: { waitingForOpponent: true } });
+    vi.advanceTimersByTime(60_000);
+    expect(resync).toHaveBeenCalledTimes(5);
+    cleanup?.();
+  });
   it('starts a new room on the same socket after a previous match opened', () => {
     const { socket, receive, events } = fixture();
     const cleanup = attachMatchStart(socket, '/chess', vi.fn());
