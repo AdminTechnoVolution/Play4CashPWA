@@ -927,6 +927,7 @@
   "update_available_body": "Eine neue Version der App ist bereit. Das Neuladen dauert nur wenige Sekunden.",
   "update_required_title": "Aktualisierung erforderlich",
   "update_required_body": "Deine Version ist veraltet und wird vom Server nicht mehr unterstützt. Du musst aktualisieren, um fortzufahren.",
+  "RELIABLE_COMMANDS_UPGRADE_REQUIRED": "Deine App-Version ist veraltet. Lade die App neu oder aktualisiere sie, um fortzufahren.",
   "update_now": "Jetzt aktualisieren",
   "update_later": "Später",
   "update_loading": "Aktualisiere…",

@@ -954,6 +954,7 @@
   "update_available_body": "Hay una versión nueva de la app. Recargar tomará solo unos segundos.",
   "update_required_title": "Actualización requerida",
   "update_required_body": "Tu versión está desactualizada y no es compatible con el servidor. Debes actualizar para continuar.",
+  "RELIABLE_COMMANDS_UPGRADE_REQUIRED": "Tu versión de la app está desactualizada. Recarga o actualiza la app para continuar.",
   "update_now": "Actualizar ahora",
   "update_later": "Después",
   "update_loading": "Actualizando…",

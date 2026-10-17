@@ -927,6 +927,7 @@
   "update_available_body": "È disponibile una nuova versione dell'app. Il ricaricamento richiederà solo pochi secondi.",
   "update_required_title": "Aggiornamento richiesto",
   "update_required_body": "La tua versione è obsoleta e non è più supportata dal server. Devi aggiornare per continuare.",
+  "RELIABLE_COMMANDS_UPGRADE_REQUIRED": "La tua versione dell'app è obsoleta. Ricarica o aggiorna l'app per continuare.",
   "update_now": "Aggiorna ora",
   "update_later": "Più tardi",
   "update_loading": "Aggiornamento…",

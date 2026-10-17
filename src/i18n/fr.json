@@ -927,6 +927,7 @@
   "update_available_body": "Une nouvelle version de l'application est prête. Le rechargement ne prendra que quelques secondes.",
   "update_required_title": "Mise à jour requise",
   "update_required_body": "Votre version est obsolète et n'est plus prise en charge par le serveur. Vous devez mettre à jour pour continuer.",
+  "RELIABLE_COMMANDS_UPGRADE_REQUIRED": "Votre version de l'application est obsolète. Rechargez ou mettez à jour l'application pour continuer.",
   "update_now": "Mettre à jour",
   "update_later": "Plus tard",
   "update_loading": "Mise à jour…",

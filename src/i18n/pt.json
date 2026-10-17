@@ -927,6 +927,7 @@
   "update_available_body": "Uma nova versão do app está pronta. Recarregar levará apenas alguns segundos.",
   "update_required_title": "Atualização necessária",
   "update_required_body": "Sua versão está desatualizada e não é mais compatível com o servidor. Você deve atualizar para continuar.",
+  "RELIABLE_COMMANDS_UPGRADE_REQUIRED": "Sua versão do app está desatualizada. Recarregue ou atualize o app para continuar.",
   "update_now": "Atualizar agora",
   "update_later": "Depois",
   "update_loading": "Atualizando…",

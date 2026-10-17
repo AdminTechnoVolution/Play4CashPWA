@@ -951,6 +951,7 @@
   "update_available_body": "A new version of the app is ready. Reloading will only take a few seconds.",
   "update_required_title": "Update required",
   "update_required_body": "Your version is out of date and no longer supported by the server. You must update to continue.",
+  "RELIABLE_COMMANDS_UPGRADE_REQUIRED": "Your app version is out of date. Reload or update the app to continue.",
   "update_now": "Update now",
   "update_later": "Later",
   "update_loading": "Updating…",
