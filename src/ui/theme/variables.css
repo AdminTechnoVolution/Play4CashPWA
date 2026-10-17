@@ -231,6 +231,11 @@ ion-alert .alert-message {
   color: var(--sovereign-text) !important;
 }
 
+/* Alert messages are plain text (Ionic does not render HTML); keep their paragraph breaks. */
+ion-alert.sovereign-alert .alert-message {
+  white-space: pre-line;
+}
+
 ion-alert .alert-button {
   color: var(--sovereign-gold) !important;
   font-weight: 600;

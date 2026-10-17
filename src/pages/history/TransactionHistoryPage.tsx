@@ -682,7 +682,7 @@ const TransactionHistoryPage: React.FC = () => {
               t(selectedAuditAdjustment.kind === 'balance_removed'
                 ? 'game_history_audit_removed_explanation'
                 : 'game_history_audit_refunded_explanation'),
-            ].filter(Boolean).join('<br/><br/>')
+            ].filter(Boolean).join('\n\n')
           : ''}
         buttons={[t('ok')]}
         cssClass="sovereign-alert"
