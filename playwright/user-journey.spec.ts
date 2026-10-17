@@ -48,11 +48,15 @@ test.describe('User journey: navigate the current PWA', () => {
     await expect(page.getByRole('button', { name: 'Calculate fee' })).toBeDisabled();
   });
 
-  test('navigates to the current USDT history', async ({ page }) => {
+  test('navigates to the history of payments, games and tournaments', async ({ page }) => {
     await page.getByText('History', { exact: true }).click();
     await page.waitForURL('**/history');
-    await expect(page.locator('ion-title').filter({ hasText: 'USDT activity' })).toBeVisible();
-    await expect(page.getByText('No activity yet')).toBeVisible();
+    await expect(page.locator('ion-title').filter({ hasText: 'History' })).toBeVisible();
+    await expect(page.getByText('No deposits yet')).toBeVisible();
+    await page.locator('ion-segment-button[value="withdrawals"]').click();
+    await expect(page.getByText('No withdrawals yet')).toBeVisible();
+    await page.locator('ion-segment-button[value="games"]').click();
+    await expect(page.getByText('No games played yet')).toBeVisible();
   });
 
   test('navigates to Contact Us, checks My Requests, and submits a new one', async ({ page }) => {
@@ -110,6 +114,9 @@ test.describe('User journey: navigate the current PWA', () => {
   });
 
   test('logs out and returns to the login page', async ({ page }) => {
+    // `goto` resolves before the app's first session refresh; mocking it as anonymous
+    // earlier sends the app to /login by itself before the button is clicked.
+    await expect(page.getByText('Log out', { exact: true })).toBeVisible();
     await mockAnonymousSession(page);
 
     await page.getByText('Log out', { exact: true }).click();
