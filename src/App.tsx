@@ -1,6 +1,6 @@
 import DepositPage from './pages/payments/DepositPage';
 import WithdrawalPage from './pages/payments/WithdrawalPage';
-import PaymentHistoryPage from './pages/payments/PaymentHistoryPage';
+import TransactionHistoryPage from './pages/history/TransactionHistoryPage';
 import { useEffect } from 'react';
 import { IonApp, setupIonicReact } from '@ionic/react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
@@ -75,7 +75,7 @@ export default function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/contact-us" element={<ContactUsPage />} />
-            <Route path="/history" element={<PaymentHistoryPage />} />
+            <Route path="/history" element={<TransactionHistoryPage />} />
             <Route path="/add-funds" element={<DepositPage />} />
             <Route path="/withdrawal" element={<WithdrawalPage />} />
             <Route path="/withdrawal-verify" element={<WithdrawalPage />} />

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonIcon, IonSkeletonText } from '@ionic/react';
-import { checkmarkCircle, checkmarkOutline, cubeOutline, flaskOutline, gameControllerOutline, helpBuoyOutline, walletOutline } from 'ionicons/icons';
+import { arrowDownOutline, arrowUpOutline, checkmarkCircle, checkmarkOutline, cubeOutline, flaskOutline, gameControllerOutline, helpBuoyOutline, walletOutline } from 'ionicons/icons';
 import { AppBackButton } from '../../navigation/AppBackButton';
 import { paymentsApi } from '../../data/network/PaymentsApi';
 import type { PaymentNetwork, PaymentOrder } from '../../data/network/PaymentsApi';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import { useT } from '../../i18n/translations';
+import { useLanguageStore } from '../../i18n/languageStore';
 import { SovereignSecondaryButton } from '../../ui/components/SovereignButton';
 import '../../ui/theme/variables.css';
 import './payments.css';
@@ -286,6 +287,36 @@ export const ReturnRequestCard: React.FC<{ storageKey: string }> = ({ storageKey
           <SovereignSecondaryButton onClick={submit} loading={loading} disabled={reason.trim().length < 10}>{t('payments_return_button')}</SovereignSecondaryButton>
         </>
       )}
+    </div>
+  );
+};
+
+/** One provider deposit or withdrawal, as listed in the history. */
+export const PaymentOrderRow: React.FC<{ order: PaymentOrder }> = ({ order }) => {
+  const t = useT();
+  const lang = useLanguageStore(s => s.lang);
+  const deposit = order.kind === 'deposit';
+  const failed = failedStatuses.has(order.status);
+  const status = deposit && order.status === 'verification_delivery_failed' ? 'failed' : order.status;
+  const statusColor = order.status === 'confirmed' ? success : failed ? 'var(--sovereign-error)' : 'var(--sovereign-gold)';
+  const kindColor = deposit ? success : 'var(--sovereign-gold)';
+  const value = formatUsdt(deposit ? order.credited ?? order.amount : order.amount);
+  return (
+    <div className="p4c-tx">
+      <div className="p4c-tx-icon" style={{ color: kindColor }}><IonIcon icon={deposit ? arrowDownOutline : arrowUpOutline} /></div>
+      <div className="p4c-tx-main">
+        <p className="p4c-tx-title">{t(deposit ? 'payments_kind_deposit' : 'payments_kind_withdrawal')} · {order.network}</p>
+        <p className="p4c-tx-sub">
+          <time dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleString(lang, { dateStyle: 'medium', timeStyle: 'short' })}</time> · <span className="p4c-mono">{shortId(order.id)}</span>
+        </p>
+      </div>
+      <div className="p4c-tx-amount">
+        <strong className="p4c-mono" style={{ color: failed ? 'var(--sovereign-text-muted)' : deposit && order.status === 'confirmed' ? success : 'var(--sovereign-text)',
+          textDecoration: failed ? 'line-through' : undefined }}>
+          {failed ? '' : deposit ? '+' : '−'}{value}
+        </strong>
+        <span style={{ color: statusColor }}>{t(`${deposit ? 'deposit' : 'withdraw'}_status_${status}`)}</span>
+      </div>
     </div>
   );
 };

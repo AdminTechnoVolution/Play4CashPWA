@@ -39,6 +39,10 @@ import {
   removeCircleOutline,
 } from 'ionicons/icons';
 import { apiRepository } from '../../data/network/ApiRepository';
+import { paymentsApi } from '../../data/network/PaymentsApi';
+import type { PaymentOrder } from '../../data/network/PaymentsApi';
+import { getUserAccount } from '../../data/auth/AuthSessionStore';
+import { PaymentOrderRow, ReturnRequestCard } from '../payments/PaymentUi';
 import { formatApiMessageForDisplay } from '../../i18n/ApiMessageDisplay';
 import '../../ui/theme/variables.css';
 import type { RechargeHistoryItem, WithdrawalHistoryItem, GameHistoryItem, TournamentHistoryItem } from '../../data/models/ApiModels';
@@ -53,6 +57,8 @@ const TransactionHistoryPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('deposits');
 
+  /** Provider (NowPayments) deposits and withdrawals; the legacy lists below keep older records. */
+  const [orders, setOrders] = useState<PaymentOrder[]>([]);
   const [deposits, setDeposits] = useState<RechargeHistoryItem[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalHistoryItem[]>([]);
   const [games, setGames] = useState<GameHistoryItem[]>([]);
@@ -91,30 +97,37 @@ const TransactionHistoryPage: React.FC = () => {
     }
   };
 
-  const loadDeposits = useCallback(async () => {
-    setDepositsLoading(true);
+  // A failure here must not hide the legacy list (and vice versa).
+  const loadOrders = useCallback(async () => {
     try {
-      const data = await apiRepository.getRechargeHistory();
-      setDeposits(data);
-      setDepositsLoaded(true);
+      setOrders(await paymentsApi.history());
     } catch (err: any) {
       console.error(formatApiMessageForDisplay(err));
-    } finally {
-      setDepositsLoading(false);
     }
+  }, []);
+
+  const loadDeposits = useCallback(async () => {
+    setDepositsLoading(true);
+    const [legacy] = await Promise.allSettled([apiRepository.getRechargeHistory(), loadOrders()]);
+    if (legacy.status === 'fulfilled') {
+      setDeposits(legacy.value);
+      setDepositsLoaded(true);
+    } else {
+      console.error(formatApiMessageForDisplay(legacy.reason));
+    }
+    setDepositsLoading(false);
   }, []);
 
   const loadWithdrawals = useCallback(async () => {
     setWithdrawalsLoading(true);
-    try {
-      const data = await apiRepository.getWithdrawalHistory();
-      setWithdrawals(data);
+    const [legacy] = await Promise.allSettled([apiRepository.getWithdrawalHistory(), loadOrders()]);
+    if (legacy.status === 'fulfilled') {
+      setWithdrawals(legacy.value);
       setWithdrawalsLoaded(true);
-    } catch (err: any) {
-      console.error(formatApiMessageForDisplay(err));
-    } finally {
-      setWithdrawalsLoading(false);
+    } else {
+      console.error(formatApiMessageForDisplay(legacy.reason));
     }
+    setWithdrawalsLoading(false);
   }, []);
 
   const loadGames = useCallback(async () => {
@@ -216,6 +229,24 @@ const TransactionHistoryPage: React.FC = () => {
     return item.prize > 0 ? 'win' : 'lose';
   };
 
+  // Provider orders and legacy records share one list per tab, newest first.
+  const depositEntries = [
+    ...orders.filter((o) => o.kind === 'deposit').map((order) => ({ at: Date.parse(order.createdAt), order })),
+    ...deposits.map((legacy) => ({ at: Date.parse(legacy.createdAt), legacy })),
+  ].sort((a, b) => b.at - a.at);
+  const withdrawalEntries = [
+    ...orders.filter((o) => o.kind === 'withdrawal').map((order) => ({ at: Date.parse(order.createdAt), order })),
+    ...withdrawals.map((legacy) => ({ at: Date.parse(legacy.createdAt), legacy })),
+  ].sort((a, b) => b.at - a.at);
+  const orderCard: React.CSSProperties = {
+    background: 'var(--sovereign-surface)',
+    border: '1px solid var(--sovereign-border)',
+    borderRadius: '12px',
+    padding: '2px 16px',
+    marginBottom: '8px',
+    animation: 'fadeInUp 0.4s ease',
+  };
+
   const SkeletonItem = () => (
     <div
       style={{
@@ -285,13 +316,18 @@ const TransactionHistoryPage: React.FC = () => {
             <>
               {depositsLoading ? (
                 [0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)
-              ) : deposits.length === 0 ? (
+              ) : depositEntries.length === 0 ? (
                 <EmptyState icon={arrowDownOutline} message={t('deposit_history_empty')} />
               ) : (
                 <IonList style={{ background: 'transparent' }}>
-                  {deposits.map((item, idx) => (
+                  {depositEntries.map((entry, idx) => {
+                    if ('order' in entry) {
+                      return <div key={entry.order.id} style={orderCard}><PaymentOrderRow order={entry.order} /></div>;
+                    }
+                    const item = entry.legacy;
+                    return (
                     <div
-                      key={idx}
+                      key={`legacy-${idx}`}
                       style={{
                         background: 'var(--sovereign-surface)',
                         border: '1px solid var(--sovereign-border)',
@@ -357,7 +393,8 @@ const TransactionHistoryPage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </IonList>
               )}
             </>
@@ -368,13 +405,18 @@ const TransactionHistoryPage: React.FC = () => {
             <>
               {withdrawalsLoading ? (
                 [0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)
-              ) : withdrawals.length === 0 ? (
+              ) : withdrawalEntries.length === 0 ? (
                 <EmptyState icon={arrowUpOutline} message={t('withdrawal_history_empty')} />
               ) : (
                 <IonList style={{ background: 'transparent' }}>
-                  {withdrawals.map((item, idx) => (
+                  {withdrawalEntries.map((entry, idx) => {
+                    if ('order' in entry) {
+                      return <div key={entry.order.id} style={orderCard}><PaymentOrderRow order={entry.order} /></div>;
+                    }
+                    const item = entry.legacy;
+                    return (
                     <div
-                      key={idx}
+                      key={`legacy-${idx}`}
                       style={{
                         background: 'var(--sovereign-surface)',
                         border: '1px solid var(--sovereign-border)',
@@ -445,10 +487,17 @@ const TransactionHistoryPage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </IonList>
               )}
             </>
+          )}
+
+          {(activeTab === 'deposits' || activeTab === 'withdrawals') && (
+            <div style={{ marginTop: '16px' }}>
+              <ReturnRequestCard storageKey={`p4c:payment:${getUserAccount()?.id ?? ''}:history`} />
+            </div>
           )}
 
           {/* GAMES TAB */}
