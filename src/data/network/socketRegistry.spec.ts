@@ -31,6 +31,7 @@ function makeFakeSocket(initiallyConnected = false) {
   const ioHandlers = new Map<string, Handler>();
   const socket = {
     connected: initiallyConnected,
+    emit: vi.fn(),
     on: vi.fn((event: string, cb: Handler) => {
       socketHandlers.set(event, cb);
     }),

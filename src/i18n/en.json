@@ -483,6 +483,7 @@
   "bs_waiting_opponent_ready": "Wait until your opponent places their ships and confirms they are ready.",
   "bs_waiting_title": "WAITING",
   "play_checking_game_status": "Checking game status…",
+  "play_preparing_match": "Syncing the match with the other players…",
   "bs_your_fleet": "YOUR FLEET",
   "bs_your_turn": "YOUR TURN — Fire!",
   "cancel": "Cancel",

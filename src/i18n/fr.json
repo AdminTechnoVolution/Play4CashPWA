@@ -471,6 +471,7 @@
   "bs_victory": "VICTOIRE !",
   "bs_waiting_title": "EN ATTENTE",
   "play_checking_game_status": "Vérification de la partie…",
+  "play_preparing_match": "Synchronisation de la partie avec les autres joueurs…",
   "bs_your_fleet": "VOTRE FLOTTE",
   "bs_your_turn": "VOTRE TOUR — Feu !",
   "cancel": "Annuler",

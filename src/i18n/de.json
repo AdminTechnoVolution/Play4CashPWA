@@ -471,6 +471,7 @@
   "bs_victory": "SIEG!",
   "bs_waiting_title": "WARTEN",
   "play_checking_game_status": "Spielstatus wird geprüft…",
+  "play_preparing_match": "Partie wird mit den anderen Spielern synchronisiert…",
   "bs_your_fleet": "DEINE FLOTTE",
   "bs_your_turn": "DEIN ZUG — Feuer!",
   "cancel": "Abbrechen",

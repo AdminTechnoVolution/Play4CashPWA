@@ -1,3 +1,4 @@
+import { attachMatchStart } from './matchStart';
 import { attachReliableCommands } from './reliableCommands';
 import type { Socket } from 'socket.io-client';
 import { useConnectionStore } from '../../store/connectionStore';
@@ -60,7 +61,8 @@ export function instrumentSocket(
   commandCleanups.get(namespace)?.();
   commandCleanups.delete(namespace);
   const cleanup = attachReliableCommands(socket, namespace, () => triggerSocketResync(namespace));
-  if (cleanup) commandCleanups.set(namespace, cleanup);
+  const startCleanup = attachMatchStart(socket, namespace, () => triggerSocketResync(namespace));
+  commandCleanups.set(namespace, () => { startCleanup?.(); cleanup?.(); });
   liveSockets.set(namespace, socket);
   const setStatus = useConnectionStore.getState().setStatus;
 

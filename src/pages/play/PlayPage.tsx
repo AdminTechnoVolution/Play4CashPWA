@@ -1,3 +1,4 @@
+import { useMatchStartStore } from '../../data/network/matchStart';
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { IonAlert, IonLoading, IonModal, IonText } from '@ionic/react';
@@ -141,6 +142,7 @@ export default function PlayPage() {
   const me = useAuthStore((s) => s.user);
 
   const roomId = playCtx?.roomId ?? '';
+  const preparingMatch = useMatchStartStore(s => !!s.pending[roomId]);
   const isSpectator = playCtx?.isSpectator ?? false;
   const isTournamentPlay = (playCtx?.betAmount ?? 0) === 0 && !isSpectator;
 
@@ -388,6 +390,8 @@ export default function PlayPage() {
       {!tearingDown && !['chess', 'halma', 'domino', 'uno', 'connect-four'].includes(gameSocketCode) && (
         <BattleshipPage {...gameProps} />
       )}
+
+      <IonLoading isOpen={preparingMatch && !tearingDown && !snapOver} message={t('play_preparing_match')} />
 
       {/* Checking server status */}
       <IonLoading isOpen={checkingLeave} message={t('play_checking_game_status')} />
