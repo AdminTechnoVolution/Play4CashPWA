@@ -361,6 +361,12 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
         return;
       }
 
+      // ── Own sync: the opponent is already seated (no toast; that is only for an actual arrival) ──
+      if (data.opponentPresent === true && !get().opponentConfirmed) {
+        clearBattleshipOpponentPoll();
+        set({ opponentConfirmed: true, opponentName: String(data.opponentName ?? '').trim() || get().opponentName });
+      }
+
       // ── Waiting for a second player to join ─────────────────────────────────
       if (data.waitingForOpponent === true) {
         if (isMatchTerminalPhase(get().phase) || get().gameOver) return;
@@ -801,7 +807,8 @@ function handleFullSync(
     const c        = entry.col as number;
     const o        = ((entry.outcome as string) ?? 'miss').trim().toLowerCase();
     const shipType = typeof entry.shipType === 'string' ? (entry.shipType as string) : undefined;
-    if (r < 0 || r >= 10 || c < 0 || c >= 10) return;
+    // Only shots have a cell; servers before the fix also listed fleet placements here.
+    if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || r >= 10 || c < 0 || c >= 10) return;
 
     const isSunk = o === 'sunk';
     const isHit  = o === 'hit' || isSunk;

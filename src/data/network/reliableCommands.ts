@@ -12,7 +12,11 @@ export function attachReliableCommands(socket: Socket, namespace: string, resync
   const auth = socket.auth;
   socket.auth = typeof auth === 'function' ? callback => auth(payload => callback({ ...payload, commandProtocol: '1' })) : { ...auth, commandProtocol: '1' };
   const key = `p4c:commands:${actor}:${namespace}`;
-  const versions = new Map<string, number>();
+  const versions = new Map<string, number>(); // Room revision the next command must expect.
+  // Last snapshot version handed to the store. Kept apart from `versions`: command_state reports the live revision,
+  // which can be ahead of snapshots still queued for delivery (e.g. the start snapshot after a REST ready), and those
+  // must not be discarded as stale when nothing newer was ever applied.
+  const applied = new Map<string, number>();
   const pending = new Map<string, PendingCommand>();
   try {
     const saved: PendingCommand[] = JSON.parse(localStorage.getItem(key) ?? '[]');
@@ -51,16 +55,24 @@ export function attachReliableCommands(socket: Socket, namespace: string, resync
       const roomId = data?.roomId ?? data?.room_id;
       const version = data?.stateVersion;
       if (typeof roomId === 'string' && Number.isSafeInteger(version)) {
-        const preceding = versions.get(roomId);
+        const preceding = applied.get(roomId);
         if (preceding !== undefined && version < preceding) return;
-        versions.set(roomId, version);
+        applied.set(roomId, version);
+        versions.set(roomId, Math.max(versions.get(roomId) ?? version, version));
         if (preceding !== undefined && version > preceding + 1) resync();
       }
       handler(...args);
     });
   }) as Socket['on'];
+  // Opening the start barrier advances the room revision without a snapshot; its state carries the new revision,
+  // so the first move after the countdown does not go out with an outdated version and get rejected.
+  on('match_start_state', (state: { roomId?: string; version?: number }) => {
+    if (typeof state?.roomId === 'string' && Number.isSafeInteger(state.version)) {
+      versions.set(state.roomId, Math.max(versions.get(state.roomId) ?? state.version!, state.version!));
+    }
+  });
   on('command_state', (state: { roomId: string; version: number }) => {
-    if (Number.isSafeInteger(state.version)) versions.set(state.roomId, state.version);
+    if (Number.isSafeInteger(state.version)) versions.set(state.roomId, Math.max(versions.get(state.roomId) ?? state.version, state.version));
   });
   on('command_ack', (ack: { commandId: string; roomId: string; status: string; version: number; reason?: string }) => {
     const command = pending.get(ack.commandId);

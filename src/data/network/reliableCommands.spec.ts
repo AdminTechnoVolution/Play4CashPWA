@@ -82,4 +82,30 @@ describe('recoverable browser commands', () => {
     window.removeEventListener('p4c:command-pending', listen);
     cleanup?.();
   });
+  it('applies a queued snapshot older than the live revision reported by command_state', () => {
+    const { socket, sent, receive } = fixture(); const apply = vi.fn();
+    const cleanup = attachReliableCommands(socket, '/uno', vi.fn());
+    socket.on('uno', apply);
+    socket.emit('join', { room_id: 'room-a' });
+    // A REST ready committed revisions 2 and 3 before the start snapshot (revision 1) left the outbox.
+    receive('command_state', { roomId: 'room-a', version: 3 });
+    receive('uno', { data: { roomId: 'room-a', stateVersion: 1, gameStarted: true, hand: [] } });
+    expect(apply).toHaveBeenCalledOnce();
+    receive('uno', { data: { roomId: 'room-a', stateVersion: 0 } });
+    expect(apply).toHaveBeenCalledOnce();
+    // Commands still expect the live revision, not the older snapshot's.
+    socket.emit('draw_one', { room_id: 'room-a' });
+    expect(sent.find(p => p.event === 'draw_one')!.payload.expectedVersion).toBe(3);
+    cleanup?.();
+  });
+  it('takes the revision advanced by the start barrier from match_start_state', () => {
+    const { socket, sent, receive } = fixture();
+    const cleanup = attachReliableCommands(socket, '/chess', vi.fn());
+    socket.emit('join', { room_id: 'room-a' });
+    receive('command_state', { roomId: 'room-a', version: 4 });
+    receive('match_start_state', { roomId: 'room-a', phase: 'active', version: 5 });
+    socket.emit('move', { room_id: 'room-a', from: 'e2', to: 'e4' });
+    expect(sent.find(p => p.event === 'move')!.payload.expectedVersion).toBe(5);
+    cleanup?.();
+  });
 });
