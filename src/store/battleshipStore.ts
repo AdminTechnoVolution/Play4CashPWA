@@ -391,6 +391,9 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
                        typeof data.shot_from === 'string' ? data.shot_from :
                        typeof data.player    === 'string' ? data.player    :
                        typeof data.shooter   === 'string' ? data.shooter   : undefined;
+      // Sent by the server to each player. hasPendingFire is only a fallback: a full sync between firing and the
+      // result clears it, which used to draw my own shot on my board.
+      const yourShot = typeof data.yourShot === 'boolean' ? data.yourShot : undefined;
       if (spectatorMode) {
         console.log('[SPECTATOR][10] Shot event → outcome:', data.outcome, '| row:', data.row, '| col:', data.col, '| shooter resolved as:', shooter, '| spectatorBoardOwner:', get().spectatorBoardOwner);
       }
@@ -410,7 +413,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
           if (row >= 0 && col >= 0) {
             const finalShotFromPlayer1 = spec
               ? (shooter != null ? shooter === boardOwner : false)
-              : hasPendingFire;
+              : yourShot ?? hasPendingFire;
             finalBoard = finalShotFromPlayer1 ? 'opponent' : 'player';
             if (finalShotFromPlayer1) {
               oBoard[row][col] = 'sunk';
@@ -455,7 +458,7 @@ export const useBattleshipStore = create<BattleshipStore>((set, get) => ({
         if (row >= 0 && col >= 0) {
           const isShotFromPlayer1 = isSpectator
             ? (shooter != null ? shooter === spectatorBoardOwner : false)
-            : hasPendingFire;
+            : yourShot ?? hasPendingFire;
           shotBoard = isShotFromPlayer1 ? 'opponent' : 'player';
 
           if (isShotFromPlayer1) {

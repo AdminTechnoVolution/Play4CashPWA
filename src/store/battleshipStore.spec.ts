@@ -33,6 +33,20 @@ describe('battleship store sync', () => {
     expect(state.playerBoard[3][4]).toBe('miss');
   });
 
+  it('puts each shot on the board the server names, even after a resync cleared the pending-fire flag', () => {
+    useBattleshipStore.getState().initGame('room-1', 'alice', true, 'bob', false);
+    deliver({ success: true, messages: [], data: { gameStarted: true, yourTurn: true, player1: 'alice', player2: 'bob', ships: fleet, history: [] } });
+    useBattleshipStore.setState({ hasPendingFire: false });
+
+    deliver({ success: true, messages: [], data: { outcome: 'miss', row: 9, col: 0, yourTurn: false, yourShot: true } });
+    expect(useBattleshipStore.getState().opponentBoard[9][0]).toBe('miss');
+    expect(useBattleshipStore.getState().playerBoard[9][0]).not.toBe('miss');
+
+    vi.advanceTimersByTime(3000);
+    deliver({ success: true, messages: [], data: { outcome: 'miss', row: 9, col: 0, yourTurn: true, yourShot: false } });
+    expect(useBattleshipStore.getState().playerBoard[9][0]).toBe('miss');
+  });
+
   it('enables fleet confirmation from its own sync when the opponent is already seated, without a join toast', () => {
     useBattleshipStore.getState().initGame('room-1', 'alice', false, '', false);
     expect(useBattleshipStore.getState().opponentConfirmed).toBe(false);
