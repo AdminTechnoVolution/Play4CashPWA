@@ -63,7 +63,12 @@ export default function ActiveRoomBanner() {
           setActive(null);
           return;
         }
-        if (room.status === 'started' && !location.pathname.startsWith('/play/')) {
+        const status = room.status.trim().toLowerCase();
+        if (status !== 'waiting' && status !== 'started') {
+          setActive(null);
+          return;
+        }
+        if (status === 'started' && !location.pathname.startsWith('/play/')) {
           enterRoom(room, true);
           return;
         }
