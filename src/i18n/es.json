@@ -517,6 +517,8 @@
   "bs_waiting_opponent_ready": "Espera mientras tu oponente coloca sus barcos y confirma que está listo.",
   "bs_waiting_title": "ESPERANDO",
   "play_checking_game_status": "Comprobando el estado de la partida…",
+  "play_leave_status_unavailable_title": "No se pudo verificar la partida",
+  "play_leave_status_unavailable_message": "No abandonamos la partida porque no pudimos comprobar su estado. Inténtalo de nuevo.",
   "play_preparing_match": "Sincronizando la partida con los demás jugadores…",
   "bs_your_fleet": "TU FLOTA",
   "bs_your_turn": "TU TURNO — ¡Dispara!",

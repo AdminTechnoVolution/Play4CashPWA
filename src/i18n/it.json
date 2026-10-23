@@ -503,6 +503,8 @@
   "bs_victory": "VITTORIA!",
   "bs_waiting_title": "IN ATTESA",
   "play_checking_game_status": "Verifica dello stato di gioco…",
+  "play_leave_status_unavailable_title": "Impossibile verificare la partita",
+  "play_leave_status_unavailable_message": "La partita non è stata abbandonata perché non è stato possibile verificarne lo stato. Riprova.",
   "play_preparing_match": "Sincronizzazione della partita con gli altri giocatori…",
   "bs_your_fleet": "LA TUA FLOTTA",
   "bs_your_turn": "TUO TURNO — Fuoco!",

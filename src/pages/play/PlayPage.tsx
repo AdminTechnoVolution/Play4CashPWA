@@ -189,6 +189,7 @@ export default function PlayPage() {
   const [checkingLeave,    setCheckingLeave]    = useState(false);
   const [showForfeit,      setShowForfeit]      = useState(false);
   const [showFinished,     setShowFinished]     = useState(false);
+  const [showLeaveStatusError, setShowLeaveStatusError] = useState(false);
   const [finishedStatus,   setFinishedStatus]   = useState<RoomStatusResponse | null>(null);
   // Phase D: gate the Leave confirmation button while leaveRoom() is in flight to
   // defeat double-tap (two POST /leave → double forfeit-payout race on the server).
@@ -289,11 +290,10 @@ export default function PlayPage() {
           // Game still active — warn about forfeit
           setShowForfeit(true);
         }
-      } catch {
+      } catch (error) {
         setCheckingLeave(false);
-        // Room likely gone on server — exit without forfeit/money modal
-        const dest = `/rooms/${encodeURIComponent(gameSocketCode)}`;
-        void doLeave(true, { explicitPath: dest });
+        console.error('[PlayPage] Unable to verify room status before leaving:', error);
+        setShowLeaveStatusError(true);
       }
       return;
     }
@@ -395,6 +395,17 @@ export default function PlayPage() {
 
       {/* Checking server status */}
       <IonLoading isOpen={checkingLeave} message={t('play_checking_game_status')} />
+
+      <IonAlert
+        isOpen={showLeaveStatusError}
+        header={t('play_leave_status_unavailable_title')}
+        message={t('play_leave_status_unavailable_message')}
+        buttons={[{
+          text: t('ok'),
+          handler: () => setShowLeaveStatusError(false),
+        }]}
+        onDidDismiss={() => setShowLeaveStatusError(false)}
+      />
 
       {/* Forfeit warning — game active, opponent present */}
       <IonModal

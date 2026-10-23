@@ -515,6 +515,8 @@
   "bs_waiting_opponent_ready": "Wait until your opponent places their ships and confirms they are ready.",
   "bs_waiting_title": "WAITING",
   "play_checking_game_status": "Checking game status…",
+  "play_leave_status_unavailable_title": "Could not verify the match",
+  "play_leave_status_unavailable_message": "We did not leave the match because its status could not be checked. Please try again.",
   "play_preparing_match": "Syncing the match with the other players…",
   "bs_your_fleet": "YOUR FLEET",
   "bs_your_turn": "YOUR TURN — Fire!",

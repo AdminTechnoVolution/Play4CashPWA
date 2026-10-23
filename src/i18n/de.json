@@ -503,6 +503,8 @@
   "bs_victory": "SIEG!",
   "bs_waiting_title": "WARTEN",
   "play_checking_game_status": "Spielstatus wird geprüft…",
+  "play_leave_status_unavailable_title": "Spielstatus konnte nicht geprüft werden",
+  "play_leave_status_unavailable_message": "Das Spiel wurde nicht verlassen, weil sein Status nicht geprüft werden konnte. Bitte versuche es erneut.",
   "play_preparing_match": "Partie wird mit den anderen Spielern synchronisiert…",
   "bs_your_fleet": "DEINE FLOTTE",
   "bs_your_turn": "DEIN ZUG — Feuer!",
