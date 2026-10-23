@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { IonInput, IonIcon, IonSpinner } from '@ionic/react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
@@ -37,6 +37,17 @@ const DepositPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [depositLimit, setDepositLimit] = useState<string | null>(null);
+  const orderRef = useRef(order);
+  orderRef.current = order;
+
+  useEffect(() => () => {
+    // Keep a confirmed receipt visible while the user is on this page, but do
+    // not restore it when they leave and later start a new deposit.
+    if (orderRef.current?.status === 'confirmed') {
+      sessionStorage.removeItem(`${storageKey}:order`);
+      sessionStorage.removeItem(`${storageKey}:request`);
+    }
+  }, [storageKey]);
 
   useEffect(() => {
     let active = true;
