@@ -104,12 +104,10 @@ export function clearRoomState(gameSocketCode: string, roomId?: string): void {
  * Skips error UI while a game-end modal is showing; redirects to lobby without money modal.
  */
 export function handleRoomGone(opts: HandleRoomGoneOptions): void {
-  if (
-    shouldSuppressRoomNotFound() &&
-    (opts.reason === 'notFound' || opts.reason === 'inactive' || opts.reason === 'deleted')
-  ) {
-    return;
-  }
+  // The room is expected to close after a completed match. Keep the result UI
+  // visible and let the player leave it explicitly instead of handling that
+  // normal terminal cleanup as a room-gone error or redirect.
+  if (shouldSuppressRoomNotFound()) return;
 
   const gameSocketCode = opts.gameSocketCode ?? gameSocketCodeFromPlayPath();
   const roomId = opts.roomId ?? getPlayContext()?.roomId;

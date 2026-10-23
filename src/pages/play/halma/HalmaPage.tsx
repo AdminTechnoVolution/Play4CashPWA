@@ -10,6 +10,7 @@ import { ChatSocketManager } from '../../../data/network/ChatSocketManager';
 import { apiRepository } from '../../../data/network/ApiRepository';
 import type { GreetingResponse, ChatMessage } from '../../../data/models/ApiModels';
 import { useT } from '../../../i18n/translations';
+import { shouldSuppressRoomNotFound } from '../../../util/playRoomSession';
 import TurnTimer from '../components/TurnTimer';
 import GameOverModal from '../components/GameOverModal';
 import ChatGreetingChips from '../components/ChatGreetingChips';
@@ -358,7 +359,7 @@ export default function HalmaPage({ roomId, betAmount, roomName, onLeaveRequest,
       />
       
       <GenericErrorModal 
-        isOpen={!!store.apiErrorRawMessage} 
+        isOpen={!!store.apiErrorRawMessage && !shouldSuppressRoomNotFound()} 
         message={store.apiErrorRawMessage || ''} 
         onDismiss={() => { store.clearError(); onLeaveRequest(); }} 
       />
