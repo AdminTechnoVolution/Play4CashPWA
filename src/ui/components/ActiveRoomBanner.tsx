@@ -74,17 +74,23 @@ export default function ActiveRoomBanner() {
         }
         setActive(room);
       } catch {
-        // A later focus/visibility transition retries transient failures.
+        // Never keep offering a room from a previous successful lookup when
+        // its status can no longer be confirmed.
+        if (!cancelled) setActive(null);
       }
     };
     const onVisibility = () => {
       if (document.visibilityState === 'visible') void checkActiveRoom();
     };
     void checkActiveRoom();
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void checkActiveRoom();
+    }, 5_000);
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', checkActiveRoom);
     return () => {
       cancelled = true;
+      window.clearInterval(refreshInterval);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', checkActiveRoom);
     };
